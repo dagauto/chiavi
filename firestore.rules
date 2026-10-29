@@ -1,0 +1,64 @@
+rules_version = '2';
+// Regole di sicurezza del registro chiavi e della lavorazione usato Dag Auto.
+// Entra solo chi ha verificato la propria email ED è presente nell'elenco "utenti".
+// Ruoli: admin, backoffice, usato (responsabile usato), ripristini, foto, operatore.
+// Il carico fiscale (usato_riservato) lo vedono solo admin, backoffice e usato.
+// Lo storico movimenti si può solo aggiungere: nessuno può modificarlo o cancellarlo.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function emailUtente() {
+      return request.auth.token.email.lower();
+    }
+    function autorizzato() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/utenti/$(emailUtente()));
+    }
+    function ruolo() {
+      return get(/databases/$(database)/documents/utenti/$(emailUtente())).data.ruolo;
+    }
+    function admin() {
+      return autorizzato() && ruolo() == "admin";
+    }
+    function lavoraUsato() {
+      return autorizzato() && ruolo() != "operatore";
+    }
+    function vedeFiscale() {
+      return autorizzato() && ruolo() in ["admin", "backoffice", "usato"];
+    }
+
+    match /chiavi/{id} {
+      allow read: if autorizzato();
+      allow create, update: if autorizzato()
+        && request.resource.data.colore in ["BLU", "ROSSO", "VERDE"]
+        && request.resource.data.numero is int
+        && request.resource.data.numero >= 1 && request.resource.data.numero <= 100
+        && request.resource.data.updatedBy == emailUtente();
+      allow delete: if admin();
+    }
+
+    match /usato/{id} {
+      allow read: if lavoraUsato();
+      allow create: if vedeFiscale() && request.resource.data.updatedBy == emailUtente();
+      allow update: if lavoraUsato() && request.resource.data.updatedBy == emailUtente();
+      allow delete: if admin();
+    }
+
+    match /usato_riservato/{id} {
+      allow read, create, update: if vedeFiscale();
+      allow delete: if admin();
+    }
+
+    match /movimenti/{id} {
+      allow read: if autorizzato();
+      allow create: if autorizzato() && request.resource.data.email == emailUtente();
+      allow update, delete: if false;
+    }
+
+    match /utenti/{email} {
+      allow read: if autorizzato();
+      allow write: if admin();
+    }
+  }
+}

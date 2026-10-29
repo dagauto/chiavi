@@ -143,6 +143,21 @@ input.mono{font-family:var(--f-mono)!important;text-transform:uppercase}
 .opt span{font-size:13px;color:var(--muted)}
 .rip{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:6px;background:var(--warn-soft);color:var(--warn)}
 .keybox.ripbox{border-color:var(--warn)}
+.tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:12px;align-self:flex-start}
+.tabs button{border:0;background:none;padding:8px 14px;border-radius:9px;color:var(--muted)}
+.tabs button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.uinfo{display:block;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.ugrp{margin:10px 0 2px;font-family:var(--f-display);font-size:17px;letter-spacing:.04em;color:var(--muted)}
+.ucard{grid-template-columns:96px minmax(0,1fr)}
+.ustate{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:8px 6px;border-radius:8px;text-align:center;background:var(--sunk);color:var(--muted);line-height:1.2}
+.s-attesa{background:var(--warn-soft);color:var(--warn)} .s-ripristino{background:var(--blu-soft);color:var(--blu)} .s-pronta{background:var(--verde-soft);color:var(--verde)} .s-foto{background:var(--verde-soft);color:var(--verde)} .s-pubblicata{background:var(--ok-soft);color:var(--ok)}
+.voci{display:flex;flex-direction:column;gap:10px}
+.voce{border-top:1px solid var(--line);padding-top:8px;display:flex;flex-direction:column;gap:6px}
+.voce .vh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.voce>input,.voce input[data-vf]{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.voce input[type=checkbox]{width:auto}
+.grid2.tight{gap:8px}
+.keybox.fisc{border-color:var(--rosso);background:var(--rosso-soft)}
 details.raw summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}
 details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;background:var(--bg);border-radius:8px;padding:10px;max-height:200px;overflow:auto}
 .rowmsg{font-size:13px;font-weight:600}
@@ -214,20 +229,23 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
 
 <!-- Applicazione -->
 <div class="wrap" id="app" hidden>
+  <nav class="tabs" id="tabs" hidden><button data-tab="chiavi" aria-pressed="true">Chiavi</button><button data-tab="usato" aria-pressed="false">Lavorazione usato</button></nav>
   <div id="demoBanner" class="banner" hidden>Modalità prova: i dati sono esempi e non vengono salvati. Si attiva il registro vero inserendo i dati di Firebase nel file config.js.</div>
   <header class="top">
     <div>
-      <h1>Chiavi Dag Auto</h1>
-      <p class="sub">Cerca per targa, telaio, modello o numero del cartellino.</p>
+      <h1 id="h1t">Chiavi Dag Auto</h1>
+      <p class="sub" id="subt">Cerca per targa, telaio, modello o numero del cartellino.</p>
     </div>
     <div class="actions">
       <button class="primary" id="btnBolla">+ Aggiungi vettura</button>
+      <button class="primary" id="btnPresa" hidden>+ Presa in carico</button>
       <button id="btnMore" aria-expanded="false">Altro</button>
     </div>
   </header>
   <div class="actions" id="moreMenu" hidden>
     <button id="btnNew">Primo numero libero</button>
     <button id="btnExport">Esporta Excel</button>
+    <button id="btnExportU" hidden>Esporta Excel usato</button>
     <button id="btnImport" hidden>Importa Excel</button>
     <button id="btnUsers" hidden>Utenti</button>
     <button id="btnOut">Esci</button>
@@ -236,6 +254,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
 
   <div id="msg" hidden></div>
 
+  <div id="vChiavi">
   <div class="search">
     <div class="sbox">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -249,6 +268,19 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
   <div class="summary" id="summary"></div>
   <div class="count" id="count"></div>
   <div id="results" class="list"></div>
+  </div>
+  <div id="vUsato" hidden>
+    <div class="search">
+      <div class="sbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="uq" type="search" inputmode="search" autocomplete="off" placeholder="Targa, telaio, modello o venditore" aria-label="Cerca nell'usato">
+      </div>
+      <div class="chips" id="uStato"></div>
+    </div>
+    <div class="summary" id="uSummary"></div>
+    <div class="count" id="uCount"></div>
+    <div id="uList" class="list"></div>
+  </div>
 
   <section>
     <h2 class="sec">Ultimi movimenti</h2>
@@ -324,6 +356,16 @@ async function avviaFirebase(){
       onChiavi(cb,ecb){subs.push(F.onSnapshot(F.collection(db,"chiavi"),s=>cb(s.docs.map(d=>[d.id,d.data()])),ecb));},
       onLog(cb){subs.push(F.onSnapshot(F.query(F.collection(db,"movimenti"),F.orderBy("ts","desc"),F.limit(50)),s=>cb(s.docs.map(d=>d.data())),()=>{}));},
       onUtenti(cb){subs.push(F.onSnapshot(F.collection(db,"utenti"),s=>cb(s.docs.map(d=>Object.assign({email:d.id},d.data()))),()=>{}));},
+      onColl(col,cb){subs.push(F.onSnapshot(F.collection(db,col),s=>cb(s.docs.map(d=>[d.id,d.data()])),()=>{}));},
+      async commitU(writes,logs){
+        const b=F.writeBatch(db);
+        for(const w of writes){const ref=F.doc(db,w.col,w.id);
+          if(w.del){b.delete(ref);continue;}
+          const data=Object.assign({},w.data,{updatedAt:Date.now(),updatedBy:email});
+          w.merge?b.set(ref,data,{merge:true}):b.set(ref,data);}
+        for(const l of logs)b.set(F.doc(F.collection(db,"movimenti")),Object.assign({},l,{ts:Date.now(),email,nome:store.me.nome}));
+        await b.commit();
+      },
       async commit(writes,logs,onProg){
         const ops=[...writes.map(w=>["c",w]),...logs.map(l=>["l",l])];
         for(let i=0;i<ops.length;i+=400){
@@ -365,11 +407,18 @@ function avviaDemo(){
   let log=[{ts:Date.now()-3600e3,email:"prova@dagauto.it",nome:"Utente di prova",codice:"R 12",azione:"Aggiornato",dettaglio:"Dove prima: Garage → Cimitero"}];
   const L={c:[],l:[],u:[]};
   let utenti=[{email:"prova@dagauto.it",nome:"Utente di prova",ruolo:"admin"}];
+  const coll={usato:new Map([["FY456AB",{targa:"FY456AB",telaio:"WDD1183441N000013",modello:"CLA 200 (esempio)",km:68200,chiave:"13",venditore:"Rossi",stato:"attesa",priorita:"alta",date:{presa:"2026-10-20",attesa:"2026-10-21"},voci:{carrozzeria:{descrizione:"Paraurti anteriore",stimato:450,effettivo:""},interni:{descrizione:"Sanificazione",stimato:120,effettivo:""}}}],
+    ["GH123KL",{targa:"GH123KL",telaio:"WDD2050041R000012",modello:"Classe C 220 d (esempio)",km:91000,chiave:"12",venditore:"Bianchi",stato:"ripristino",priorita:"normale",date:{presa:"2026-10-14",attesa:"2026-10-15",ripristino:"2026-10-22"},voci:{pneumatici:{descrizione:"4 gomme",stimato:600,effettivo:640},freni:{descrizione:"Pastiglie ant.",stimato:180,effettivo:""}}}]]),
+    usato_riservato:new Map([["FY456AB",{valoreContratto:18500,ivaEsposta:"No"}],["GH123KL",{valoreContratto:21000,ivaEsposta:"Sì"}]])};
+  const LC={usato:[],usato_riservato:[]};
   const fire=()=>{L.c.forEach(f=>f([...docs.entries()]));L.l.forEach(f=>f(log.slice(0,50)));L.u.forEach(f=>f(utenti));};
   avviaApp({
     demo:true,me:{email:"prova@dagauto.it",nome:"Utente di prova",ruolo:"admin"},
     onChiavi(cb){L.c.push(cb);cb([...docs.entries()]);},onLog(cb){L.l.push(cb);cb(log);},onUtenti(cb){L.u.push(cb);cb(utenti);},
     async commit(writes,logs){for(const w of writes)docs.set(w.id,Object.assign({},w.data));log=[...logs.map(l=>Object.assign({},l,{ts:Date.now(),email:"prova@dagauto.it",nome:"Utente di prova"})).reverse(),...log];fire();},
+    onColl(col,cb){LC[col].push(cb);cb([...coll[col].entries()]);},
+    async commitU(writes,logs){for(const w of writes){const m=w.col==="chiavi"?docs:coll[w.col];if(w.del){m.delete(w.id);continue;}m.set(w.id,w.merge?Object.assign({},m.get(w.id)||{},w.data):JSON.parse(JSON.stringify(w.data)));}
+      log=[...logs.map(l=>Object.assign({},l,{ts:Date.now(),email:"prova@dagauto.it",nome:"Utente di prova"})).reverse(),...log];fire();for(const c in LC)LC[c].forEach(f=>f([...coll[c].entries()]));},
     async setUtente(em,d){utenti=utenti.filter(u=>u.email!==em).concat([Object.assign({email:em},d)]);fire();},
     async delUtente(em){utenti=utenti.filter(u=>u.email!==em);fire();},
     async logout(){location.reload();},
@@ -740,13 +789,13 @@ $("btnExport").onclick=async()=>{
 function renderUtenti(){
   const box=$("u_list");if(!box)return;
   const us=[...S.utenti].sort((a,b)=>(a.nome||a.email).localeCompare(b.nome||b.email));
-  box.innerHTML=us.length?us.map(u=>`<div><span><b>${esc(u.nome||"—")}</b>${u.ruolo==="admin"?' <span class="pill p-Doppia">admin</span>':""}<br><span class="em">${esc(u.email)}</span></span>${u.email===S.me.email?'<span class="small">sei tu</span>':`<button type="button" class="danger" data-rm="${esc(u.email)}">Togli</button>`}</div>`).join(""):`<div class="small">Nessun utente.</div>`;
+  box.innerHTML=us.length?us.map(u=>`<div><span><b>${esc(u.nome||"—")}</b>${u.ruolo?` <span class="pill p-Doppia">${esc(NOME_RUOLO[u.ruolo]||u.ruolo)}</span>`:""}<br><span class="em">${esc(u.email)}</span></span>${u.email===S.me.email?'<span class="small">sei tu</span>':`<button type="button" class="danger" data-rm="${esc(u.email)}">Togli</button>`}</div>`).join(""):`<div class="small">Nessun utente.</div>`;
 }
 $("btnUsers").onclick=()=>{
   openSheet(`<div class="panel" role="dialog" aria-modal="true" aria-label="Utenti"><div class="phead"><div><h2>Utenti autorizzati</h2><p>Entra solo chi è in questo elenco e ha confermato la propria email.</p></div></div>
   <form id="u_form" class="keybox"><h4>Aggiungi una persona</h4>
     <div class="grid2"><label class="f">Nome e cognome<input id="u_nome" required></label><label class="f">Email<input id="u_email" type="email" required></label></div>
-    <label class="f">Ruolo<select id="u_ruolo"><option value="operatore">Operatore: cerca, sposta, assegna</option><option value="admin">Amministratore: anche import Excel e utenti</option></select></label>
+    <label class="f">Ruolo<select id="u_ruolo">${RUOLI.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("")}</select></label>
     <div id="e_err"></div><button class="primary" type="submit">Autorizza</button></form>
   <div class="users" id="u_list"></div>
   <p class="small">Dopo averla aggiunta, la persona apre il link, tocca «Crea l'accesso» con la stessa email e conferma il messaggio che riceve.</p>
@@ -759,6 +808,204 @@ $("btnUsers").onclick=()=>{
     try{await S.store.delUtente(b.dataset.rm);}catch(x){flash(erroreScrittura(x),"bad");}};
 };
 
+/* =================== Lavorazione usato =================== */
+const STATI_U=[["presa","Presa in carico"],["attesa","In attesa di ripristino"],["ripristino","In ripristino"],["pronta","Pronta e lavata"],["foto","Foto fatte"],["pubblicata","Pubblicata"]];
+const NOME_STATO=Object.fromEntries(STATI_U);
+const VOCI=[["carrozzeria","Carrozzeria"],["manutenzione","Manutenzione"],["freni","Freni"],["pneumatici","Pneumatici"],["meccanica","Meccanica e motore"],["cristalli","Cristalli"],["illuminazione","Impianto illuminazione"],["interni","Interni e sanificazione"],["altro","Altro"]];
+const PRIO=[["alta","Alta"],["normale","Normale"],["bassa","Bassa"]];
+const PRIO_ORD={alta:0,normale:1,bassa:2};
+const RUOLI=[["operatore","Operatore chiavi: cerca, sposta, assegna chiavi"],["ripristini","Ripristini: chiavi + lavorazione usato"],["foto","Foto: chiavi + lavorazione usato"],["backoffice","Back office: anche presa in carico e carico fiscale"],["usato","Responsabile usato: anche carico fiscale"],["admin","Amministratore: tutto, anche import Excel e utenti"]];
+const NOME_RUOLO=Object.fromEntries(RUOLI.map(([k,v])=>[k,v.split(":")[0]]));
+const canUsato=()=>S.me&&S.me.ruolo!=="operatore";
+const canFiscale=()=>S.me&&["admin","backoffice","usato"].includes(S.me.ruolo);
+const U={docs:new Map(),ris:new Map(),q:"",stato:null};
+const euro=n=>(n===""||n==null||isNaN(n))?"—":Number(n).toLocaleString("it-IT",{style:"currency",currency:"EUR",maximumFractionDigits:0});
+const num=v=>{if(v===""||v==null)return "";const n=parseFloat(String(v).replace(/\./g,"").replace(",",".").replace(/[^\d.\-]/g,""));return isNaN(n)?"":n;};
+const idU=(targa,telaio)=>norm(targa)||norm(telaio);
+function totali(u){let s=0,e=0,hasE=false;for(const[k]of VOCI){const v=(u.voci||{})[k]||{};if(v.stimato!==""&&v.stimato!=null)s+=Number(v.stimato)||0;if(v.effettivo!==""&&v.effettivo!=null){e+=Number(v.effettivo)||0;hasE=true;}}return{s,e,hasE};}
+function giorniStato(u){const d=(u.date||{})[u.stato];return d?giorniDa(d):null;}
+function giorniTot(u){const a=(u.date||{}).presa,b=(u.date||{}).pubblicata;if(!a||!b)return null;return Math.max(0,Math.round((new Date(b)-new Date(a))/864e5));}
+const plur=(n,a,b)=>n===1?a:b;
+const giorniTxt=n=>n==null?"":n===0?"da oggi":n===1?"da ieri":`da ${n} giorni`;
+
+function listaU(){
+  const q=norm(U.q);
+  return [...U.docs.entries()].map(([id,d])=>Object.assign({id},d)).filter(u=>{
+    if(q)return [u.targa,u.telaio,u.modello,u.chiave,u.venditore].some(v=>norm(v).includes(q));
+    if(U.stato)return u.stato===U.stato;
+    return u.stato!=="pubblicata";
+  }).sort((a,b)=>{
+    const sa=STATI_U.findIndex(x=>x[0]===a.stato),sb=STATI_U.findIndex(x=>x[0]===b.stato);
+    if(sa!==sb)return sa-sb;
+    const pa=PRIO_ORD[a.priorita||"normale"],pb=PRIO_ORD[b.priorita||"normale"];
+    if(pa!==pb)return pa-pb;
+    return String((a.date||{}).presa||"").localeCompare(String((b.date||{}).presa||""));
+  });
+}
+function renderUsato(){
+  if(!canUsato())return;
+  const all=[...U.docs.values()];
+  chipRow($("uStato"),[[null,"Da lavorare"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`])],U.stato,v=>{U.stato=v;renderUsato();});
+  const pub=all.filter(u=>giorniTot(u)!=null),media=pub.length?Math.round(pub.reduce((a,u)=>a+giorniTot(u),0)/pub.length):null;
+  const aperte=all.filter(u=>u.stato!=="pubblicata");let ts=0,te=0;aperte.forEach(u=>{const t=totali(u);ts+=t.s;te+=t.e;});
+  $("uSummary").innerHTML=`<div class="sum"><h3>APERTE</h3><dl><dt>Vetture</dt><dd>${aperte.length}</dd><dt>Priorità alta</dt><dd>${aperte.filter(u=>u.priorita==="alta").length}</dd></dl></div>
+    <div class="sum"><h3>RIPRISTINI</h3><dl><dt>Stimato</dt><dd>${euro(ts)}</dd><dt>Effettivo</dt><dd>${euro(te)}</dd></dl></div>
+    <div class="sum"><h3>TEMPI</h3><dl><dt>Presa → pubblicata</dt><dd>${media==null?"—":media+" gg"}</dd><dt>Su vetture</dt><dd>${pub.length}</dd></dl></div>`;
+  const xs=listaU();
+  $("uCount").textContent=U.q?`${xs.length} ${plur(xs.length,"risultato","risultati")} per «${U.q}»`:`${xs.length} ${plur(xs.length,"vettura","vetture")}`;
+  if(!U.docs.size){$("uList").innerHTML=`<div class="empty"><h2>Nessuna vettura in lavorazione</h2><p>Qui il back office registra la presa in carico delle vetture usate. Ogni vettura poi avanza: attesa di ripristino, ripristino, pronta e lavata, foto, pubblicazione.</p><p>${canPresa()?"Tocca <b>+ Presa in carico</b> per inserire la prima.":""}</p></div>`;return;}
+  let html="",cur=null;
+  for(const u of xs){
+    if(!U.q&&!U.stato&&u.stato!==cur){cur=u.stato;html+=`<h3 class="ugrp">${esc(NOME_STATO[cur]||cur)}</h3>`;}
+    const t=totali(u),g=giorniStato(u);
+    html+=`<button class="card ucard" data-u="${esc(u.id)}">
+      <span class="ustate s-${esc(u.stato)}">${esc(NOME_STATO[u.stato]||"")}</span>
+      <span style="min-width:0">
+        <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?'<span class="pill p-Solo-seconda">Priorità alta</span>':u.priorita==="bassa"?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
+        <span class="uinfo">${[u.chiave?`Chiave R ${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
+        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${g!=null?`<span class="kp">${esc(giorniTxt(g))}</span>`:""}</span>
+      </span></button>`;
+  }
+  $("uList").innerHTML=html||`<div class="empty"><p>Nessuna vettura in questa vista.</p></div>`;
+}
+const canPresa=()=>S.me&&["admin","backoffice","usato"].includes(S.me.ruolo);
+
+/* --- lettura del testo della mail di presa in carico --- */
+const ETICHETTE=[["marca",/^marca$/i],["modello",/^modello$/i],["targa",/^targa$/i],["km",/^km$/i],["scadBollo",/^scadenza bollo$/i],["scadRevisione",/^scadenza revisione$/i],["chiave",/^n[°º.]?\s*chiav[ei]$/i],["immatricolazione",/^anno immatricolazione$/i],["valoreContratto",/^valore da contratto$/i],["ivaEsposta",/^iva esposta$/i],["exProprietario",/^ex proprietario$/i],["venditore",/^venditore$/i],["ritiroPermuta",/^ritiro permuta su contratto$/i],["telaio",/^(telaio|vin)$/i]];
+function leggiMail(testo){
+  const righe=String(testo||"").split(/\r?\n/).map(r=>r.replace(/ /g," ").trim()).filter(Boolean);
+  const out={};
+  for(let i=0;i<righe.length;i++){
+    const r=righe[i].replace(/:$/,"");
+    for(const[k,re]of ETICHETTE){
+      if(re.test(r)&&!(k in out)){
+        const nx=righe[i+1]||"";
+        if(!ETICHETTE.some(([,re2])=>re2.test(nx.replace(/:$/,""))))out[k]=nx;else out[k]="";
+      }
+      const m=righe[i].match(new RegExp("^("+re.source.replace(/^\^|\$$/g,"")+")\\s*[:\\-]\\s*(.+)$","i"));
+      if(m&&!(k in out))out[k]=m[2].trim();
+    }
+  }
+  if(out.targa)out.targa=out.targa.toUpperCase().replace(/\s/g,"");
+  if(out.km)out.km=num(out.km);
+  if(out.chiave)out.chiave=String(parseInt(out.chiave,10)||"");
+  if(out.valoreContratto!==undefined)out.valoreContratto=num(out.valoreContratto);
+  if(out.ivaEsposta)out.ivaEsposta=/^s/i.test(out.ivaEsposta)?"Sì":/^n/i.test(out.ivaEsposta)?"No":out.ivaEsposta;
+  const tel=trovaTelaiTesto(testo);if(!out.telaio&&tel)out.telaio=tel;
+  return out;
+}
+function trovaTelaiTesto(t){try{const r=leggiBolla(t);return r.length?r[0].telaio:"";}catch(e){return "";}}
+
+/* --- scheda usato --- */
+function openUsato(id){
+  const nuovo=!id;
+  const base=nuovo?{stato:"presa",priorita:"normale",marca:"MERCEDES",date:{presa:oggi()},voci:{}}:Object.assign({},U.docs.get(id));
+  const ris=nuovo?{}:Object.assign({},U.ris.get(id)||{});
+  const f=JSON.parse(JSON.stringify(base));f.voci=f.voci||{};f.date=f.date||{};
+  const r=Object.assign({valoreContratto:"",ivaEsposta:""},ris);
+  const edDati=canPresa();
+  const inp=(k,l,o={})=>`<label class="f">${l}<input id="u_${k}" ${o.mono?'class="mono"':""} ${o.type?`type="${o.type}"`:""} ${o.im?`inputmode="${o.im}"`:""} value="${esc(f[k]??"")}" ${edDati?"":"disabled"} autocomplete="off"></label>`;
+  const p=openSheet(`<form class="panel" id="uf" role="dialog" aria-modal="true" aria-label="${nuovo?"Presa in carico":"Vettura usata"}">
+    <div class="phead"><div><h2>${nuovo?"Presa in carico":esc((f.targa||"")+" · "+(f.modello||""))}</h2><p>${nuovo?"Incolla la mail di presa in carico oppure compila a mano.":`${esc(NOME_STATO[f.stato])} ${esc(giorniTxt(giorniStato(f)))}`}</p></div></div>
+    ${nuovo?`<details class="raw" open><summary>Incolla il testo della mail di presa in carico</summary>
+      <textarea id="u_mail" rows="5" style="width:100%;font:inherit;font-size:14px;margin-top:8px;padding:10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)" placeholder="Apri la mail, seleziona tutto il testo, copia e incolla qui"></textarea>
+      <button type="button" id="u_parse" style="margin-top:8px">Compila dai dati della mail</button></details>`:""}
+    ${!nuovo?`<div class="keybox"><h4>Stato</h4><div class="places" data-k="stato">${STATI_U.map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}">${l}</button>`).join("")}</div>
+      <div class="small">${STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`).join(" · ")}</div></div>`:""}
+    <div class="keybox"><h4>Priorità di ripristino <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
+    <div class="grid2">${inp("targa","Targa",{mono:1})}${inp("modello","Modello")}</div>
+    ${inp("telaio","Telaio",{mono:1})}
+    <div class="grid2">${inp("km","Km",{im:"numeric"})}${inp("chiave","N° chiave (rossa)",{im:"numeric"})}</div>
+    <div class="grid2">${inp("immatricolazione","Immatricolazione")}${inp("venditore","Venditore")}</div>
+    <div class="grid2">${inp("scadBollo","Scadenza bollo")}${inp("scadRevisione","Scadenza revisione")}</div>
+    <div class="grid2">${inp("exProprietario","Ex proprietario")}${inp("ritiroPermuta","Ritiro permuta su contratto")}</div>
+    ${canFiscale()?`<div class="keybox fisc"><h4>Carico fiscale <span class="small">visibile solo ad amministratori, back office e responsabile usato</span></h4>
+      <div class="grid2"><label class="f">Valore da contratto (€)<input id="u_valoreContratto" inputmode="decimal" value="${esc(r.valoreContratto)}"></label>
+      <label class="f">IVA esposta<select id="u_ivaEsposta"><option value=""></option><option ${r.ivaEsposta==="Sì"?"selected":""}>Sì</option><option ${r.ivaEsposta==="No"?"selected":""}>No</option></select></label></div></div>`:""}
+    <div class="keybox"><h4>Ripristini <span class="small" id="u_tot"></span></h4>
+      <div class="voci">${VOCI.map(([k,l])=>{const v=f.voci[k]||{};return`<div class="voce" data-voce="${k}">
+        <div class="vh"><b>${l}</b><label class="small"><input type="checkbox" data-vf="fatto" ${v.fatto?"checked":""}> fatto</label></div>
+        <input data-vf="descrizione" placeholder="Lavori da fare" value="${esc(v.descrizione||"")}">
+        <div class="grid2 tight"><label class="f">Stimato €<input data-vf="stimato" inputmode="decimal" value="${esc(v.stimato??"")}"></label><label class="f">Effettivo €<input data-vf="effettivo" inputmode="decimal" value="${esc(v.effettivo??"")}"></label></div></div>`;}).join("")}</div></div>
+    <label class="f">Note<textarea id="u_note" rows="2">${esc(f.note||"")}</textarea></label>
+    <div id="e_err"></div>
+    <div class="pfoot">${!nuovo&&isAdmin()?`<button type="button" class="danger" id="u_del">Elimina scheda</button>`:"<span></span>"}
+      <div class="r"><button type="button" id="u_close">Annulla</button><button type="submit" class="primary" id="e_save">${nuovo?"Registra presa in carico":"Salva"}</button></div></div>
+  </form>`);
+  const press=k=>p.querySelectorAll(`[data-k="${k}"] button`).forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===f[k]));
+  p.addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(!b)return;const k=b.parentElement.dataset.k;f[k]=b.dataset.v;press(k);});
+  const leggiVoci=()=>{p.querySelectorAll("[data-voce]").forEach(el=>{const k=el.dataset.voce;const v={};el.querySelectorAll("[data-vf]").forEach(i=>{v[i.dataset.vf]=i.type==="checkbox"?i.checked:(i.dataset.vf==="descrizione"?i.value.trim():num(i.value));});
+    if(v.descrizione||v.stimato!==""||v.effettivo!==""||v.fatto)f.voci[k]=v;else delete f.voci[k];});};
+  const aggTot=()=>{leggiVoci();const t=totali(f);$("u_tot").textContent=`stimato ${euro(t.s)}${t.hasE?` · effettivo ${euro(t.e)} · scostamento ${euro(t.e-t.s)}`:""}`;};
+  p.querySelector(".voci").addEventListener("input",aggTot);p.querySelector(".voci").addEventListener("change",aggTot);aggTot();
+  $("u_close").onclick=closeSheet;
+  if(nuovo)$("u_parse").onclick=()=>{const d=leggiMail($("u_mail").value);let n=0;
+    for(const k of["targa","modello","telaio","km","chiave","immatricolazione","venditore","scadBollo","scadRevisione","exProprietario","ritiroPermuta"])if(d[k]){const i=$("u_"+k);if(i){i.value=d[k];n++;}}
+    if(d.marca&&d.marca.toUpperCase()!=="MERCEDES"&&$("u_modello")&&!$("u_modello").value.toUpperCase().startsWith(d.marca.toUpperCase()))$("u_modello").value=d.marca+" "+$("u_modello").value;
+    if(canFiscale()){if(d.valoreContratto!==undefined&&d.valoreContratto!==""){$("u_valoreContratto").value=d.valoreContratto;n++;}if(d.ivaEsposta){$("u_ivaEsposta").value=d.ivaEsposta;n++;}}
+    $("e_err").innerHTML=n?`<div class="banner ok">Ho compilato ${n} campi dalla mail. Controllali prima di registrare.</div>`:`<div class="banner">Non ho riconosciuto i campi. Controlla di aver incollato il testo della mail.</div>`;};
+  const del=$("u_del");if(del)del.onclick=async()=>{if(!del.dataset.armed){del.dataset.armed="1";del.classList.add("solid");del.textContent="Conferma eliminazione";return;}
+    try{await S.store.commitU([{col:"usato",id,del:true},...(canFiscale()?[{col:"usato_riservato",id,del:true}]:[])],[{codice:base.targa||id,azione:"Scheda usato eliminata",dettaglio:""}]);closeSheet();flash("Scheda eliminata.","ok");}catch(x){$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}};
+  p.onsubmit=async e=>{e.preventDefault();leggiVoci();
+    if(edDati)for(const k of["targa","modello","telaio","km","chiave","immatricolazione","venditore","scadBollo","scadRevisione","exProprietario","ritiroPermuta"])f[k]=$("u_"+k).value.trim();
+    f.note=$("u_note").value.trim();f.targa=String(f.targa||"").toUpperCase().replace(/\s/g,"");f.telaio=String(f.telaio||"").toUpperCase().replace(/\s/g,"");f.km=num(f.km);f.chiave=f.chiave?String(parseInt(f.chiave,10)||""):"";
+    const nid=nuovo?idU(f.targa,f.telaio):id;
+    if(!nid){$("e_err").innerHTML=`<div class="banner bad">Serve almeno la targa o il telaio.</div>`;return;}
+    if(nuovo&&U.docs.has(nid)){$("e_err").innerHTML=`<div class="banner bad">Questa vettura è già in lavorazione. Cercala nell'elenco.</div>`;return;}
+    if(f.chiave&&!(+f.chiave>=1&&+f.chiave<=100)){$("e_err").innerHTML=`<div class="banner bad">Il numero chiave va da 1 a 100.</div>`;return;}
+    if(f.stato!==base.stato||nuovo)f.date[f.stato]=f.date[f.stato]||oggi();
+    if(f.stato!==base.stato&&!nuovo)f.date[f.stato]=oggi();
+    const writes=[{col:"usato",id:nid,data:f}],logs=[];
+    if(canFiscale()){const rv={valoreContratto:num($("u_valoreContratto").value),ivaEsposta:$("u_ivaEsposta").value};if(nuovo||rv.valoreContratto!==(r.valoreContratto??"")||rv.ivaEsposta!==(r.ivaEsposta||""))writes.push({col:"usato_riservato",id:nid,data:rv});}
+    const cod=f.targa||nid;
+    if(nuovo)logs.push({codice:cod,azione:"Presa in carico",dettaglio:[f.modello,f.chiave?`chiave R ${f.chiave}`:""].filter(Boolean).join(" · ")});
+    else if(f.stato!==base.stato)logs.push({codice:cod,azione:NOME_STATO[f.stato],dettaglio:`da «${NOME_STATO[base.stato]}»`});
+    else logs.push({codice:cod,azione:"Scheda usato aggiornata",dettaglio:f.priorita!==base.priorita?`priorità ${f.priorita}`:""});
+    // collegamento con il registro chiavi
+    let avviso="";
+    if(f.chiave){const s=slot("ROSSO",+f.chiave);const stessa=s._has&&((f.telaio&&norm(s.telaio)===norm(f.telaio))||(f.targa&&norm(s.targa)===norm(f.targa)));
+      if(!occupato(s)&&nuovo){writes.push({col:"chiavi",id:s.id,data:{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio,targa:f.targa,modello:f.modello,prima:"Sì",dovePrima:"",seconda:"",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Da presa in carico usato: indicare dove sono le chiavi"}});logs.push({codice:`R ${f.chiave}`,azione:"Assegnato da presa in carico",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")});}
+      else if(occupato(s)&&!stessa&&nuovo)avviso=` Attenzione: la chiave Rossa ${f.chiave} risulta già occupata (${s.targa||s.modello||s.telaio||"altra vettura"}); il registro chiavi non è stato modificato.`;
+      const ok=occupato(s)?stessa:nuovo;
+      if(ok&&f.stato!==base.stato){
+        if(f.stato==="ripristino"){const tipi=VOCI.filter(([k])=>f.voci[k]&&!f.voci[k].fatto&&(f.voci[k].descrizione||f.voci[k].stimato)).map(([,l])=>l).join(", ");writes.push({col:"chiavi",id:s.id,merge:true,data:{ripristino:"Sì",ripristinoTipo:"",ripristinoDove:tipi?("Lavorazione usato: "+tipi):"Lavorazione usato",ripristinoDal:oggi()}});}
+        else if(base.stato==="ripristino")writes.push({col:"chiavi",id:s.id,merge:true,data:{ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:""}});
+      }
+    }
+    $("e_save").disabled=true;
+    try{await S.store.commitU(writes,logs);closeSheet();flash((nuovo?"Presa in carico registrata.":"Scheda salvata.")+avviso,avviso?"":"ok");}
+    catch(x){$("e_save").disabled=false;$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}
+  };
+}
+$("uList").addEventListener("click",e=>{const b=e.target.closest("[data-u]");if(b)openUsato(b.dataset.u);});
+$("uq").addEventListener("input",e=>{U.q=e.target.value.trim();renderUsato();});
+$("btnPresa").onclick=()=>openUsato(null);
+$("btnExportU").onclick=async()=>{
+  try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
+  const rows=[...U.docs.entries()].map(([id,u])=>{const t=totali(u);const o={"Targa":u.targa||"","Telaio":u.telaio||"","Modello":u.modello||"","Km":u.km??"","Chiave R":u.chiave||"","Venditore":u.venditore||"","Stato":NOME_STATO[u.stato]||"","Priorità":u.priorita||""};
+    for(const[k,l]of STATI_U)o["Data "+l.toLowerCase()]=(u.date||{})[k]||"";
+    o["Giorni presa → pubblicata"]=giorniTot(u)??"";
+    for(const[k,l]of VOCI){const v=(u.voci||{})[k]||{};o[l+" lavori"]=v.descrizione||"";o[l+" stimato"]=v.stimato??"";o[l+" effettivo"]=v.effettivo??"";}
+    o["Totale stimato"]=t.s;o["Totale effettivo"]=t.hasE?t.e:"";o["Scostamento"]=t.hasE?t.e-t.s:"";
+    if(canFiscale()){const r=U.ris.get(id)||{};o["Valore da contratto"]=r.valoreContratto??"";o["IVA esposta"]=r.ivaEsposta||"";}
+    o["Note"]=u.note||"";return o;});
+  const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"Targa":""}]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Lavorazione usato");
+  const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Lavorazione_usato_${oggi()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+};
+function vista(v){
+  const u=v==="usato"&&canUsato();
+  $("vChiavi").hidden=u;$("vUsato").hidden=!u;
+  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===(u?"usato":"chiavi")));
+  $("btnBolla").hidden=u;$("btnPresa").hidden=!u||!canPresa();
+  $("btnExport").hidden=u;$("btnExportU").hidden=!u;$("btnNew").hidden=u;$("btnImport").hidden=u||!isAdmin();
+  $("h1t").textContent=u?"Lavorazione usato":"Chiavi Dag Auto";
+  $("subt").textContent=u?"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.":"Cerca per targa, telaio, modello o numero del cartellino.";
+  try{localStorage.setItem("vista",u?"usato":"chiavi");}catch(e){}
+  if(u)renderUsato();
+}
+$("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b)vista(b.dataset.tab);});
+
 /* =================== Avvio =================== */
 $("btnMore").onclick=()=>{const m=$("moreMenu");m.hidden=!m.hidden;$("btnMore").setAttribute("aria-expanded",String(!m.hidden));};
 $("btnOut").onclick=()=>S.store.logout();
@@ -770,7 +1017,11 @@ function avviaApp(store){
   store.onChiavi(list=>{S.docs=new Map(list);render();},()=>flash("Non riesco a leggere il registro. Ricarica la pagina.","bad"));
   store.onLog(l=>{S.log=l;renderLog();});
   if(isAdmin())store.onUtenti(u=>{S.utenti=u;renderUtenti();});
+  if(canUsato()){$("tabs").hidden=false;store.onColl("usato",l=>{U.docs=new Map(l);renderUsato();});
+    if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);});}
+  $("whoami").textContent=`Accesso: ${store.me.nome} (${store.me.email}) · ${NOME_RUOLO[store.me.ruolo]||store.me.ruolo}`;
   render();
+  let v="chiavi";try{v=localStorage.getItem("vista")||"chiavi";}catch(e){}vista(v);
 }
 if(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.apiKey){avviaFirebase().catch(()=>{show("boot");$("boot").innerHTML=`<div class="banner bad">Non riesco a collegarmi al registro. Controlla la connessione e ricarica la pagina.</div>`;});}
 else avviaDemo();
