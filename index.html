@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#20385A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Chiavi">
+<title>Chiavi Dag Auto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: una colonna da officina, ricerca in alto fissa, schede-cartellino sotto */
+:root{
+  --bg:#EEF1F5; --surface:#FFFFFF; --sunk:#E4E8EE; --ink:#15202C; --muted:#5A6676; --line:#D3D9E2;
+  --accent:#20385A; --accent-ink:#FFFFFF;
+  --blu:#1F5FBF; --blu-soft:#E1EBFA; --rosso:#BE3328; --rosso-soft:#FAE3E0; --verde:#1C8048; --verde-soft:#DDF2E5;
+  --warn:#9A5B00; --warn-soft:#FFF1D2; --bad:#B42318; --bad-soft:#FDE4E1; --ok:#1C7A43; --ok-soft:#DBF3E4;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E131A; --surface:#17202B; --sunk:#111821; --ink:#E6EBF1; --muted:#97A3B4; --line:#2A3544;
+  --accent:#9CBBEA; --accent-ink:#0E131A;
+  --blu:#79A6F2; --blu-soft:#1A2B47; --rosso:#F08A7E; --rosso-soft:#3A1E1C; --verde:#62CC8F; --verde-soft:#16321F;
+  --warn:#F3C26B; --warn-soft:#3A2C10; --bad:#F59A90; --bad-soft:#3E1B18; --ok:#6FD39A; --ok-soft:#153222; color-scheme:dark}}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.4;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 48px;display:flex;flex-direction:column;gap:14px}
+h1{font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:.01em;margin:0;text-wrap:balance}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button,.btn{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button.danger.solid{background:var(--bad);color:var(--surface)}
+button.link{border:0;background:none;padding:4px 0;color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+button:disabled{opacity:.5;cursor:default}
+.search{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:6px;display:flex;flex-direction:column;gap:8px}
+.search input{width:100%;font:inherit;font-size:17px;padding:13px 14px 13px 42px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink)}
+.sbox{position:relative}
+.sbox svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:20px;height:20px;stroke:var(--muted)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;align-items:center}
+.chips::-webkit-scrollbar{display:none}
+.chips .lbl{font-size:12px;color:var(--muted);white-space:nowrap;font-weight:600}
+.chip{white-space:nowrap;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.c-BLU[aria-pressed="true"]{background:var(--blu);border-color:var(--blu);color:var(--surface)}
+.chip.c-ROSSO[aria-pressed="true"]{background:var(--rosso);border-color:var(--rosso);color:var(--surface)}
+.chip.c-VERDE[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:var(--surface)}
+.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sum{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;border-top:4px solid var(--cc)}
+.sum h3{margin:0 0 4px;font-family:var(--f-display);font-size:16px;letter-spacing:.06em;color:var(--cc)}
+.sum dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:1px 6px;font-size:12.5px;color:var(--muted)}
+.sum dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+.cBLU{--cc:var(--blu);--cs:var(--blu-soft)} .cROSSO{--cc:var(--rosso);--cs:var(--rosso-soft)} .cVERDE{--cc:var(--verde);--cs:var(--verde-soft)}
+.list{display:flex;flex-direction:column;gap:8px}
+.card{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;text-align:left;width:100%;padding:12px;border-radius:14px;border:1px solid var(--line);background:var(--surface);font-weight:400}
+.tag{position:relative;width:74px;padding:8px 6px 7px 14px;border-radius:6px 12px 12px 6px;background:var(--cs);border:1.5px solid var(--cc);color:var(--cc);text-align:center;flex:none}
+.tag::before{content:"";position:absolute;left:5px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:var(--surface);border:1.5px solid var(--cc)}
+.tag b{display:block;font-family:var(--f-display);font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.tag small{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;opacity:.85;font-variant-numeric:tabular-nums}
+.ctitle{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.targa{font-family:var(--f-mono);font-weight:500;font-size:15px;letter-spacing:.04em;padding:1px 6px;border:1px solid var(--line);border-radius:4px;background:var(--sunk)}
+.modello{font-weight:600}
+.telaio{display:block;font-family:var(--f-mono);font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.kp{font-size:12.5px;padding:3px 8px;border-radius:6px;background:var(--sunk);color:var(--ink)}
+.kp.miss{background:var(--bad-soft);color:var(--bad)}
+.kp strong{font-weight:700}
+.pill{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px}
+.p-Doppia{background:var(--sunk);color:var(--muted)}
+.p-Solo-prima{background:var(--warn-soft);color:var(--warn)}
+.p-Solo-seconda,.p-Chiavi-mancanti{background:var(--bad-soft);color:var(--bad)}
+.p-LIBERO{background:var(--ok-soft);color:var(--ok)}
+.p-Da-controllare,.p-Non-censito{background:var(--sunk);color:var(--muted)}
+.avv{display:block;margin-top:6px;font-size:13px;color:var(--bad);font-weight:600}
+.free{display:flex;flex-direction:column;gap:12px}
+.freegrp h3{margin:0 0 6px;font-family:var(--f-display);letter-spacing:.06em;color:var(--cc);font-size:17px}
+.nums{display:flex;flex-wrap:wrap;gap:6px}
+.num{min-width:48px;padding:7px 8px;border-radius:8px;border:1.5px solid var(--cc);background:var(--cs);color:var(--cc);font-family:var(--f-display);font-size:18px;font-variant-numeric:tabular-nums}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:18px;color:var(--muted)}
+.empty h2{margin:0 0 6px;color:var(--ink);font-size:17px}
+.empty p{margin:4px 0}
+.count{font-size:13px;color:var(--muted)}
+h2.sec{font-family:var(--f-display);font-size:19px;letter-spacing:.04em;margin:8px 0 6px}
+.log{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.log div{padding:9px 12px;border-top:1px solid var(--line);font-size:13.5px;display:grid;gap:2px}
+.log div:first-child{border-top:0}
+.log .meta{color:var(--muted);font-size:12px}
+.banner{padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-size:13.5px;font-weight:600}
+.banner.ok{background:var(--ok-soft);color:var(--ok)}
+.banner.bad{background:var(--bad-soft);color:var(--bad)}
+.who{display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:13px;color:var(--muted);flex-wrap:wrap}
+/* pannelli */
+.sheet{position:fixed;inset:0;z-index:20;background:rgba(10,16,24,.5);display:flex;align-items:flex-end;justify-content:center}
+.panel{background:var(--surface);width:100%;max-width:640px;max-height:94%;overflow-y:auto;border-radius:18px 18px 0 0;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.phead{display:flex;gap:12px;align-items:center}
+.phead h2{margin:0;font-family:var(--f-display);font-size:24px}
+.phead p{margin:0;color:var(--muted);font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:460px){.grid2{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.02em;min-width:0}
+label.f input,label.f select,label.f textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-weight:400;width:100%}
+input.mono{font-family:var(--f-mono)!important;text-transform:uppercase}
+.keybox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.keybox h4{margin:0;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.keybox h4 span.small{font-weight:500}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:none}
+.seg button{border:0;border-radius:0;padding:6px 14px;background:var(--surface);color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.places{display:flex;flex-wrap:wrap;gap:6px}
+.pfoot{display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:12px}
+.pfoot .r{display:flex;gap:8px;margin-left:auto}
+.pick{display:flex;gap:8px;flex-wrap:wrap}
+.pick button{flex:1;min-width:90px;border:1.5px solid var(--cc);color:var(--cc);background:var(--cs);flex-direction:column}
+.small{font-size:12.5px;color:var(--muted)}
+/* bolla */
+.drop{border:2px dashed var(--line);border-radius:14px;padding:22px 16px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;background:var(--bg)}
+.drop svg{width:40px;height:40px;stroke:var(--muted)}
+.vrow{border:1.5px solid var(--cc);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;background:linear-gradient(var(--cs),var(--cs)) top/100% 4px no-repeat,var(--surface)}
+.vrow .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.numbox{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.numbox label.f{flex:0 0 120px}
+.numbox input{font-family:var(--f-display)!important;font-size:26px!important;text-align:center;padding:6px!important}
+.colseg button[data-v="BLU"][aria-pressed="true"]{background:var(--blu);color:var(--surface)}
+.colseg button[data-v="ROSSO"][aria-pressed="true"]{background:var(--rosso);color:var(--surface)}
+.colseg button[data-v="VERDE"][aria-pressed="true"]{background:var(--verde);color:var(--surface)}
+details.raw summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}
+details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;background:var(--bg);border-radius:8px;padding:10px;max-height:200px;overflow:auto}
+.rowmsg{font-size:13px;font-weight:600}
+.rowmsg.bad{color:var(--bad)} .rowmsg.warn{color:var(--warn)} .rowmsg.ok{color:var(--ok)}
+.bar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+/* accesso */
+.authbox{max-width:420px;margin:8vh auto 0;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px 20px;display:flex;flex-direction:column;gap:14px}
+.brand{display:flex;gap:12px;align-items:center}
+.brand .tag{width:58px}
+.brand .tag b{font-size:20px}
+.users{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.users div{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-top:1px solid var(--line);font-size:14px;flex-wrap:wrap}
+.users div:first-child{border-top:0}
+.users .em{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+@media (prefers-reduced-motion:no-preference){.panel{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+</style>
+</head>
+<body>
+
+<!-- Avvio -->
+<div class="wrap" id="boot"><p class="small">Caricamento…</p></div>
+
+<!-- Accesso -->
+<div class="wrap" id="auth" hidden>
+  <div class="authbox">
+    <div class="brand"><span class="tag cBLU"><b>5</b><small>B · 105</small></span><div><h1>Chiavi Dag Auto</h1><p class="sub">Registro chiavi della concessionaria</p></div></div>
+
+    <form id="fLogin" class="authform">
+      <label class="f">Email<input id="lEmail" type="email" autocomplete="username" required></label>
+      <label class="f">Password<input id="lPass" type="password" autocomplete="current-password" required></label>
+      <div id="lErr"></div>
+      <button class="primary" type="submit">Entra</button>
+      <div class="who"><button type="button" class="link" data-go="fReg">Prima volta? Crea l'accesso</button><button type="button" class="link" data-go="fReset">Password dimenticata</button></div>
+    </form>
+
+    <form id="fReg" class="authform" hidden>
+      <p class="small" style="margin:0">Usa l'email di lavoro. L'accesso funziona solo dopo che l'amministratore ha autorizzato la tua email.</p>
+      <label class="f">Nome e cognome<input id="rNome" autocomplete="name" required></label>
+      <label class="f">Email<input id="rEmail" type="email" autocomplete="username" required></label>
+      <label class="f">Password (almeno 8 caratteri)<input id="rPass" type="password" autocomplete="new-password" minlength="8" required></label>
+      <div id="rErr"></div>
+      <button class="primary" type="submit">Crea l'accesso</button>
+      <button type="button" class="link" data-go="fLogin">Ho già l'accesso</button>
+    </form>
+
+    <form id="fReset" class="authform" hidden>
+      <p class="small" style="margin:0">Ti mandiamo un'email con il link per scegliere una nuova password.</p>
+      <label class="f">Email<input id="pEmail" type="email" autocomplete="username" required></label>
+      <div id="pErr"></div>
+      <button class="primary" type="submit">Invia il link</button>
+      <button type="button" class="link" data-go="fLogin">Torna all'accesso</button>
+    </form>
+
+    <div id="fVerify" class="authform" hidden>
+      <div class="banner">Ti abbiamo mandato un'email a <b id="vEmail"></b>. Apri il link che contiene, poi torna qui e tocca «Ho confermato». Se non la trovi, guarda nella posta indesiderata.</div>
+      <div id="vErr"></div>
+      <button class="primary" type="button" id="vDone">Ho confermato</button>
+      <div class="who"><button type="button" class="link" id="vResend">Rimanda l'email</button><button type="button" class="link" data-out>Esci</button></div>
+    </div>
+
+    <div id="fNot" class="authform" hidden>
+      <div class="banner bad">L'email <b id="nEmail"></b> non è ancora autorizzata. Chiedi all'amministratore di aggiungerla nell'elenco utenti, poi tocca «Riprova».</div>
+      <button class="primary" type="button" id="nRetry">Riprova</button>
+      <button type="button" class="link" data-out>Esci</button>
+    </div>
+  </div>
+</div>
+
+<!-- Applicazione -->
+<div class="wrap" id="app" hidden>
+  <div id="demoBanner" class="banner" hidden>Modalità prova: i dati sono esempi e non vengono salvati. Si attiva il registro vero inserendo i dati di Firebase nel file config.js.</div>
+  <header class="top">
+    <div>
+      <h1>Chiavi Dag Auto</h1>
+      <p class="sub">Cerca per targa, telaio, modello o numero del cartellino.</p>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btnBolla">Da bolla</button>
+      <button id="btnNew">Nuovo numero</button>
+      <button id="btnMore" aria-expanded="false">Altro</button>
+    </div>
+  </header>
+  <div class="actions" id="moreMenu" hidden>
+    <button id="btnExport">Esporta Excel</button>
+    <button id="btnImport" hidden>Importa Excel</button>
+    <button id="btnUsers" hidden>Utenti</button>
+    <button id="btnOut">Esci</button>
+  </div>
+  <input type="file" id="fileImport" accept=".xlsx,.xls" hidden>
+
+  <div id="msg" hidden></div>
+
+  <div class="search">
+    <div class="sbox">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="Targa, telaio, modello o n° (es. GH123KL, 105)" aria-label="Cerca">
+    </div>
+    <div class="chips" id="fColore"></div>
+    <div class="chips" id="fStato"></div>
+    <div class="chips" id="fLuogo"></div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+  <div class="count" id="count"></div>
+  <div id="results" class="list"></div>
+
+  <section>
+    <h2 class="sec">Ultimi movimenti</h2>
+    <div id="log" class="log"><div class="meta">Nessun movimento registrato.</div></div>
+  </section>
+  <p class="who"><span id="whoami"></span></p>
+</div>
+
+<div class="sheet" id="sheet" hidden></div>
+
+<script src="config.js"></script>
+<script type="module">
+import { leggiBolla } from "./bolla.js";
+
+const COLORI=["BLU","ROSSO","VERDE"];
+const NOMI={BLU:"Blu · nuove",ROSSO:"Rosse · usate",VERDE:"Verdi · noleggio"};
+const CORTO={BLU:"Blu",ROSSO:"Rosse",VERDE:"Verdi"};
+const SING={BLU:"Blu",ROSSO:"Rossa",VERDE:"Verde"};
+const LETT={BLU:"B",ROSSO:"R",VERDE:"V"};
+const LUOGHI=["Salone","Officina","Garage","Cimitero","Bel Sito"];
+const RETRO="retro cassaforte salone";
+const MOTIVI=["Seconda mai arrivata da Mercedes","Seconda rimasta al cliente","Chiave persa","Altro (vedi note)"];
+const FB="https://www.gstatic.com/firebasejs/10.12.2/";
+const S={docs:new Map(),log:[],utenti:[],q:"",col:null,stato:"incasa",luogo:null,store:null,me:null};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s??"").toUpperCase().replace(/[\s\-\.]/g,"");
+const idOf=(c,n)=>c+"-"+String(n).padStart(3,"0");
+const oggi=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+const isAdmin=()=>S.me&&S.me.ruolo==="admin";
+function show(id){for(const x of["boot","auth","app"])$(x).hidden=x!==id;}
+
+/* =================== Archivio: Firebase =================== */
+async function avviaFirebase(){
+  const [{initializeApp},A,F]=await Promise.all([import(FB+"firebase-app.js"),import(FB+"firebase-auth.js"),import(FB+"firebase-firestore.js")]);
+  const app=initializeApp(window.FIREBASE_CONFIG);
+  const auth=A.getAuth(app);auth.languageCode="it";
+  let db;try{db=F.initializeFirestore(app,{localCache:F.persistentLocalCache()});}catch(e){db=F.getFirestore(app);}
+  const torna=()=>({url:location.href.split("#")[0]});
+
+  const errAuth=e=>{const c=(e&&e.code)||"";
+    if(c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found"))return"Email o password non corrette.";
+    if(c.includes("email-already-in-use"))return"Esiste già un accesso con questa email: usa «Ho già l'accesso».";
+    if(c.includes("weak-password"))return"La password deve avere almeno 8 caratteri.";
+    if(c.includes("invalid-email"))return"L'email non è scritta correttamente.";
+    if(c.includes("too-many-requests"))return"Troppi tentativi. Aspetta qualche minuto e riprova.";
+    if(c.includes("network"))return"Connessione assente. Controlla la rete e riprova.";
+    return"Operazione non riuscita. Riprova.";};
+  const err=(id,t)=>$(id).innerHTML=t?`<div class="banner bad">${esc(t)}</div>`:"";
+  function vista(id){show("auth");for(const f of["fLogin","fReg","fReset","fVerify","fNot"])$(f).hidden=f!==id;}
+  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>vista(b.dataset.go));
+  document.querySelectorAll("[data-out]").forEach(b=>b.onclick=()=>A.signOut(auth));
+  $("fLogin").onsubmit=async e=>{e.preventDefault();err("lErr");try{await A.signInWithEmailAndPassword(auth,$("lEmail").value.trim(),$("lPass").value);}catch(x){err("lErr",errAuth(x));}};
+  $("fReg").onsubmit=async e=>{e.preventDefault();err("rErr");
+    try{const c=await A.createUserWithEmailAndPassword(auth,$("rEmail").value.trim(),$("rPass").value);
+      await A.updateProfile(c.user,{displayName:$("rNome").value.trim()});
+      await A.sendEmailVerification(c.user,torna());vista("fVerify");$("vEmail").textContent=c.user.email;}catch(x){err("rErr",errAuth(x));}};
+  $("fReset").onsubmit=async e=>{e.preventDefault();err("pErr");try{await A.sendPasswordResetEmail(auth,$("pEmail").value.trim(),torna());$("pErr").innerHTML=`<div class="banner ok">Email inviata. Segui il link per scegliere la nuova password.</div>`;}catch(x){err("pErr",errAuth(x));}};
+  $("vDone").onclick=async()=>{err("vErr");try{await auth.currentUser.reload();if(auth.currentUser.emailVerified){await auth.currentUser.getIdToken(true);entra(auth.currentUser);}else err("vErr","L'email non risulta ancora confermata. Apri il link nell'email e riprova.");}catch(x){err("vErr",errAuth(x));}};
+  $("vResend").onclick=async()=>{try{await A.sendEmailVerification(auth.currentUser,torna());$("vErr").innerHTML=`<div class="banner ok">Email inviata di nuovo.</div>`;}catch(x){err("vErr",errAuth(x));}};
+  $("nRetry").onclick=()=>entra(auth.currentUser);
+
+  let subs=[];
+  async function entra(u){
+    const email=u.email.toLowerCase();
+    let info=null;
+    try{const s=await F.getDoc(F.doc(db,"utenti",email));if(s.exists())info=s.data();}catch(e){}
+    if(!info){vista("fNot");$("nEmail").textContent=email;return;}
+    const store={
+      demo:false,
+      me:{email,nome:info.nome||u.displayName||email,ruolo:info.ruolo||"operatore"},
+      onChiavi(cb,ecb){subs.push(F.onSnapshot(F.collection(db,"chiavi"),s=>cb(s.docs.map(d=>[d.id,d.data()])),ecb));},
+      onLog(cb){subs.push(F.onSnapshot(F.query(F.collection(db,"movimenti"),F.orderBy("ts","desc"),F.limit(50)),s=>cb(s.docs.map(d=>d.data())),()=>{}));},
+      onUtenti(cb){subs.push(F.onSnapshot(F.collection(db,"utenti"),s=>cb(s.docs.map(d=>Object.assign({email:d.id},d.data()))),()=>{}));},
+      async commit(writes,logs,onProg){
+        const ops=[...writes.map(w=>["c",w]),...logs.map(l=>["l",l])];
+        for(let i=0;i<ops.length;i+=400){
+          const b=F.writeBatch(db);
+          for(const [k,w] of ops.slice(i,i+400)){
+            if(k==="c")b.set(F.doc(db,"chiavi",w.id),Object.assign({},w.data,{updatedAt:Date.now(),updatedBy:email}));
+            else b.set(F.doc(F.collection(db,"movimenti")),Object.assign({},w,{ts:Date.now(),email,nome:store.me.nome}));
+          }
+          await b.commit();onProg&&onProg(Math.min(ops.length,i+400),ops.length);
+        }
+      },
+      async setUtente(em,data){await F.setDoc(F.doc(db,"utenti",em.toLowerCase()),data);},
+      async delUtente(em){await F.deleteDoc(F.doc(db,"utenti",em.toLowerCase()));},
+      async logout(){subs.forEach(f=>{try{f()}catch(e){}});subs=[];await A.signOut(auth);location.reload();},
+    };
+    avviaApp(store);
+  }
+  A.onAuthStateChanged(auth,u=>{
+    if(S.store)return;
+    if(!u){vista("fLogin");return;}
+    if(!u.emailVerified){vista("fVerify");$("vEmail").textContent=u.email;return;}
+    entra(u);
+  });
+}
+
+/* =================== Archivio: modalità prova =================== */
+function avviaDemo(){
+  const ex=[
+    ["BLU",3,{telaio:"W1N2539151F000003",targa:"",modello:"GLC 220 d (esempio)",prima:"Sì",dovePrima:"Salone",seconda:"Sì"}],
+    ["BLU",4,{telaio:"W1K1770121J000004",targa:"",modello:"Classe A 180 d (esempio)",prima:"Sì",dovePrima:"Garage",seconda:"No"}],
+    ["BLU",5,{prima:"No",seconda:"No"}],["BLU",6,{prima:"No",seconda:"No"}],
+    ["ROSSO",12,{telaio:"WDD2050041R000012",targa:"GH123KL",modello:"Classe C 220 d (esempio)",prima:"Sì",dovePrima:"Cimitero",seconda:"No",motivo:"Seconda rimasta al cliente"}],
+    ["ROSSO",13,{telaio:"WDD1183441N000013",targa:"FY456AB",modello:"CLA 200 (esempio)",prima:"Sì",dovePrima:"Officina",seconda:"Sì"}],
+    ["ROSSO",14,{prima:"No",seconda:"No"}],
+    ["VERDE",1,{telaio:"W1V9076331P000001",targa:"GK789CD",modello:"Sprinter 317 CDI (esempio)",prima:"Sì",dovePrima:"Bel Sito",seconda:"Sì"}],
+    ["VERDE",2,{prima:"No",seconda:"No"}],
+  ];
+  const docs=new Map(ex.map(([c,n,d])=>[idOf(c,n),Object.assign({colore:c,numero:n},d)]));
+  let log=[{ts:Date.now()-3600e3,email:"prova@dagauto.it",nome:"Utente di prova",codice:"R 12",azione:"Aggiornato",dettaglio:"Dove prima: Garage → Cimitero"}];
+  const L={c:[],l:[],u:[]};
+  let utenti=[{email:"prova@dagauto.it",nome:"Utente di prova",ruolo:"admin"}];
+  const fire=()=>{L.c.forEach(f=>f([...docs.entries()]));L.l.forEach(f=>f(log.slice(0,50)));L.u.forEach(f=>f(utenti));};
+  avviaApp({
+    demo:true,me:{email:"prova@dagauto.it",nome:"Utente di prova",ruolo:"admin"},
+    onChiavi(cb){L.c.push(cb);cb([...docs.entries()]);},onLog(cb){L.l.push(cb);cb(log);},onUtenti(cb){L.u.push(cb);cb(utenti);},
+    async commit(writes,logs){for(const w of writes)docs.set(w.id,Object.assign({},w.data));log=[...logs.map(l=>Object.assign({},l,{ts:Date.now(),email:"prova@dagauto.it",nome:"Utente di prova"})).reverse(),...log];fire();},
+    async setUtente(em,d){utenti=utenti.filter(u=>u.email!==em).concat([Object.assign({email:em},d)]);fire();},
+    async delUtente(em){utenti=utenti.filter(u=>u.email!==em);fire();},
+    async logout(){location.reload();},
+  });
+}
+
+/* =================== Logica registro =================== */
+function slots(){const out=[];for(const c of COLORI)for(let n=1;n<=100;n++){const d=S.docs.get(idOf(c,n));out.push(Object.assign({id:idOf(c,n),colore:c,numero:n,_has:!!d},d||{}));}return out;}
+const slot=(c,n)=>{const d=S.docs.get(idOf(c,n));return Object.assign({id:idOf(c,n),colore:c,numero:n,_has:!!d},d||{});};
+function stato(s){
+  if(!s._has)return"Non censito";
+  const p=s.prima,q=s.seconda;
+  if(p==="Sì"&&q==="Sì")return"Doppia";
+  if(p==="Sì"&&q==="No")return"Solo prima";
+  if(p==="No"&&q==="Sì")return"Solo seconda";
+  if(p==="No"&&q==="No")return s.telaio||s.targa?"Chiavi mancanti":"LIBERO";
+  return"Da controllare";
+}
+function avvisi(s){
+  const st=stato(s);if(st==="Non censito"||st==="Da controllare"||st==="LIBERO")return"";
+  const a=[];
+  if(s.colore==="BLU"&&(st==="Solo prima"||st==="Solo seconda"))a.push("Nuova con una sola chiave!");
+  if(!s.telaio)a.push("Manca telaio.");
+  if(s.prima==="Sì"&&!s.dovePrima)a.push("Indicare dove sta la prima.");
+  if((st==="Solo prima"||st==="Solo seconda")&&!s.motivo)a.push("Indicare motivo.");
+  if(st==="Solo seconda")a.push("Cercare la prima.");
+  if(st==="Chiavi mancanti")a.push("Telaio senza chiavi: cercare.");
+  return a.join(" ");
+}
+const cls=st=>"p-"+st.replace(/\s/g,"-");
+const occupato=s=>s._has&&stato(s)!=="LIBERO";
+const codice=s=>`${LETT[s.colore]} ${s.numero}`;
+function primoLibero(c,esclusi){return slots().find(s=>s.colore===c&&stato(s)==="LIBERO"&&!(esclusi||[]).includes(s.numero));}
+function telaioUsato(t,eccetto){if(!t)return null;const n=norm(t);return slots().find(s=>s.id!==eccetto&&s._has&&norm(s.telaio)===n)||null;}
+
+function matches(s){
+  const q=norm(S.q);if(!q)return true;
+  if(/^\d{1,3}$/.test(q)){const n=+q;return s.numero===n||s.numero+100===n;}
+  const c1=LETT[s.colore]+s.numero,c2=LETT[s.colore]+(s.numero+100),lungo=s.colore+s.numero;
+  return [s.targa,s.telaio,s.modello,s.note].some(v=>norm(v).includes(q))||q===c1||q===c2||q===lungo;
+}
+function filtered(){
+  return slots().filter(s=>{
+    if(S.col&&s.colore!==S.col)return false;
+    const st=stato(s);
+    if(S.luogo){if(S.luogo==="RETRO"){if(s.seconda!=="Sì")return false;}else if(!(s.prima==="Sì"&&s.dovePrima===S.luogo))return false;}
+    if(S.q)return matches(s);
+    switch(S.stato){
+      case"incasa":return occupato(s);
+      case"avvisi":return !!avvisi(s);
+      case"una":return st==="Solo prima"||st==="Solo seconda";
+      case"liberi":return st==="LIBERO";
+      case"daverif":return st==="Non censito"||st==="Da controllare";
+    }return true;
+  });
+}
+
+/* =================== Disegno =================== */
+function chipRow(el,items,cur,onPick,lbl){
+  el.innerHTML=(lbl?`<span class="lbl">${esc(lbl)}</span>`:"")+items.map(([v,l,c])=>`<button class="chip ${c||""}" data-v="${esc(v??"")}" aria-pressed="${(cur??"")===(v??"")}">${esc(l)}</button>`).join("");
+  el.onclick=e=>{const b=e.target.closest("button");if(!b)return;onPick(b.dataset.v||null);};
+}
+function renderFilters(){
+  chipRow($("fColore"),[[null,"Tutti i colori"],...COLORI.map(c=>[c,CORTO[c],"c-"+c])],S.col,v=>{S.col=v;render();});
+  chipRow($("fStato"),[["incasa","In casa"],["avvisi","Con avvisi"],["una","Una sola chiave"],["liberi","Numeri liberi"],["daverif","Da censire"]],S.stato,v=>{S.stato=v||"incasa";render();});
+  chipRow($("fLuogo"),[[null,"Ovunque"],...LUOGHI.map(l=>[l,l]),["RETRO","Seconde · retro salone"]],S.luogo,v=>{S.luogo=v;render();},"Prima chiave in:");
+}
+function renderSummary(){
+  const all=slots();
+  $("summary").innerHTML=COLORI.map(c=>{
+    const xs=all.filter(s=>s.colore===c);
+    return`<div class="sum c${c}"><h3>${CORTO[c].toUpperCase()}</h3><dl><dt>In casa</dt><dd>${xs.filter(occupato).length}</dd><dt>Liberi</dt><dd>${xs.filter(s=>stato(s)==="LIBERO").length}</dd><dt>Avvisi</dt><dd>${xs.filter(s=>avvisi(s)).length}</dd></dl></div>`;
+  }).join("");
+}
+function keyPills(s){
+  const p=s.prima==="Sì"?`<span class="kp"><strong>1ª</strong> ${esc(s.dovePrima||"dove?")}</span>`:s.prima==="No"?`<span class="kp miss"><strong>1ª</strong> manca</span>`:`<span class="kp"><strong>1ª</strong> da controllare</span>`;
+  const q=s.seconda==="Sì"?`<span class="kp"><strong>2ª</strong> retro salone</span>`:s.seconda==="No"?`<span class="kp miss"><strong>2ª</strong> manca</span>`:`<span class="kp"><strong>2ª</strong> da controllare</span>`;
+  return p+q;
+}
+const tagHtml=s=>`<span class="tag"><b>${s.numero}</b><small>${LETT[s.colore]} · ${s.numero+100}</small></span>`;
+function card(s){
+  const st=stato(s),av=avvisi(s);
+  return`<button class="card c${s.colore}" data-id="${s.id}">${tagHtml(s)}
+    <span style="min-width:0">
+      <span class="ctitle">${s.targa?`<span class="targa">${esc(s.targa)}</span>`:""}<span class="modello">${esc(s.modello||(s._has?"Modello non indicato":"Numero non ancora censito"))}</span><span class="pill ${cls(st)}">${esc(st)}</span></span>
+      ${s.telaio?`<span class="telaio">${esc(s.telaio)}</span>`:""}
+      ${occupato(s)?`<span class="keys">${keyPills(s)}</span>`:""}
+      ${av?`<span class="avv">${esc(av)}</span>`:""}
+    </span></button>`;
+}
+function render(){
+  renderFilters();renderSummary();
+  const res=$("results");
+  if(S.docs.size===0&&!S.q){
+    res.innerHTML=`<div class="empty"><h2>Il registro è ancora vuoto</h2><p>Qui compariranno tutte le vetture con il numero del cartellino e dove sono la prima e la seconda chiave.</p><p>${isAdmin()?"Per partire, apri <b>Altro → Importa Excel</b> e carica il file del censimento compilato.":"Il registro si riempie quando viene caricato il file del censimento."}</p></div>`;
+    $("count").textContent="";return;
+  }
+  const xs=filtered();
+  if(!S.q&&S.stato==="liberi"){
+    $("count").textContent=xs.length+" numeri liberi verificati";
+    res.innerHTML=`<div class="free">${COLORI.filter(c=>!S.col||S.col===c).map(c=>{const ns=xs.filter(s=>s.colore===c);return`<div class="freegrp c${c}"><h3>${NOMI[c].toUpperCase()}</h3>${ns.length?`<div class="nums">${ns.map(s=>`<button class="num" data-id="${s.id}" aria-label="Assegna ${SING[c]} ${s.numero}">${s.numero}</button>`).join("")}</div>`:`<p class="small">Nessun numero libero verificato.</p>`}</div>`;}).join("")}</div>`;
+  }else{
+    $("count").textContent=S.q?`${xs.length} risultat${xs.length===1?"o":"i"} per «${S.q}»`:`${xs.length} numeri`;
+    res.innerHTML=xs.length?xs.map(card).join(""):`<div class="empty"><p>${S.q?"Nessuna vettura trovata. Controlla la targa o prova con le ultime cifre del telaio.":"Nessun numero in questa vista."}</p></div>`;
+  }
+}
+function renderLog(){
+  const el=$("log");
+  if(!S.log.length){el.innerHTML=`<div class="meta">Nessun movimento registrato.</div>`;return;}
+  el.innerHTML=S.log.map(l=>{const d=new Date(l.ts);
+    return`<div><span><b>${esc(l.codice)}</b> · ${esc(l.azione)}${l.dettaglio?" — "+esc(l.dettaglio):""}</span><span class="meta">${esc(l.nome||l.email||"")} · ${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})}</span></div>`;}).join("");
+}
+let msgT;function flash(t,kind){const m=$("msg");m.className="banner "+(kind||"");m.textContent=t;m.hidden=false;clearTimeout(msgT);msgT=setTimeout(()=>m.hidden=true,6000);}
+function openSheet(html){const sh=$("sheet");sh.innerHTML=html;sh.hidden=false;sh.onclick=e=>{if(e.target===sh)closeSheet();};return sh.firstElementChild;}
+function closeSheet(){$("sheet").hidden=true;$("sheet").innerHTML="";}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)closeSheet();});
+const erroreScrittura=e=>e&&String(e.code||"").includes("permission")?"Non hai il permesso di fare questa modifica.":"Salvataggio non riuscito. Controlla la connessione e riprova.";
+
+/* =================== Scheda vettura =================== */
+const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
+function openEditor(id,assegna){
+  const base=slots().find(s=>s.id===id);if(!base)return;
+  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",controllatoDa:"",dataControllo:"",note:""},base);
+  const libero=!occupato(base);
+  if(assegna&&libero){f.prima="Sì";f.dovePrima="Salone";f.seconda=base.colore==="BLU"?"Sì":"";f.dataControllo=oggi();f.controllatoDa=S.me.nome;}
+  const seg=k=>`<span class="seg" data-k="${k}">${["Sì","No"].map(v=>`<button type="button" data-v="${v}" aria-pressed="${f[k]===v}">${v}</button>`).join("")}</span>`;
+  const ed=openSheet(`<form class="panel c${base.colore}" id="ed" role="dialog" aria-modal="true" aria-label="Chiavi ${codice(base)}">
+    <div class="phead">${tagHtml(base)}<div><h2>${esc(NOMI[base.colore])} · n° ${base.numero}</h2><p>Prima chiave al ${base.numero}, seconda al ${base.numero+100}${libero?" · numero libero":""}</p></div></div>
+    <div class="grid2">
+      <label class="f">Targa<input class="mono" id="e_targa" value="${esc(f.targa)}" autocomplete="off"></label>
+      <label class="f">Modello<input id="e_modello" value="${esc(f.modello)}" autocomplete="off"></label>
+    </div>
+    <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
+    <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
+    <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
+    <label class="f">Motivo se c'è una sola chiave<select id="e_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${f.motivo===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label>
+    <div class="grid2">
+      <label class="f">Controllato da<input id="e_controllatoDa" value="${esc(f.controllatoDa)}"></label>
+      <label class="f">Data controllo<input type="date" id="e_dataControllo" value="${esc(f.dataControllo)}"></label>
+    </div>
+    <label class="f">Note<textarea id="e_note" rows="2">${esc(f.note)}</textarea></label>
+    <div id="e_err"></div>
+    <div class="pfoot">
+      ${!libero?`<button type="button" class="danger" id="e_out">Auto uscita: libera il numero</button>`:"<span></span>"}
+      <div class="r"><button type="button" id="e_close">Annulla</button><button type="submit" class="primary" id="e_save">Salva</button></div>
+    </div>
+  </form>`);
+  const press=(k)=>ed.querySelectorAll(`[data-k="${k}"] button`).forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===f[k]));
+  ed.addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(!b)return;const k=b.parentElement.dataset.k;f[k]=f[k]===b.dataset.v?"":b.dataset.v;press(k);
+    if(k==="prima"&&f.prima!=="Sì"){f.dovePrima="";press("dovePrima");}
+    if(k==="dovePrima"&&f.dovePrima){f.prima="Sì";press("prima");}
+  });
+  $("e_close").onclick=closeSheet;
+  const out=$("e_out");
+  if(out)out.onclick=()=>{
+    if(!out.dataset.armed){out.dataset.armed="1";out.classList.add("solid");out.textContent="Conferma: la vettura è uscita";return;}
+    salva([{id:base.id,data:{colore:base.colore,numero:base.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}}],
+      [{codice:codice(base),azione:"Numero liberato",dettaglio:`uscita ${base.targa||base.telaio||""}`.trim()}],`${SING[base.colore]} ${base.numero} liberato.`);
+  };
+  ed.onsubmit=e=>{e.preventDefault();
+    for(const k of["telaio","targa","modello","motivo","controllatoDa","dataControllo","note"])f[k]=$("e_"+k).value.trim();
+    f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");f.targa=f.targa.toUpperCase().replace(/\s/g,"");
+    const dup=telaioUsato(f.telaio,base.id);
+    if(dup){$("e_err").innerHTML=`<div class="banner bad">Questo telaio è già registrato al ${esc(SING[dup.colore])} ${dup.numero}. Libera prima quel numero o correggi il telaio.</div>`;return;}
+    const data={colore:base.colore,numero:base.numero};for(const[k]of FIELDS)data[k]=f[k]||"";
+    const diffs=[];for(const[k,l]of FIELDS){if(k==="controllatoDa"||k==="dataControllo")continue;const a=base[k]||"",b=data[k];if(a!==b)diffs.push(a?`${l}: ${a} → ${b||"—"}`:`${l}: ${b}`);}
+    if(!diffs.length&&base._has){closeSheet();return;}
+    salva([{id:base.id,data}],[{codice:codice(base),azione:libero?"Assegnato":"Aggiornato",dettaglio:diffs.slice(0,4).join(" · ")}],`${SING[base.colore]} ${base.numero}: salvato.`);
+  };
+  setTimeout(()=>{const t=$(assegna?"e_targa":"e_close");t&&t.focus();},30);
+}
+async function salva(writes,logs,okMsg){
+  const btn=$("e_save");if(btn)btn.disabled=true;
+  try{await S.store.commit(writes,logs);closeSheet();flash(okMsg,"ok");}
+  catch(e){const el=$("e_err");if(el)el.innerHTML=`<div class="banner bad">${esc(erroreScrittura(e))}</div>`;if(btn)btn.disabled=false;}
+}
+$("results").addEventListener("click",e=>{const b=e.target.closest("[data-id]");if(b)openEditor(b.dataset.id,S.stato==="liberi"&&!S.q);});
+$("q").addEventListener("input",e=>{S.q=e.target.value.trim();render();});
+
+/* =================== Nuovo numero =================== */
+$("btnNew").onclick=()=>{
+  const p=openSheet(`<div class="panel" role="dialog" aria-modal="true" aria-label="Nuovo numero"><div class="phead"><div><h2>Nuovo numero</h2><p>Prendo il primo numero libero verificato del colore scelto.</p></div></div>
+  <div class="pick">${COLORI.map(c=>{const f=primoLibero(c);return`<button class="c${c}" data-c="${c}" ${f?"":"disabled"}><span>${SING[c]}</span><span class="small" style="color:inherit">${f?"n° "+f.numero+" / "+(f.numero+100):"nessuno libero"}</span></button>`;}).join("")}</div>
+  <p class="small">Un numero è libero quando prima e seconda chiave risultano «No» e non c'è telaio. Se un colore non ne ha, completa prima il censimento.</p>
+  <div class="pfoot"><div class="r"><button id="n_close">Annulla</button></div></div></div>`);
+  $("n_close").onclick=closeSheet;
+  p.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{const f=primoLibero(b.dataset.c);if(f)openEditor(f.id,true);});
+};
+
+/* =================== Da bolla (foto) =================== */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("load "+src));document.head.appendChild(s);});}
+async function preparaFoto(file){
+  const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file);});
+  const k=Math.min(1,2400/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);
+  const x=c.getContext("2d");x.drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(img.src);
+  const d=x.getImageData(0,0,c.width,c.height),p=d.data;
+  for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];g=Math.max(0,Math.min(255,(g-128)*1.5+128));p[i]=p[i+1]=p[i+2]=g;}
+  x.putImageData(d,0,0);return c;
+}
+let B=null; // stato del pannello bolla
+$("btnBolla").onclick=()=>{
+  B={righe:[],testo:""};
+  openSheet(`<div class="panel" role="dialog" aria-modal="true" aria-label="Inserimento da bolla" id="bp">
+    <div class="phead"><div><h2>Da bolla</h2><p>Fotografa la bolla: leggo telaio e modello, tu metti solo il numero della chiave.</p></div></div>
+    <div class="drop" id="b_drop">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <label class="btn primary" for="b_file" style="background:var(--accent);color:var(--accent-ink);border-color:var(--accent)">Scatta o scegli la foto</label>
+      <input type="file" id="b_file" accept="image/*" capture="environment" multiple hidden>
+      <span class="small">Foto dritta, con buona luce, inquadrando la zona con i telai. Se la bolla ha più pagine puoi sceglierne più foto.</span>
+      <button type="button" class="link" id="b_manual">Non ho la foto: inserisco il telaio a mano</button>
+    </div>
+    <div id="b_prog" hidden><p class="small" id="b_progT">Lettura in corso…</p><div class="bar"><i id="b_bar"></i></div></div>
+    <div id="b_rows" class="list"></div>
+    <div id="b_err"></div>
+    <div class="pfoot"><button type="button" class="link" id="b_add" hidden>+ Aggiungi vettura</button><div class="r"><button type="button" id="b_close">Annulla</button><button type="button" class="primary" id="b_save" hidden>Registra</button></div></div>
+  </div>`);
+  $("b_close").onclick=closeSheet;
+  $("b_manual").onclick=()=>{aggiungiRiga({});};
+  $("b_add").onclick=()=>aggiungiRiga({});
+  $("b_file").onchange=e=>leggiFoto([...e.target.files]);
+  $("b_save").onclick=registraBolla;
+};
+async function leggiFoto(files){
+  if(!files.length)return;
+  $("b_prog").hidden=false;$("b_err").innerHTML="";
+  const prog=(t,v)=>{$("b_progT").textContent=t;$("b_bar").style.width=Math.round(v*100)+"%";};
+  try{
+    prog("Preparo il lettore (la prima volta può volerci qualche secondo)…",.03);
+    if(!window.Tesseract)await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
+    let quale=0;
+    const w=await Tesseract.createWorker("eng",1,{logger:m=>{if(m.status==="recognizing text")prog(`Leggo la foto ${quale+1} di ${files.length}…`,(quale+m.progress)/files.length);}});
+    let testo="";
+    for(quale=0;quale<files.length;quale++){const c=await preparaFoto(files[quale]);const r=await w.recognize(c);testo+="\n"+r.data.text;}
+    await w.terminate();
+    B.testo=(B.testo+"\n"+testo).trim();
+    const trovate=leggiBolla(testo);
+    $("b_prog").hidden=true;
+    if(!trovate.length){$("b_err").innerHTML=`<div class="banner">Non ho trovato nessun telaio nella foto. Riprova con una foto più nitida e dritta, oppure inserisci il telaio a mano.</div>`;mostraTesto();if(!B.righe.length)aggiungiRiga({});return;}
+    for(const v of trovate)if(!B.righe.some(r=>r.telaio===v.telaio))aggiungiRiga(v,true);
+    renderRighe();mostraTesto();
+    flash(`Trovat${trovate.length===1?"a 1 vettura":"e "+trovate.length+" vetture"}: controlla i telai e metti il numero.`,"ok");
+  }catch(e){$("b_prog").hidden=true;$("b_err").innerHTML=`<div class="banner bad">Non riesco a leggere la foto (serve la connessione per il lettore). Puoi inserire il telaio a mano.</div>`;}
+}
+function mostraTesto(){
+  let d=$("b_raw");if(!d){d=document.createElement("details");d.className="raw";d.id="b_raw";$("b_rows").after(d);}
+  d.innerHTML=`<summary>Testo letto dalla foto</summary><pre>${esc(B.testo||"(niente)")}</pre>`;
+}
+function aggiungiRiga(v,silenzioso){
+  B.righe.push({telaio:v.telaio||"",modello:v.modello||"",targa:v.targa||"",colore:"BLU",numero:"",prima:"Sì",dovePrima:"Salone",seconda:"Sì"});
+  if(!silenzioso)renderRighe();
+}
+function controllaRiga(r,i){
+  if(!r.telaio)return["bad","Manca il telaio."];
+  if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(r.telaio))return["warn",`Il telaio ha ${r.telaio.length} caratteri invece di 17: controllalo.`];
+  const dup=telaioUsato(r.telaio);if(dup)return["bad",`Telaio già registrato al ${SING[dup.colore]} ${dup.numero}.`];
+  if(B.righe.some((x,j)=>j!==i&&x.telaio===r.telaio))return["bad","Telaio ripetuto in questa bolla."];
+  const n=parseInt(r.numero,10);
+  if(!r.numero)return["warn","Metti il numero della chiave."];
+  if(!(n>=1&&n<=100))return["bad","Il numero va da 1 a 100 (la seconda prende +100 da sola)."];
+  if(B.righe.some((x,j)=>j!==i&&x.colore===r.colore&&parseInt(x.numero,10)===n))return["bad","Numero già usato per un'altra vettura di questa bolla."];
+  const s=slot(r.colore,n);
+  if(occupato(s))return["bad",`Il ${SING[r.colore]} ${n} è occupato${s.targa||s.modello?" ("+(s.targa||s.modello)+")":""}.`];
+  if(!s._has)return["warn",`Il ${SING[r.colore]} ${n} non è ancora censito: controlla che i ganci ${n} e ${n+100} siano vuoti.`];
+  return["ok",`Prima al ${n}, seconda al ${n+100} nel ${RETRO}.`];
+}
+function renderRighe(){
+  const box=$("b_rows");
+  $("b_add").hidden=$("b_save").hidden=!B.righe.length;
+  $("b_save").textContent=B.righe.length===1?"Registra la vettura":`Registra ${B.righe.length} vetture`;
+  box.innerHTML=B.righe.map((r,i)=>{const[k,m]=controllaRiga(r,i);const lib=primoLibero(r.colore,B.righe.filter((x,j)=>j!==i&&x.colore===r.colore).map(x=>parseInt(x.numero,10)));
+    return`<div class="vrow c${r.colore}" data-i="${i}">
+      <div class="head"><span class="seg colseg" data-k="colore">${COLORI.map(c=>`<button type="button" data-v="${c}" aria-pressed="${r.colore===c}">${SING[c]}</button>`).join("")}</span><button type="button" class="link" data-del="${i}">Togli</button></div>
+      <label class="f">Telaio<input class="mono" data-f="telaio" value="${esc(r.telaio)}" maxlength="17" autocomplete="off"></label>
+      <div class="grid2"><label class="f">Modello<input data-f="modello" value="${esc(r.modello)}" autocomplete="off"></label><label class="f">Targa<input class="mono" data-f="targa" value="${esc(r.targa)}" autocomplete="off"></label></div>
+      <div class="numbox"><label class="f">N° chiave<input data-f="numero" type="number" inputmode="numeric" min="1" max="100" value="${esc(r.numero)}" placeholder="—"></label>
+        ${lib&&!r.numero?`<button type="button" data-lib="${lib.numero}">Usa il primo libero: ${lib.numero}</button>`:""}</div>
+      <div class="grid2">
+        <label class="f">Prima chiave in<select data-f="dovePrima">${LUOGHI.map(l=>`<option ${r.dovePrima===l?"selected":""}>${l}</option>`).join("")}<option value="" ${!r.dovePrima?"selected":""}>Non c'è</option></select></label>
+        <label class="f">Seconda chiave (${RETRO})<select data-f="seconda"><option value="Sì" ${r.seconda==="Sì"?"selected":""}>Sì, c'è</option><option value="No" ${r.seconda==="No"?"selected":""}>Non c'è</option></select></label>
+      </div>
+      <div class="rowmsg ${k}" data-msg>${esc(m)}</div>
+    </div>`;}).join("");
+  box.oninput=e=>{const t=e.target,row=t.closest(".vrow");if(!row||!t.dataset.f)return;const r=B.righe[+row.dataset.i];
+    let v=t.value;if(t.dataset.f==="telaio"||t.dataset.f==="targa")v=v.toUpperCase().replace(/\s/g,"");r[t.dataset.f]=v;
+    if(t.dataset.f==="dovePrima")r.prima=v?"Sì":"No";
+    const[k,m]=controllaRiga(r,+row.dataset.i);const mm=row.querySelector("[data-msg]");mm.className="rowmsg "+k;mm.textContent=m;};
+  box.onchange=e=>{if(e.target.dataset.f==="numero")renderRighe();};
+  box.onclick=e=>{const b=e.target.closest("button");if(!b)return;const row=b.closest(".vrow");const i=+row.dataset.i;
+    if(b.dataset.del!==undefined){B.righe.splice(i,1);renderRighe();return;}
+    if(b.dataset.lib){B.righe[i].numero=b.dataset.lib;renderRighe();return;}
+    if(b.dataset.v){B.righe[i].colore=b.dataset.v;B.righe[i].numero="";renderRighe();}};
+}
+async function registraBolla(){
+  const errs=B.righe.map((r,i)=>controllaRiga(r,i)).map(([k,m],i)=>[k,m,i]).filter(([k,m])=>k==="bad"||m.startsWith("Metti"));
+  if(errs.length){$("b_err").innerHTML=`<div class="banner bad">Sistema prima ${errs.length===1?"la vettura evidenziata":"le "+errs.length+" vetture evidenziate"}: ${esc(errs[0][1])}</div>`;return;}
+  const writes=[],logs=[];
+  for(const r of B.righe){const n=parseInt(r.numero,10);
+    writes.push({id:idOf(r.colore,n),data:{colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Inserita da bolla"}});
+    logs.push({codice:`${LETT[r.colore]} ${n}`,azione:"Assegnato da bolla",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
+  $("b_save").disabled=true;
+  try{await S.store.commit(writes,logs);closeSheet();flash(writes.length===1?"Vettura registrata.":`${writes.length} vetture registrate.`,"ok");}
+  catch(e){$("b_save").disabled=false;$("b_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(e))}</div>`;}
+}
+
+/* =================== Excel =================== */
+const XLSX_URL="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+function siNo(v){v=String(v??"").trim().toLowerCase();if(["sì","si","s","x"].includes(v))return"Sì";if(["no","n"].includes(v))return"No";return"";}
+function toIso(v){if(!v)return"";if(v instanceof Date&&!isNaN(v))return new Date(v.getTime()-v.getTimezoneOffset()*60000).toISOString().slice(0,10);const m=String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);if(m){const y=m[3].length===2?"20"+m[3]:m[3];return`${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;}return String(v);}
+const luogo=v=>{v=String(v??"").trim();return LUOGHI.find(l=>l.toLowerCase()===v.toLowerCase())||v;};
+$("btnImport").onclick=()=>$("fileImport").click();
+$("fileImport").onchange=async e=>{
+  const file=e.target.files[0];e.target.value="";if(!file)return;
+  try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
+  let rows=[];
+  try{const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true});const ws=wb.Sheets["Censimento"]||wb.Sheets[wb.SheetNames[0]];rows=XLSX.utils.sheet_to_json(ws,{defval:""});}catch(_){flash("Il file non si apre come Excel. Usa il file «Registro chiavi Dag Auto».","bad");return;}
+  const writes=[];
+  for(const r of rows){
+    const c=String(r["Colore"]||"").trim().toUpperCase(),n=parseInt(r["N° prima"],10);
+    if(!COLORI.includes(c)||!(n>=1&&n<=100))continue;
+    const d={colore:c,numero:n,telaio:String(r["Telaio"]||"").trim().toUpperCase().replace(/\s/g,""),targa:String(r["Targa"]||"").trim().toUpperCase().replace(/\s/g,""),modello:String(r["Modello"]||"").trim(),
+      prima:siNo(r["Prima chiave"]),dovePrima:luogo(r["Dove prima"]),seconda:siNo(r["Seconda chiave"]),
+      motivo:String(r["Motivo chiave singola"]||"").trim(),controllatoDa:String(r["Controllato da"]||"").trim(),dataControllo:toIso(r["Data controllo"]),note:String(r["Note"]||"").trim()};
+    if(!(d.telaio||d.targa||d.prima||d.seconda))continue;
+    writes.push({id:idOf(c,n),data:d});
+  }
+  if(!writes.length){flash("Nel file non ho trovato righe compilate nel foglio «Censimento».","bad");return;}
+  openSheet(`<div class="panel" role="dialog" aria-modal="true" aria-label="Importa Excel"><div class="phead"><div><h2>Importa il censimento</h2><p>${esc(file.name)}</p></div></div>
+  <p>Ho trovato <b>${writes.length}</b> numeri compilati (${COLORI.map(c=>`${CORTO[c]} ${writes.filter(w=>w.data.colore===c).length}`).join(" · ")}). Questi numeri verranno sovrascritti con i dati del file; gli altri restano come sono.</p>
+  <div id="e_err"></div>
+  <div class="pfoot"><div class="r"><button id="i_close">Annulla</button><button class="primary" id="e_save">Importa ${writes.length} numeri</button></div></div></div>`);
+  $("i_close").onclick=closeSheet;
+  $("e_save").onclick=()=>salva(writes,[{codice:"Excel",azione:`Importati ${writes.length} numeri`,dettaglio:file.name}],`Importati ${writes.length} numeri dal file.`);
+};
+$("btnExport").onclick=async()=>{
+  try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
+  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Seconda chiave":s.seconda||"","Stato":stato(s),"Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
+  const ws=XLSX.utils.json_to_sheet(rows);ws["!cols"]=[9,9,10,20,11,18,11,12,12,16,30,30,14,13,30].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Censimento");
+  const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Registro_chiavi_${oggi()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+};
+
+/* =================== Utenti =================== */
+function renderUtenti(){
+  const box=$("u_list");if(!box)return;
+  const us=[...S.utenti].sort((a,b)=>(a.nome||a.email).localeCompare(b.nome||b.email));
+  box.innerHTML=us.length?us.map(u=>`<div><span><b>${esc(u.nome||"—")}</b>${u.ruolo==="admin"?' <span class="pill p-Doppia">admin</span>':""}<br><span class="em">${esc(u.email)}</span></span>${u.email===S.me.email?'<span class="small">sei tu</span>':`<button type="button" class="danger" data-rm="${esc(u.email)}">Togli</button>`}</div>`).join(""):`<div class="small">Nessun utente.</div>`;
+}
+$("btnUsers").onclick=()=>{
+  openSheet(`<div class="panel" role="dialog" aria-modal="true" aria-label="Utenti"><div class="phead"><div><h2>Utenti autorizzati</h2><p>Entra solo chi è in questo elenco e ha confermato la propria email.</p></div></div>
+  <form id="u_form" class="keybox"><h4>Aggiungi una persona</h4>
+    <div class="grid2"><label class="f">Nome e cognome<input id="u_nome" required></label><label class="f">Email<input id="u_email" type="email" required></label></div>
+    <label class="f">Ruolo<select id="u_ruolo"><option value="operatore">Operatore: cerca, sposta, assegna</option><option value="admin">Amministratore: anche import Excel e utenti</option></select></label>
+    <div id="e_err"></div><button class="primary" type="submit">Autorizza</button></form>
+  <div class="users" id="u_list"></div>
+  <p class="small">Dopo averla aggiunta, la persona apre il link, tocca «Crea l'accesso» con la stessa email e conferma il messaggio che riceve.</p>
+  <div class="pfoot"><div class="r"><button id="u_close">Chiudi</button></div></div></div>`);
+  renderUtenti();$("u_close").onclick=closeSheet;
+  $("u_form").onsubmit=async e=>{e.preventDefault();const em=$("u_email").value.trim().toLowerCase();
+    try{await S.store.setUtente(em,{nome:$("u_nome").value.trim(),ruolo:$("u_ruolo").value});$("u_form").reset();$("e_err").innerHTML=`<div class="banner ok">${esc(em)} autorizzata.</div>`;}catch(x){$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}};
+  $("u_list").onclick=async e=>{const b=e.target.closest("[data-rm]");if(!b)return;
+    if(!b.dataset.armed){b.dataset.armed="1";b.classList.add("solid");b.textContent="Conferma";return;}
+    try{await S.store.delUtente(b.dataset.rm);}catch(x){flash(erroreScrittura(x),"bad");}};
+};
+
+/* =================== Avvio =================== */
+$("btnMore").onclick=()=>{const m=$("moreMenu");m.hidden=!m.hidden;$("btnMore").setAttribute("aria-expanded",String(!m.hidden));};
+$("btnOut").onclick=()=>S.store.logout();
+function avviaApp(store){
+  S.store=store;S.me=store.me;show("app");
+  $("demoBanner").hidden=!store.demo;
+  $("btnImport").hidden=$("btnUsers").hidden=!isAdmin();
+  $("whoami").textContent=`Accesso: ${store.me.nome} (${store.me.email})${isAdmin()?" · amministratore":""}`;
+  store.onChiavi(list=>{S.docs=new Map(list);render();},()=>flash("Non riesco a leggere il registro. Ricarica la pagina.","bad"));
+  store.onLog(l=>{S.log=l;renderLog();});
+  if(isAdmin())store.onUtenti(u=>{S.utenti=u;renderUtenti();});
+  render();
+}
+if(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.apiKey){avviaFirebase().catch(()=>{show("boot");$("boot").innerHTML=`<div class="banner bad">Non riesco a collegarmi al registro. Controlla la connessione e ricarica la pagina.</div>`;});}
+else avviaDemo();
+</script>
+</body>
+</html>
