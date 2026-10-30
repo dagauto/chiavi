@@ -58,6 +58,12 @@ service cloud.firestore {
       allow delete: if admin();
     }
 
+    match /storico/{id} {
+      allow read: if lavoraUsato();
+      allow create: if autorizzato();
+      allow update, delete: if admin();
+    }
+
     match /movimenti/{id} {
       allow read: if autorizzato();
       allow create: if autorizzato() && request.resource.data.email == emailUtente();
