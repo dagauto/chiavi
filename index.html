@@ -458,6 +458,7 @@ async function avviaFirebase(){
       async setUtente(em,data){await F.setDoc(F.doc(db,"utenti",em.toLowerCase()),data);},
       async delUtente(em){await F.deleteDoc(F.doc(db,"utenti",em.toLowerCase()));},
       async logout(){subs.forEach(f=>{try{f()}catch(e){}});subs=[];await A.signOut(auth);location.reload();},
+      async idToken(){return auth.currentUser.getIdToken();},
       onMiePrefs(cb){subs.push(F.onSnapshot(F.doc(db,"notifiche_utenti",email),s=>cb(s.exists()?s.data():{}),()=>{}));},
       async setMiePrefs(d){await F.setDoc(F.doc(db,"notifiche_utenti",email),Object.assign({},d,{email,aggiornato:Date.now()}),{merge:true});},
       async attivaPush(){
@@ -774,10 +775,36 @@ $("btnBolla").onclick=()=>{
   $("b_file").onchange=e=>leggiFoto([...e.target.files]);
   $("b_save").onclick=registraBolla;
 };
+// Foto ridotta e compressa per la lettura con l'intelligenza artificiale.
+async function fotoAI(file){
+  const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file);});
+  const k=Math.min(1,2000/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(img.src);
+  return c.toDataURL("image/jpeg",.85).split(",")[1];
+}
 async function leggiFoto(files){
   if(!files.length)return;
   $("b_prog").hidden=false;$("b_err").innerHTML="";
   const prog=(t,v)=>{$("b_progT").textContent=t;$("b_bar").style.width=Math.round(v*100)+"%";};
+  if(window.LEGGIFOTO_URL&&S.store.idToken){
+    try{
+      const tutte=[];
+      for(let i=0;i<files.length;i++){
+        prog(`Leggo la foto ${i+1} di ${files.length} con l'intelligenza artificiale…`,(i+.3)/files.length);
+        const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken()},body:JSON.stringify({immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
+        if(!r.ok)throw new Error("http "+r.status);
+        const j=await r.json();for(const v of j.vetture||[])tutte.push(v);
+        B.testo=(B.testo+`\nFoto ${i+1}: ${j.tipo||"documento"} · ${(j.vetture||[]).length} vetture`).trim();
+      }
+      $("b_prog").hidden=true;
+      if(!tutte.length){$("b_err").innerHTML=`<div class="banner">Nella foto non ho trovato nessun telaio. Riprova inquadrando bene il documento, oppure inserisci il telaio a mano.</div>`;if(!B.righe.length)aggiungiRiga({});return;}
+      let n=0;for(const v of tutte)if(!B.righe.some(r=>r.telaio===v.telaio)){aggiungiRiga({telaio:v.telaio,modello:v.modello,targa:v.targa,dubbio:!v.sicuro||v.telaio.length!==17},true);n++;}
+      renderRighe();
+      flash(`Trovat${n===1?"a 1 vettura":"e "+n+" vetture"}: controlla i dati e metti il numero della chiave.`,"ok");
+      return;
+    }catch(e){prog("Lettura AI non riuscita, uso il lettore del telefono…",.05);}
+  }
   try{
     prog("Preparo il lettore (la prima volta può volerci qualche secondo)…",.03);
     if(!window.Tesseract)await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");
@@ -800,7 +827,7 @@ function mostraTesto(){
   d.innerHTML=`<summary>Testo letto dalla foto</summary><pre>${esc(B.testo||"(niente)")}</pre>`;
 }
 function aggiungiRiga(v,silenzioso){
-  B.righe.push({foto:!!silenzioso,telaio:v.telaio||"",modello:v.modello||"",targa:v.targa||"",colore:"BLU",numero:"",prima:"Sì",dovePrima:"Salone",seconda:"Sì"});
+  B.righe.push({foto:!!silenzioso,dubbio:!!v.dubbio,telaio:v.telaio||"",modello:v.modello||"",targa:v.targa||"",colore:"BLU",numero:"",prima:"Sì",dovePrima:"Salone",seconda:"Sì"});
   if(!silenzioso)renderRighe();
 }
 function controllaRiga(r,i){
@@ -815,6 +842,7 @@ function controllaRiga(r,i){
   const s=slot(r.colore,n);
   if(occupato(s))return["bad",`Il ${SING[r.colore]} ${n} è occupato${s.targa||s.modello?" ("+(s.targa||s.modello)+")":""}.`];
   if(!s._has)return["warn",`Il ${SING[r.colore]} ${n} non è ancora censito: controlla che i ganci ${n} e ${n+100} siano vuoti.`];
+  if(r.dubbio)return["warn",`Controlla il telaio carattere per carattere: la foto non era nitida. Prima al ${n}, seconda al ${n+100}.`];
   return["ok",`Prima al ${n}, seconda al ${n+100} nel ${RETRO}.`];
 }
 function renderRighe(){
@@ -838,7 +866,7 @@ function renderRighe(){
     </div>`;}).join("");
   box.oninput=e=>{const t=e.target,row=t.closest(".vrow");if(!row||!t.dataset.f)return;const r=B.righe[+row.dataset.i];
     if(t.dataset.f==="danni"){r.danni=t.checked;renderRighe();return;}
-    let v=t.value;if(t.dataset.f==="telaio"||t.dataset.f==="targa")v=v.toUpperCase().replace(/\s/g,"");r[t.dataset.f]=v;
+    let v=t.value;if(t.dataset.f==="telaio"||t.dataset.f==="targa")v=v.toUpperCase().replace(/\s/g,"");if(t.dataset.f==="telaio")r.dubbio=false;r[t.dataset.f]=v;
     if(t.dataset.f==="dovePrima")r.prima=v?"Sì":"No";
     const[k,m]=controllaRiga(r,+row.dataset.i);const mm=row.querySelector("[data-msg]");mm.className="rowmsg "+k;mm.textContent=m;};
   box.onchange=e=>{if(e.target.dataset.f==="numero")renderRighe();};
