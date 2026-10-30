@@ -197,11 +197,11 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
 .brand{display:flex;gap:12px;align-items:center}
 .brand .tag{width:58px}
 .brand .tag b{font-size:20px}
-.users{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.users{display:flex;flex-direction:column;flex-shrink:0;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .users div{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;border-top:1px solid var(--line);font-size:14px;flex-wrap:wrap}
 .users div:first-child{border-top:0}
 .users .em{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
-@media (prefers-reduced-motion:no-preference){.panel{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+@media (prefers-reduced-motion:no-preference){.panel{animation:up .18s ease-out}.panel>*{flex-shrink:0}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 </style>
 </head>
 <body>
@@ -861,7 +861,7 @@ $("btnExport").onclick=async()=>{
 /* =================== Utenti =================== */
 function renderUtenti(){
   const box=$("u_list");if(!box)return;
-  const us=[...S.utenti].sort((a,b)=>(a.nome||a.email).localeCompare(b.nome||b.email));
+  const us=[...S.utenti].sort((a,b)=>(a.nome||a.email).localeCompare(b.nome||b.email));const tt=$("u_tot");if(tt)tt.textContent=`Utenti autorizzati: ${us.length}`;
   box.innerHTML=us.length?us.map(u=>`<div><span><b>${esc(u.nome||"—")}</b>${u.ruolo?` <span class="pill p-Doppia">${esc(NOME_RUOLO[u.ruolo]||u.ruolo)}</span>`:""}<br><span class="em">${esc(u.email)}</span></span>${u.email===S.me.email?'<span class="small">sei tu</span>':`<button type="button" class="danger" data-rm="${esc(u.email)}">Togli</button>`}</div>`).join(""):`<div class="small">Nessun utente.</div>`;
 }
 $("btnUsers").onclick=()=>{
@@ -870,7 +870,7 @@ $("btnUsers").onclick=()=>{
     <div class="grid2"><label class="f">Nome e cognome<input id="u_nome" required></label><label class="f">Email<input id="u_email" type="email" required></label></div>
     <label class="f">Ruolo<select id="u_ruolo">${RUOLI.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("")}</select></label>
     <div id="e_err"></div><button class="primary" type="submit">Autorizza</button></form>
-  <div class="users" id="u_list"></div>
+  <h4 id="u_tot" style="margin:6px 0 0"></h4><div class="users" id="u_list"></div>
   <p class="small">Dopo averla aggiunta, la persona apre il link, tocca «Crea l'accesso» con la stessa email e conferma il messaggio che riceve.</p>
   <div class="pfoot"><div class="r"><button id="u_close">Chiudi</button></div></div></div>`);
   renderUtenti();$("u_close").onclick=closeSheet;
