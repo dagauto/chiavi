@@ -6,8 +6,8 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#20385A">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Chiavi">
-<title>Chiavi Dag Auto</title>
+<meta name="apple-mobile-web-app-title" content="Dag Vetture">
+<title>Dag Auto Vetture</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
@@ -212,7 +212,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
 <!-- Accesso -->
 <div class="wrap" id="auth" hidden>
   <div class="authbox">
-    <div class="brand"><span class="tag cBLU"><b>5</b><small>B · 105</small></span><div><h1>Chiavi Dag Auto</h1><p class="sub">Registro chiavi della concessionaria</p></div></div>
+    <div class="brand"><span class="tag cBLU"><b>5</b><small>B · 105</small></span><div><h1>Dag Auto Vetture</h1><p class="sub">Registro chiavi della concessionaria</p></div></div>
 
     <form id="fLogin" class="authform">
       <label class="f">Email<input id="lEmail" type="email" autocomplete="username" required></label>
@@ -261,7 +261,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
   <div id="demoBanner" class="banner" hidden>Modalità prova: i dati sono esempi e non vengono salvati. Si attiva il registro vero inserendo i dati di Firebase nel file config.js.</div>
   <header class="top">
     <div>
-      <h1 id="h1t">Chiavi Dag Auto</h1>
+      <h1 id="h1t">Dag Auto Vetture</h1>
       <p class="sub" id="subt">Cerca per targa, telaio, modello o numero del cartellino.</p>
     </div>
     <div class="actions">
@@ -1098,7 +1098,7 @@ function vista(v){
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===v));
   $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();
   $("btnExport").hidden=v!=="chiavi";$("btnExportU").hidden=v!=="usato";$("btnExportC").hidden=v!=="consegne";$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!canImport();
-  $("h1t").textContent={chiavi:"Chiavi Dag Auto",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio"}[v];
+  $("h1t").textContent={chiavi:"Dag Auto Vetture",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio"}[v];
   $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio."}[v];
   try{localStorage.setItem("vista",v);}catch(e){}
   if(v==="usato")renderUsato();if(v==="consegne")renderConsegne();
