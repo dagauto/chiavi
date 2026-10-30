@@ -1273,8 +1273,9 @@ function openConsegna(id){
       <div class="grid2"><label class="f">Colore chiave<select id="c_colore" ${nuovo?"":"disabled"}>${COLORI.map(c=>`<option value="${c}" ${f.colore===c?"selected":""}>${SING[c]} (${LETT_C[c]})</option>`).join("")}</select></label>
       <label class="f">N° chiave<input id="c_numero" inputmode="numeric" value="${esc(f.numero??"")}" ${nuovo?"":"disabled"}></label></div>
       <div id="c_vett" class="small"></div>
-      <div class="grid2"><label class="f">Targa<input class="mono" id="c_targa" value="${esc(f.targa||"")}" placeholder="vuota se da targare"></label>
-      <label class="f">Tipo<select id="c_tipo" ${ro}><option value="vendita" ${f.tipo==="vendita"?"selected":""}>Vendita</option><option value="noleggio" ${f.tipo==="noleggio"?"selected":""}>Noleggio</option></select></label></div></div>
+      <div class="grid2"><label class="f">Targa<input class="mono" id="c_targa" value="${esc(f.targa||"")}" placeholder="vuota se da targare" autocomplete="off"></label>
+      <label class="f">Telaio<input class="mono" id="c_telaio" value="${esc(f.telaio||"")}" placeholder="17 caratteri" maxlength="24" autocomplete="off"></label></div>
+      <div class="grid2"><label class="f">Tipo<select id="c_tipo" ${ro}><option value="vendita" ${f.tipo==="vendita"?"selected":""}>Vendita</option><option value="noleggio" ${f.tipo==="noleggio"?"selected":""}>Noleggio</option></select></label></div></div>
     <div class="grid2"><label class="f">Cliente<input id="c_cliente" value="${esc(f.cliente||"")}" ${ro}></label>
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
     <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&S.me.ruolo==="venditore"?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
@@ -1300,13 +1301,13 @@ function openConsegna(id){
   $("c_omlist").addEventListener("click",e=>{const b=e.target.closest("[data-omdel]");if(b)b.closest(".omrow").remove();});
   const mostraVett=()=>{const n=parseInt($("c_numero").value,10),col=$("c_colore").value;const el=$("c_vett");
     if(!(n>=1&&n<=100)){el.textContent="";return null;}const s=slot(col,n);
-    if(occupato(s)){el.innerHTML=`Dal registro chiavi: <b>${esc(s.modello||"modello non indicato")}</b> · ${esc(s.telaio||"telaio non indicato")}${s.targa?" · "+esc(s.targa):""}`;if(nuovo&&!$("c_targa").value&&s.targa)$("c_targa").value=s.targa;return s;}
+    if(occupato(s)){el.innerHTML=`Dal registro chiavi: <b>${esc(s.modello||"modello non indicato")}</b> · ${esc(s.telaio||"telaio non indicato")}${s.targa?" · "+esc(s.targa):""}`;if(nuovo&&!$("c_targa").value&&s.targa)$("c_targa").value=s.targa;if(nuovo&&!$("c_telaio").value&&s.telaio)$("c_telaio").value=s.telaio;return s;}
     el.innerHTML=`<span style="color:var(--bad)">Il ${SING[col]} ${n} non risulta occupato nel registro chiavi: controlla il numero.</span>`;return null;};
   if(nuovo){const cerca=$("c_cerca"),ris=$("c_ris");
     cerca.addEventListener("input",()=>{const q=cerca.value.toUpperCase().replace(/\s/g,"");if(q.length<3){ris.innerHTML=q?'<span class="small">Scrivi almeno 3 caratteri.</span>':"";return;}
       const hit=slots().filter(x=>occupato(x)&&((x.targa||"").includes(q)||(x.telaio||"").includes(q))).slice(0,8);
       ris.innerHTML=hit.length?hit.map(x=>`<button type="button" data-pick="${x.colore}|${x.numero}">${esc(SING[x.colore]+" "+x.numero)} · ${esc(x.targa||"senza targa")} · ${esc((x.telaio||"").slice(-8))} ${esc(x.modello||"")}</button>`).join(""):'<span class="small" style="color:var(--bad)">Nessuna vettura nel registro chiavi con questa targa o telaio.</span>';});
-    ris.addEventListener("click",e=>{const b=e.target.closest("[data-pick]");if(!b)return;const[col,n]=b.dataset.pick.split("|");$("c_colore").value=col;$("c_numero").value=n;$("c_targa").value="";mostraVett();ris.innerHTML="";cerca.value="";});
+    ris.addEventListener("click",e=>{const b=e.target.closest("[data-pick]");if(!b)return;const[col,n]=b.dataset.pick.split("|");$("c_colore").value=col;$("c_numero").value=n;$("c_targa").value="";$("c_telaio").value="";mostraVett();ris.innerHTML="";cerca.value="";});
     setTimeout(()=>cerca.focus(),50);}
   $("c_numero").addEventListener("input",mostraVett);$("c_colore").addEventListener("change",mostraVett);mostraVett();
   const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=oreLavorative(Date.now(),new Date(`${d}T${o}:00`).getTime());
@@ -1318,7 +1319,7 @@ function openConsegna(id){
   $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);$("c_venditore").addEventListener("input",avvData);avvData();
   p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked;if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
   const leggi=()=>{
-    for(const k of["targa","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();
+    for(const k of["targa","telaio","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");
     f.targa=f.targa.toUpperCase().replace(/\s/g,"");f.tipo=$("c_tipo").value;
     f.omaggi=[...p.querySelectorAll(".omrow")].map(r=>({testo:r.querySelector('[data-om="testo"]').value.trim(),fatto:r.querySelector('[data-om="fatto"]').checked})).filter(o=>o.testo);delete f.omaggio;delete f.omaggioFatto;
     p.querySelectorAll("[data-g]").forEach(i=>{f[i.dataset.g][i.dataset.k]=i.checked;});
@@ -1335,7 +1336,7 @@ function openConsegna(id){
   const cid=()=>id||`${f.colore}-${String(f.numero).padStart(3,"0")}-${Date.now().toString(36)}`;
   p.onsubmit=e=>{e.preventDefault();leggi();
     if(nuovo){if(!(f.numero>=1&&f.numero<=100)){$("e_err").innerHTML=`<div class="banner bad">Cerca la vettura per targa o telaio e toccala nei risultati (oppure indica colore e numero chiave).</div>`;return;}
-      const s=mostraVett();if(s){f.telaio=s.telaio||"";f.modello=s.modello||"";}
+      const s=mostraVett();if(s){if(!f.telaio)f.telaio=s.telaio||"";f.modello=s.modello||"";}
       const aperta=[...C.docs.values()].find(c=>c.colore===f.colore&&c.numero===f.numero&&c.stato!=="consegnata"&&c.stato!=="annullata");
       if(aperta){$("e_err").innerHTML=`<div class="banner bad">Per la chiave ${esc(etich(f))} c'è già una consegna aperta (${esc(aperta.cliente||"")}).</div>`;return;}}
     if(f.data&&!base.data)f.date.fissata=oggi();
