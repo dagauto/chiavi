@@ -1,6 +1,6 @@
 {
-  "name": "Chiavi Dag Auto",
-  "short_name": "Chiavi",
+  "name": "Dag Auto Vetture",
+  "short_name": "Dag Vetture",
   "description": "Registro chiavi, lavorazione usato e consegne di Dag Auto",
   "start_url": "./",
   "scope": "./",
