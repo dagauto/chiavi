@@ -1,0 +1,10 @@
+{
+  "name": "leggifoto-dag-auto",
+  "version": "1.0.0",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.4.0",
+    "firebase-admin": "^12.1.0"
+  }
+}
