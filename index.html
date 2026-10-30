@@ -1123,8 +1123,8 @@ function vista(v){
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===v));
   $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();$("btnImpegno").hidden=!["consegne","agenda"].includes(v)||!canImpegni();
   $("btnExport").hidden=v!=="chiavi";$("btnExportU").hidden=v!=="usato";$("btnExportC").hidden=v!=="consegne";$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!canImport();
-  $("h1t").textContent={chiavi:"Dag Auto Vetture",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio",agenda:"Agenda forza vendita"}[v];
-  $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio.",agenda:"Consegne, appuntamenti, corsi e permessi di tutta la forza vendita."}[v];
+  $("h1t").textContent={chiavi:"Dag Auto Vetture",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio",agenda:"Agenda"}[v];
+  $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio.",agenda:"Consegne, appuntamenti, corsi e permessi."}[v];
   try{localStorage.setItem("vista",v);}catch(e){}
   if(v==="usato")renderUsato();if(v==="consegne")renderConsegne();if(v==="agenda")renderAgenda();
 }
@@ -1277,7 +1277,7 @@ function openConsegna(id){
       <label class="f">Tipo<select id="c_tipo" ${ro}><option value="vendita" ${f.tipo==="vendita"?"selected":""}>Vendita</option><option value="noleggio" ${f.tipo==="noleggio"?"selected":""}>Noleggio</option></select></label></div></div>
     <div class="grid2"><label class="f">Cliente<input id="c_cliente" value="${esc(f.cliente||"")}" ${ro}></label>
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
-    <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&S.me.ruolo==="venditore"?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${pes().map(p=>`<option value="${esc(p.nome)}">`).join("")}</datalist></label>
+    <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&S.me.ruolo==="venditore"?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
       <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}"></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}"></label></div><div id="c_dwarn"></div></div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato»</span></h4>
@@ -1374,10 +1374,11 @@ function openConsegna(id){
 }
 $("cList").addEventListener("click",e=>{const im=e.target.closest("[data-imp]");if(im){openImpegno(im.dataset.imp);return;}const b=e.target.closest("[data-c]");if(b)openConsegna(b.dataset.c);});
 $("btnImpegno").onclick=()=>openImpegno(null);
-/* =================== Agenda forza vendita =================== */
+/* =================== Agenda =================== */
 const A={mese:0,chi:""};
+const AGENDA_PERSONE=["Domenico Sperandeo","Nicola Bussolotto","Dino Di Bello","Girolamo De Blasiis"];
 function voceAgenda(iso){
-  const cs=[...C.docs.entries()].map(([id,c])=>Object.assign({id},c)).filter(c=>c.data===iso&&c.stato!=="annullata"&&(!A.chi||norm(c.venditore)===norm(A.chi)))
+  const cs=[...C.docs.entries()].map(([id,c])=>Object.assign({id},c)).filter(c=>c.data===iso&&c.stato!=="annullata"&&(!A.chi||(c.venditore&&(norm(A.chi).includes(norm(c.venditore))||norm(c.venditore).includes(norm(A.chi))))))
     .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${esc(etich(c))} ${esc(c.cliente||"")}</span>`}));
   const is=impegniDel(iso,A.chi).map(i=>({ord:i.tutto?"00":i.dalle||"98",html:`<span class="ach t-${esc(i.tipo||"altro")}" data-imp="${esc(i.id)}">${esc((i.nome||"").split(" ")[0])} ${esc(titoloImp(i)||"impegno")}</span>`}));
   return cs.concat(is).sort((a,b)=>a.ord.localeCompare(b.ord));
@@ -1386,7 +1387,7 @@ function renderAgenda(){
   if(!$("aCal")||$("vAgenda").hidden)return;
   const t=new Date();const m0=new Date(t.getFullYear(),t.getMonth()+A.mese,1);
   $("aMese").textContent=m0.toLocaleDateString("it-IT",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase());
-  const persone=[...new Set(pes().map(p=>p.nome))];
+  const persone=AGENDA_PERSONE;
   $("aChi").innerHTML=[["","Tutti"]].concat(persone.map(n=>[n,n])).map(([v,l])=>`<button class="chip" data-v="${esc(v)}" aria-pressed="${A.chi===v}">${esc(l)}</button>`).join("");
   const start=new Date(m0);start.setDate(1-((m0.getDay()+6)%7));
   let h=["Lun","Mar","Mer","Gio","Ven","Sab","Dom"].map(g=>`<div class="ah">${g}</div>`).join("");
