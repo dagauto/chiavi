@@ -146,8 +146,8 @@ input.mono{font-family:var(--f-mono)!important;text-transform:uppercase}
 .opt span{font-size:13px;color:var(--muted)}
 .rip{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:6px;background:var(--warn-soft);color:var(--warn)}
 .keybox.ripbox{border-color:var(--warn)}
-.tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:12px;align-self:flex-start}
-.tabs button{border:0;background:none;padding:8px 14px;border-radius:9px;color:var(--muted)}
+.tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:12px;align-self:flex-start;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.tabs button{border:0;background:none;padding:8px 12px;border-radius:9px;color:var(--muted);white-space:nowrap}
 .tabs button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .uinfo{display:block;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 .ugrp{margin:10px 0 2px;font-family:var(--f-display);font-size:17px;letter-spacing:.04em;color:var(--muted)}
@@ -168,6 +168,19 @@ input.mono{font-family:var(--f-mono)!important;text-transform:uppercase}
 .cnone{padding:2px 4px 6px}
 .imp{display:flex;gap:8px;align-items:center;width:100%;text-align:left;margin:4px 0;padding:8px 12px;border:1px dashed var(--line);border-radius:10px;background:var(--sunk);font-size:13.5px;color:var(--ink)}
 .imp b{white-space:nowrap}
+.agrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);background:var(--surface);border-radius:10px;overflow:hidden}
+.agrid .ah{font-size:12px;font-weight:600;color:var(--muted);text-align:center;padding:6px 0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--sunk)}
+.aday{min-height:96px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:3px;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-width:0;background:none;text-align:left;font:inherit;color:inherit;border-top:0;border-left:0;border-radius:0}
+.aday.fuori{opacity:.45}.aday.we{background:var(--bg)}.aday.oggi{background:var(--blu-soft)}
+.aday .an{font-size:13px;font-weight:600;padding:0 2px}.aday.oggi .an{color:var(--blu)}
+.ach{display:block;font-size:11.5px;line-height:1.25;padding:2px 4px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.ach.cBLU,.ach.cROSSO,.ach.cVERDE{background:var(--cs);color:var(--cc)}
+.ach.t-appuntamento{background:var(--sunk);color:var(--accent)}.ach.t-corso{background:var(--warn-soft);color:var(--warn)}
+.ach.t-permesso,.ach.t-ferie,.ach.t-assente{background:var(--bad-soft);color:var(--bad)}.ach.t-altro{background:var(--sunk);color:var(--muted)}
+.ach.done{opacity:.55;text-decoration:line-through}
+.amore{font-size:11px;color:var(--muted);padding:0 4px}
+.alegend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.alegend .ach{display:inline-block}
+@media (min-width:700px){.aday{min-height:120px}.ach{font-size:12.5px}}
 .ccard{grid-template-columns:64px minmax(0,1fr)}
 .ctime{display:flex;flex-direction:column;align-items:center;gap:6px}
 .ctime b{font-family:var(--f-display);font-size:20px;font-variant-numeric:tabular-nums}
@@ -259,7 +272,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
 
 <!-- Applicazione -->
 <div class="wrap" id="app" hidden>
-  <nav class="tabs" id="tabs" hidden><button data-tab="chiavi" aria-pressed="true">Chiavi</button><button data-tab="usato" aria-pressed="false">Usato</button><button data-tab="consegne" aria-pressed="false">Consegne</button><button data-tab="archivio" aria-pressed="false">Archivio</button></nav>
+  <nav class="tabs" id="tabs" hidden><button data-tab="chiavi" aria-pressed="true">Chiavi</button><button data-tab="usato" aria-pressed="false">Usato</button><button data-tab="consegne" aria-pressed="false">Consegne</button><button data-tab="agenda" aria-pressed="false">Agenda</button><button data-tab="archivio" aria-pressed="false">Archivio</button></nav>
   <div id="demoBanner" class="banner" hidden>Modalità prova: i dati sono esempi e non vengono salvati. Si attiva il registro vero inserendo i dati di Firebase nel file config.js.</div>
   <header class="top">
     <div>
@@ -270,7 +283,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
       <button class="primary" id="btnBolla">+ Aggiungi vettura</button>
       <button class="primary" id="btnPresa" hidden>+ Presa in carico</button>
       <button class="primary" id="btnConsegna" hidden>+ Consegna</button>
-      <button id="btnImpegno" hidden>+ Impegno PE</button>
+      <button id="btnImpegno" hidden>+ Impegno</button>
       <button id="btnMore" aria-expanded="false">Altro</button>
     </div>
   </header>
@@ -322,6 +335,14 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
       <button class="primary" type="submit">Cerca</button>
     </form>
     <div id="aList" class="list"><div class="empty"><p>Cerca una targa o un telaio: trovi chiavi, lavorazione usato, consegne, storico delle chiavi e tutti i movimenti, anche delle vetture già uscite. Da qui si recuperano le schede usato eliminate per errore.</p></div></div>
+  </div>
+  <div id="vAgenda" hidden>
+    <div class="search">
+      <div class="weeknav"><button id="aPrev" aria-label="Mese precedente">‹</button><span id="aMese"></span><button id="aNext" aria-label="Mese successivo">›</button><button id="aToday">Oggi</button></div>
+      <div class="chips" id="aChi"></div>
+    </div>
+    <div id="aCal"></div>
+    <div class="alegend"><span class="ach cBLU">N · consegna nuova</span><span class="ach cROSSO">U · consegna usato</span><span class="ach cVERDE">V · noleggio</span><span class="ach t-appuntamento">Appuntamento</span><span class="ach t-corso">Corso</span><span class="ach t-permesso">Permesso / ferie / assente</span></div>
   </div>
   <div id="vConsegne" hidden>
     <div class="search">
@@ -1097,15 +1118,15 @@ $("btnExportU").onclick=async()=>{
 };
 function vista(v){
   if(v==="usato"&&!canUsato())v="chiavi";if(v==="consegne"&&!canConsegne())v="chiavi";
-  if(v==="archivio"&&!canArchivio())v="chiavi";
-  $("vChiavi").hidden=v!=="chiavi";$("vUsato").hidden=v!=="usato";$("vConsegne").hidden=v!=="consegne";$("vArchivio").hidden=v!=="archivio";
+  if(v==="archivio"&&!canArchivio())v="chiavi";if(v==="agenda"&&!canConsegne())v="chiavi";
+  $("vAgenda").hidden=v!=="agenda";$("vChiavi").hidden=v!=="chiavi";$("vUsato").hidden=v!=="usato";$("vConsegne").hidden=v!=="consegne";$("vArchivio").hidden=v!=="archivio";
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===v));
-  $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();$("btnImpegno").hidden=v!=="consegne"||!canImpegni();
+  $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();$("btnImpegno").hidden=!["consegne","agenda"].includes(v)||!canImpegni();
   $("btnExport").hidden=v!=="chiavi";$("btnExportU").hidden=v!=="usato";$("btnExportC").hidden=v!=="consegne";$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!canImport();
-  $("h1t").textContent={chiavi:"Dag Auto Vetture",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio"}[v];
-  $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio."}[v];
+  $("h1t").textContent={chiavi:"Dag Auto Vetture",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio",agenda:"Agenda forza vendita"}[v];
+  $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio.",agenda:"Consegne, appuntamenti, corsi e permessi di tutta la forza vendita."}[v];
   try{localStorage.setItem("vista",v);}catch(e){}
-  if(v==="usato")renderUsato();if(v==="consegne")renderConsegne();
+  if(v==="usato")renderUsato();if(v==="consegne")renderConsegne();if(v==="agenda")renderAgenda();
 }
 $("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b)vista(b.dataset.tab);});
 
@@ -1119,31 +1140,38 @@ const canConsegne=()=>S.me&&S.me.ruolo!=="operatore";
 const canCreaConsegna=()=>S.me&&["admin","backoffice","usato","venditore"].includes(S.me.ruolo);
 const canImpegni=canCreaConsegna;
 const canImpTutti=()=>S.me&&["admin","backoffice","usato"].includes(S.me.ruolo);
-const pes=()=>(S.utenti||[]).filter(u=>u.ruolo==="venditore").map(u=>({email:u.email,nome:u.nome||u.email})).sort((a,b)=>a.nome.localeCompare(b.nome));
-const fasciaImp=i=>i.tutto?"tutto il giorno":`${i.dalle||"--:--"}–${i.alle||"--:--"}`;
-function impegniDel(data,nomeOEmail){const k=norm(nomeOEmail);return[...C.imp.entries()].map(([id,i])=>Object.assign({id},i)).filter(i=>i.data===data&&(!k||norm(i.nome)===k||norm(i.email)===k||norm(i.nome).includes(k)||k.includes(norm(i.nome))));}
+const FORZA=["venditore","usato","backoffice","admin","bdc"];
+const pes=()=>(S.utenti||[]).filter(u=>FORZA.includes(u.ruolo)).map(u=>({email:u.email,nome:u.nome||u.email})).sort((a,b)=>a.nome.localeCompare(b.nome));
+const TIPI_IMP=[["appuntamento","Appuntamento"],["corso","Corso"],["permesso","Permesso"],["ferie","Ferie"],["assente","Assente"],["altro","Altro"]];
+const NOME_TIPO=Object.fromEntries(TIPI_IMP);
+const fasciaImp=i=>(i.fino&&i.fino>i.data?`fino al ${new Date(i.fino).toLocaleDateString("it-IT",{day:"numeric",month:"short"})} · `:"")+(i.tutto?"tutto il giorno":`${i.dalle||"--:--"}–${i.alle||"--:--"}`);
+const titoloImp=i=>[NOME_TIPO[i.tipo||"altro"]||"",i.nota].filter(Boolean).join(": ");
+function impegniDel(data,nomeOEmail){const k=norm(nomeOEmail);return[...C.imp.entries()].map(([id,i])=>Object.assign({id},i)).filter(i=>i.data<=data&&(i.fino||i.data)>=data&&(!k||norm(i.nome)===k||norm(i.email)===k||norm(i.nome).includes(k)||k.includes(norm(i.nome))));}
 function sovrapposto(i,ora){if(i.tutto||!ora)return true;return ora>=(i.dalle||"00:00")&&ora<(i.alle||"23:59");}
 function openImpegno(id){
-  const nuovo=!id;const f=nuovo?{data:oggi(),tutto:false,dalle:"09:00",alle:"13:00",nota:"",email:S.me.email,nome:S.me.nome}:Object.assign({},C.imp.get(id));
+  const nuovo=typeof id!=="string";const f=nuovo?{data:(id&&id.data)||oggi(),tipo:"appuntamento",tutto:false,dalle:"09:00",alle:"13:00",nota:"",email:S.me.email,nome:S.me.nome}:Object.assign({tipo:"altro"},C.imp.get(id));if(nuovo)id=null;
   const mio=f.email===S.me.email;const ed=nuovo||mio||canImpTutti();const ro=ed?"":"disabled";
   const lista=pes();const scelta=canImpTutti()&&lista.length?`<label class="f">Product expert<select id="i_pe" ${ro}>${(lista.some(p=>p.email===f.email)?lista:[{email:f.email,nome:f.nome}].concat(lista)).map(p=>`<option value="${esc(p.email)}" ${p.email===f.email?"selected":""}>${esc(p.nome)}</option>`).join("")}</select></label>`:`<p class="small">Product expert: <b>${esc(f.nome)}</b></p>`;
   const p=openSheet(`<form class="panel" id="if" novalidate role="dialog" aria-modal="true" aria-label="Impegno product expert">
     <div class="phead"><div><h2>${nuovo?"Nuovo impegno":"Impegno"}</h2><p>Il back office lo vede quando fissa le consegne: quel giorno o in quella fascia il product expert non è disponibile.</p></div></div>
     ${scelta}
-    <div class="grid2"><label class="f">Data<input type="date" id="i_data" value="${esc(f.data||"")}" ${ro}></label>
+    <div class="places" id="i_tipo">${TIPI_IMP.map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.tipo===k}" ${ro}>${l}</button>`).join("")}</div>
+    <div class="grid2"><label class="f">Data<input type="date" id="i_data" value="${esc(f.data||"")}" ${ro}></label><label class="f">Fino al (più giorni, facoltativo)<input type="date" id="i_fino" value="${esc(f.fino||"")}" ${ro}></label></div>
+    <div class="grid2">
       <label class="chk" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="i_tutto" ${f.tutto?"checked":""} ${ro}> Tutto il giorno</label></div>
     <div class="grid2" id="i_fascia" ${f.tutto?"hidden":""}><label class="f">Dalle<input type="time" id="i_dalle" value="${esc(f.dalle||"")}" ${ro}></label><label class="f">Alle<input type="time" id="i_alle" value="${esc(f.alle||"")}" ${ro}></label></div>
-    <label class="f">Motivo (facoltativo)<input id="i_nota" value="${esc(f.nota||"")}" placeholder="es. appuntamento cliente, ferie, corso Mercedes" ${ro}></label>
+    <label class="f">Descrizione (facoltativa)<input id="i_nota" value="${esc(f.nota||"")}" placeholder="es. cliente Rossi test drive GLC, corso Mercedes Roma" ${ro}></label>
     <div id="e_err"></div>
     <div class="pfoot">${!nuovo&&ed?`<button type="button" class="danger" id="i_del">Elimina</button>`:"<span></span>"}<div class="r"><button type="button" id="i_close">Chiudi</button>${ed?`<button type="submit" class="primary" id="e_save">${nuovo?"Salva impegno":"Salva"}</button>`:""}</div></div>
   </form>`);
   $("i_close").onclick=closeSheet;
   $("i_tutto").onchange=()=>{$("i_fascia").hidden=$("i_tutto").checked;};
+  $("i_tipo").onclick=e=>{const b=e.target.closest("[data-v]");if(!b||!ed)return;f.tipo=b.dataset.v;$("i_tipo").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));if(["ferie","assente","permesso"].includes(f.tipo)&&!$("i_tutto").checked&&f.tipo!=="permesso"){$("i_tutto").checked=true;$("i_fascia").hidden=true;}};
   const salvaI=async(w,msg)=>{const b=$("e_save");if(b)b.disabled=true;try{await S.store.commitU(w,[]);closeSheet();flash(msg,"ok");}catch(x){if(b)b.disabled=false;$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}};
   const d=$("i_del");if(d)d.onclick=()=>{if(!d.dataset.armed){d.dataset.armed="1";d.textContent="Conferma eliminazione";return;}salvaI([{col:"impegni",id,del:true}],"Impegno eliminato.");};
   p.onsubmit=e=>{e.preventDefault();if(!ed)return;
     const sel=$("i_pe");if(sel){f.email=sel.value;f.nome=(pes().find(x=>x.email===f.email)||{nome:f.nome}).nome;}
-    f.data=$("i_data").value;f.tutto=$("i_tutto").checked;f.dalle=$("i_dalle").value;f.alle=$("i_alle").value;f.nota=$("i_nota").value.trim();
+    f.data=$("i_data").value;f.fino=$("i_fino").value>f.data?$("i_fino").value:"";f.tutto=$("i_tutto").checked;f.dalle=$("i_dalle").value;f.alle=$("i_alle").value;f.nota=$("i_nota").value.trim();
     if(!f.data){$("e_err").innerHTML=`<div class="banner bad">Indica la data.</div>`;return;}
     if(!f.tutto&&(!f.dalle||!f.alle||f.alle<=f.dalle)){$("e_err").innerHTML=`<div class="banner bad">Indica l'orario: «alle» deve essere dopo «dalle», oppure spunta «Tutto il giorno».</div>`;return;}
     delete f.id;salvaI([{col:"impegni",id:id||`imp-${Date.now().toString(36)}`,data:f}],nuovo?"Impegno salvato.":"Impegno aggiornato.");};
@@ -1201,7 +1229,7 @@ function renderConsegne(){
     const im=impegniDel(iso,"").sort((a,b)=>(a.tutto?"0":a.dalle||"").localeCompare(b.tutto?"0":b.dalle||""));
     html+=`<h3 class="ugrp ${oggiC?"today":""}">${GIORNI[i]} ${d.getDate()}${oggiC?" · oggi":""}${xs.length?` · ${xs.length}`:""}</h3>`;
     html+=xs.length?xs.map(cardC).join(""):`<div class="small cnone">Nessuna consegna</div>`;
-    html+=im.map(x=>`<button type="button" class="imp" data-imp="${esc(x.id)}"><b>${esc(fasciaImp(x))}</b><span>${esc(x.nome||"")} non disponibile${x.nota?" · "+esc(x.nota):""}</span></button>`).join("");
+    html+=im.map(x=>`<button type="button" class="imp" data-imp="${esc(x.id)}"><b>${esc(fasciaImp(x))}</b><span>${esc(x.nome||"")} · ${esc(titoloImp(x)||"non disponibile")}</span></button>`).join("");
   }
   $("cList").innerHTML=html;
 }
@@ -1284,7 +1312,7 @@ function openConsegna(id){
   const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=oreLavorative(Date.now(),new Date(`${d}T${o}:00`).getTime());
     w.innerHTML=h<24?`<div class="banner">Mancano meno di 24 ore lavorative (sabato e domenica esclusi): avvisa subito i preparatori.</div>`:"";const dup=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.ora&&c.ora===$("c_ora").value&&c.stato!=="annullata");if(dup.length)w.innerHTML+=`<div class="banner">Alla stessa ora c'è già: ${dup.map(([,c])=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}.</div>`;
     const pe=$("c_venditore").value.trim();if(pe){const im=impegniDel(d,pe);const ora=$("c_ora").value;const hit=im.filter(i=>sovrapposto(i,ora));
-      if(im.length)w.innerHTML+=`<div class="banner ${hit.length?"bad":""}">${esc(pe)} ${hit.length?"non è disponibile":"quel giorno ha impegni"}: ${im.map(i=>esc(fasciaImp(i)+(i.nota?" ("+i.nota+")":""))).join(", ")}.</div>`;
+      if(im.length)w.innerHTML+=`<div class="banner ${hit.length?"bad":""}">${esc(pe)} ${hit.length?"non è disponibile":"quel giorno ha impegni"}: ${im.map(i=>esc(fasciaImp(i)+(titoloImp(i)?" ("+titoloImp(i)+")":""))).join(", ")}.</div>`;
       const altre=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.stato!=="annullata"&&norm(c.venditore)===norm(pe));
       if(altre.length)w.innerHTML+=`<div class="banner">${esc(pe)} quel giorno ha già ${altre.length} ${plur(altre.length,"consegna","consegne")}: ${altre.map(([,c])=>esc((c.ora||"--:--")+" "+etich(c))).join(", ")}.</div>`;}};
   $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);$("c_venditore").addEventListener("input",avvData);avvData();
@@ -1346,6 +1374,40 @@ function openConsegna(id){
 }
 $("cList").addEventListener("click",e=>{const im=e.target.closest("[data-imp]");if(im){openImpegno(im.dataset.imp);return;}const b=e.target.closest("[data-c]");if(b)openConsegna(b.dataset.c);});
 $("btnImpegno").onclick=()=>openImpegno(null);
+/* =================== Agenda forza vendita =================== */
+const A={mese:0,chi:""};
+function voceAgenda(iso){
+  const cs=[...C.docs.entries()].map(([id,c])=>Object.assign({id},c)).filter(c=>c.data===iso&&c.stato!=="annullata"&&(!A.chi||norm(c.venditore)===norm(A.chi)))
+    .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${esc(etich(c))} ${esc(c.cliente||"")}</span>`}));
+  const is=impegniDel(iso,A.chi).map(i=>({ord:i.tutto?"00":i.dalle||"98",html:`<span class="ach t-${esc(i.tipo||"altro")}" data-imp="${esc(i.id)}">${esc((i.nome||"").split(" ")[0])} ${esc(titoloImp(i)||"impegno")}</span>`}));
+  return cs.concat(is).sort((a,b)=>a.ord.localeCompare(b.ord));
+}
+function renderAgenda(){
+  if(!$("aCal")||$("vAgenda").hidden)return;
+  const t=new Date();const m0=new Date(t.getFullYear(),t.getMonth()+A.mese,1);
+  $("aMese").textContent=m0.toLocaleDateString("it-IT",{month:"long",year:"numeric"}).replace(/^./,c=>c.toUpperCase());
+  const persone=[...new Set(pes().map(p=>p.nome))];
+  $("aChi").innerHTML=[["","Tutti"]].concat(persone.map(n=>[n,n])).map(([v,l])=>`<button class="chip" data-v="${esc(v)}" aria-pressed="${A.chi===v}">${esc(l)}</button>`).join("");
+  const start=new Date(m0);start.setDate(1-((m0.getDay()+6)%7));
+  let h=["Lun","Mar","Mer","Gio","Ven","Sab","Dom"].map(g=>`<div class="ah">${g}</div>`).join("");
+  for(let i=0;i<42;i++){const d=new Date(start);d.setDate(start.getDate()+i);if(i>=35&&d.getMonth()!==m0.getMonth())break;
+    const iso=isoD(d),vs=voceAgenda(iso),max=4;
+    h+=`<div class="aday ${d.getMonth()!==m0.getMonth()?"fuori":""} ${i%7>=5?"we":""} ${iso===oggi()?"oggi":""}" data-day="${iso}"><span class="an">${d.getDate()}</span>${vs.slice(0,max).map(v=>v.html).join("")}${vs.length>max?`<span class="amore">+${vs.length-max} altri</span>`:""}</div>`;}
+  $("aCal").innerHTML=`<div class="agrid">${h}</div>`;
+}
+function giornoAgenda(iso){
+  const d=new Date(iso+"T12:00:00");const vs=voceAgenda(iso);
+  openSheet(`<div class="panel" role="dialog" aria-modal="true" aria-label="Giorno"><div class="phead"><div><h2>${esc(d.toLocaleDateString("it-IT",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase()))}</h2><p>${vs.length?`${vs.length} ${plur(vs.length,"voce","voci")}`:"Nessuna voce"}</p></div></div>
+    <div id="g_list" style="display:flex;flex-direction:column;gap:6px">${vs.map(v=>v.html.replace('class="ach','style="font-size:14px;padding:8px 10px;white-space:normal" class="ach')).join("")||'<p class="small">Giornata libera per tutti.</p>'}</div>
+    <div class="pfoot"><span></span><div class="r"><button type="button" id="g_close">Chiudi</button>${canImpegni()?`<button type="button" class="primary" id="g_imp">+ Impegno</button>`:""}${canCreaConsegna()?`<button type="button" id="g_cons">+ Consegna</button>`:""}</div></div></div>`);
+  $("g_close").onclick=closeSheet;
+  const gi=$("g_imp");if(gi)gi.onclick=()=>{closeSheet();openImpegno({data:iso});};
+  const gc=$("g_cons");if(gc)gc.onclick=()=>{closeSheet();openConsegna(null);setTimeout(()=>{const x=$("c_data");if(x){x.value=iso;x.dispatchEvent(new Event("input"));}},60);};
+  $("g_list").onclick=e=>{const im=e.target.closest("[data-imp]");if(im){closeSheet();openImpegno(im.dataset.imp);return;}const c=e.target.closest("[data-c]");if(c){closeSheet();openConsegna(c.dataset.c);}};
+}
+$("aCal").addEventListener("click",e=>{const d=e.target.closest("[data-day]");if(d)giornoAgenda(d.dataset.day);});
+$("aPrev").onclick=()=>{A.mese--;renderAgenda();};$("aNext").onclick=()=>{A.mese++;renderAgenda();};$("aToday").onclick=()=>{A.mese=0;renderAgenda();};
+$("aChi").addEventListener("click",e=>{const b=e.target.closest("[data-v]");if(!b)return;A.chi=b.dataset.v;renderAgenda();});
 $("cPrev").onclick=()=>{C.week--;renderConsegne();};$("cNext").onclick=()=>{C.week++;renderConsegne();};$("cToday").onclick=()=>{C.week=0;renderConsegne();};
 $("cq").addEventListener("input",e=>{C.q=e.target.value.trim();renderConsegne();});
 $("btnConsegna").onclick=()=>openConsegna(null);
@@ -1439,16 +1501,16 @@ function avviaApp(store){
   if(isAdmin())store.onUtenti(u=>{S.utenti=u;renderUtenti();});
   if(canUsato()){$("tabs").hidden=false;store.onColl("usato",l=>{U.docs=new Map(l);renderUsato();});
     if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);});
-    store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();});
-    store.onColl("impegni",l=>{C.imp=new Map(l);renderConsegne();});
+    store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();renderAgenda();});
+    store.onColl("impegni",l=>{C.imp=new Map(l);renderConsegne();renderAgenda();});
     if(!isAdmin())store.onUtenti(u=>{S.utenti=u;});}
   $("whoami").textContent=`Accesso: ${store.me.nome} (${store.me.email}) · ${NOME_RUOLO[store.me.ruolo]||store.me.ruolo}`;
   if(store.onMiePrefs)store.onMiePrefs(d=>{MIE=Object.assign({prefs:{},tokens:[]},d);renderNotifiche();});
   try{if(!store.demo&&localStorage.getItem("pushOn")==="1"&&window.Notification&&Notification.permission==="granted")store.attivaPush().catch(()=>{});}catch(e){}
   render();
   let v="chiavi";try{v=localStorage.getItem("vista")||"chiavi";}catch(e){}
-  const hv=location.hash.replace("#","");if(["chiavi","usato","consegne","archivio"].includes(hv))v=hv;vista(v);
-  window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(["chiavi","usato","consegne","archivio"].includes(h))vista(h);});
+  const hv=location.hash.replace("#","");if(["chiavi","usato","consegne","archivio","agenda"].includes(hv))v=hv;vista(v);
+  window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(["chiavi","usato","consegne","archivio","agenda"].includes(h))vista(h);});
 }
 if(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.apiKey){avviaFirebase().catch(()=>{show("boot");$("boot").innerHTML=`<div class="banner bad">Non riesco a collegarmi al registro. Controlla la connessione e ricarica la pagina.</div>`;});}
 else avviaDemo();
