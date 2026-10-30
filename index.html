@@ -376,7 +376,8 @@ const SING={BLU:"Blu",ROSSO:"Rossa",VERDE:"Verde"};
 const LETT={BLU:"N",ROSSO:"U",VERDE:"V"};const LETT_OLD={BLU:"B",ROSSO:"R",VERDE:"V"};
 const LUOGHI=["Salone","Officina","Garage","Cimitero","Bel Sito"];
 const RETRO="retro cassaforte salone";
-const TIPI_RIP=["Meccanica","Carrozzeria","Sanificazione","Altro"];
+const TIPI_RIP=["Danni da trasporto","Meccanica","Carrozzeria","Sanificazione","Altro"];
+const DT="Danni da trasporto";
 const MOTIVI=["Seconda mai arrivata da Mercedes","Seconda rimasta al cliente","Chiave persa","Altro (vedi note)"];
 const FB="https://www.gstatic.com/firebasejs/10.12.2/";
 const S={docs:new Map(),log:[],utenti:[],q:"",col:null,stato:"incasa",luogo:null,store:null,me:null};
@@ -640,10 +641,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)
 const erroreScrittura=e=>e&&String(e.code||"").includes("permission")?"Non hai il permesso di fare questa modifica.":"Salvataggio non riuscito. Controlla la connessione e riprova.";
 
 /* =================== Scheda vettura =================== */
-const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
+const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["danni","Danni da trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
 function openEditor(id,assegna){
   const base=slots().find(s=>s.id===id);if(!base)return;
-  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",controllatoDa:"",dataControllo:"",note:""},base);
+  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",danni:"",controllatoDa:"",dataControllo:"",note:""},base);
   const libero=!occupato(base);
   if(assegna&&libero){f.prima="Sì";f.dovePrima="Salone";f.seconda=base.colore==="BLU"?"Sì":"";f.dataControllo=oggi();f.controllatoDa=S.me.nome;}
   const seg=k=>`<span class="seg" data-k="${k}">${["Sì","No"].map(v=>`<button type="button" data-v="${v}" aria-pressed="${f[k]===v}">${v}</button>`).join("")}</span>`;
@@ -656,9 +657,10 @@ function openEditor(id,assegna){
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
     <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
-    ${libero?"":`<div class="keybox ripbox"><h4><span>In ripristino<br><span class="small">${inRip(base)?esc(ripTesto(base)):"officina, sanificazione o carrozziere"}</span></span> ${seg("ripristino")}</h4>
+    ${`<div class="keybox ripbox"><h4><span>In ripristino<br><span class="small">${inRip(base)?esc(ripTesto(base)):"danni da trasporto, officina, sanificazione o carrozziere"}</span></span> ${seg("ripristino")}</h4>
       <div id="e_ripbox" ${f.ripristino==="Sì"?"":"hidden"}><div class="places" data-k="ripristinoTipo">${TIPI_RIP.map(t=>`<button type="button" class="chip" data-v="${t}" aria-pressed="${f.ripristinoTipo===t}">${t}</button>`).join("")}</div>
-      <label class="f" style="margin-top:8px">Dove o da chi (facoltativo)<input id="e_ripristinoDove" value="${esc(f.ripristinoDove)}" placeholder="es. Carrozzeria esterna, box officina 2"></label></div></div>`}
+      <label class="f" style="margin-top:8px">Dove o da chi (facoltativo)<input id="e_ripristinoDove" value="${esc(f.ripristinoDove)}" placeholder="es. Carrozzeria esterna, box officina 2"></label>
+      <label class="f" id="e_dannibox" style="margin-top:8px" ${f.ripristinoTipo===DT?"":"hidden"}>Descrizione dei danni da trasporto<textarea id="e_danni" rows="2" placeholder="es. graffio portiera posteriore sx, cerchio anteriore dx">${esc(f.danni||"")}</textarea></label></div></div>`}
     <label class="f">Motivo se c'è una sola chiave<select id="e_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${f.motivo===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label>
     <div class="grid2">
       <label class="f">Controllato da<input id="e_controllatoDa" value="${esc(f.controllatoDa)}"></label>
@@ -675,6 +677,7 @@ function openEditor(id,assegna){
   ed.addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(!b)return;const k=b.parentElement.dataset.k;f[k]=f[k]===b.dataset.v?"":b.dataset.v;press(k);
     if(k==="prima"&&f.prima!=="Sì"){f.dovePrima="";press("dovePrima");}
     if(k==="dovePrima"&&f.dovePrima){f.prima="Sì";press("prima");}
+    if(k==="ripristinoTipo"){const db=$("e_dannibox");if(db)db.hidden=f.ripristinoTipo!==DT;if(f.ripristinoTipo&&f.ripristino!=="Sì"){f.ripristino="Sì";press("ripristino");if(!f.ripristinoDal)f.ripristinoDal=oggi();}}
     if(k==="ripristino"){$("e_ripbox").hidden=f.ripristino!=="Sì";if(f.ripristino==="Sì"){if(!f.ripristinoDal)f.ripristinoDal=oggi();}else{f.ripristinoTipo="";f.ripristinoDove="";f.ripristinoDal="";press("ripristinoTipo");const d=$("e_ripristinoDove");if(d)d.value="";}}
   });
   $("e_close").onclick=closeSheet;
@@ -688,6 +691,7 @@ function openEditor(id,assegna){
   ed.onsubmit=e=>{e.preventDefault();
     for(const k of["telaio","targa","modello","motivo","controllatoDa","dataControllo","note"])f[k]=$("e_"+k).value.trim();
     if($("e_ripristinoDove"))f.ripristinoDove=f.ripristino==="Sì"?$("e_ripristinoDove").value.trim():"";
+    if($("e_danni")&&f.ripristinoTipo===DT)f.danni=$("e_danni").value.trim();
     if(f.ripristino!=="Sì")f.ripristino="";
     f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");f.targa=f.targa.toUpperCase().replace(/\s/g,"");
     const dup=telaioUsato(f.telaio,base.id);
@@ -820,9 +824,12 @@ function renderRighe(){
         <label class="f">Prima chiave in<select data-f="dovePrima">${LUOGHI.map(l=>`<option ${r.dovePrima===l?"selected":""}>${l}</option>`).join("")}<option value="" ${!r.dovePrima?"selected":""}>Non c'è</option></select></label>
         <label class="f">Seconda chiave (${RETRO})<select data-f="seconda"><option value="Sì" ${r.seconda==="Sì"?"selected":""}>Sì, c'è</option><option value="No" ${r.seconda==="No"?"selected":""}>Non c'è</option></select></label>
       </div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" data-f="danni" ${r.danni?"checked":""}> Danni da trasporto: va in ripristino</label>
+      ${r.danni?`<label class="f">Descrizione danni<input data-f="danniDescr" value="${esc(r.danniDescr||"")}" placeholder="es. graffio portiera post. sx, cerchio ant. dx" autocomplete="off"></label>`:""}
       <div class="rowmsg ${k}" data-msg>${esc(m)}</div>
     </div>`;}).join("");
   box.oninput=e=>{const t=e.target,row=t.closest(".vrow");if(!row||!t.dataset.f)return;const r=B.righe[+row.dataset.i];
+    if(t.dataset.f==="danni"){r.danni=t.checked;renderRighe();return;}
     let v=t.value;if(t.dataset.f==="telaio"||t.dataset.f==="targa")v=v.toUpperCase().replace(/\s/g,"");r[t.dataset.f]=v;
     if(t.dataset.f==="dovePrima")r.prima=v?"Sì":"No";
     const[k,m]=controllaRiga(r,+row.dataset.i);const mm=row.querySelector("[data-msg]");mm.className="rowmsg "+k;mm.textContent=m;};
@@ -837,7 +844,8 @@ async function registraBolla(){
   if(errs.length){$("b_err").innerHTML=`<div class="banner bad">Sistema prima ${errs.length===1?"la vettura evidenziata":"le "+errs.length+" vetture evidenziate"}: ${esc(errs[0][1])}</div>`;return;}
   const writes=[],logs=[];
   for(const r of B.righe){const n=parseInt(r.numero,10);
-    writes.push({id:idOf(r.colore,n),data:{colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"}});
+    writes.push({id:idOf(r.colore,n),data:Object.assign({colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"},r.danni?{ripristino:"Sì",ripristinoTipo:DT,ripristinoDove:"",ripristinoDal:oggi(),danni:(r.danniDescr||"").trim()}:{})});
+    if(r.danni)logs.push({codice:`${LETT[r.colore]}.${n}`,azione:"In ripristino",dettaglio:[DT,(r.danniDescr||"").trim()].filter(Boolean).join(" · ")});
     logs.push({codice:`${LETT[r.colore]}.${n}`,azione:r.foto?"Assegnato da foto":"Assegnato a mano",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
   $("b_save").disabled=true;
   try{await S.store.commit(writes,logs);closeSheet();flash(writes.length===1?"Vettura registrata.":`${writes.length} vetture registrate.`,"ok");}
@@ -876,7 +884,7 @@ $("fileImport").onchange=async e=>{
 };
 $("btnExport").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
-  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Seconda chiave":s.seconda||"","Stato":stato(s),"In ripristino":s.ripristino||"","Lavoro ripristino":s.ripristinoTipo||"","Dove ripristino":s.ripristinoDove||"","In ripristino dal":s.ripristinoDal||"","Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
+  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Seconda chiave":s.seconda||"","Stato":stato(s),"In ripristino":s.ripristino||"","Lavoro ripristino":s.ripristinoTipo||"","Dove ripristino":s.ripristinoDove||"","Danni da trasporto":s.danni||"","In ripristino dal":s.ripristinoDal||"","Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
   const ws=XLSX.utils.json_to_sheet(rows);ws["!cols"]=[9,9,10,20,11,18,11,12,12,16,11,14,20,13,30,30,14,13,30].map(w=>({wch:w}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Censimento");
   const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
