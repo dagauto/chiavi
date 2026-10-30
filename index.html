@@ -621,7 +621,7 @@ function openEditor(id,assegna){
   const libero=!occupato(base);
   if(assegna&&libero){f.prima="Sì";f.dovePrima="Salone";f.seconda=base.colore==="BLU"?"Sì":"";f.dataControllo=oggi();f.controllatoDa=S.me.nome;}
   const seg=k=>`<span class="seg" data-k="${k}">${["Sì","No"].map(v=>`<button type="button" data-v="${v}" aria-pressed="${f[k]===v}">${v}</button>`).join("")}</span>`;
-  const ed=openSheet(`<form class="panel c${base.colore}" id="ed" role="dialog" aria-modal="true" aria-label="Chiavi ${codice(base)}">
+  const ed=openSheet(`<form class="panel c${base.colore}" id="ed" novalidate role="dialog" aria-modal="true" aria-label="Chiavi ${codice(base)}">
     <div class="phead">${tagHtml(base)}<div><h2>${esc(NOMI[base.colore])} · n° ${base.numero}</h2><p>Prima chiave al ${base.numero}, seconda al ${base.numero+100}${libero?" · numero libero":""}</p></div></div>
     <div class="grid2">
       <label class="f">Targa<input class="mono" id="e_targa" value="${esc(f.targa)}" autocomplete="off"></label>
@@ -886,7 +886,7 @@ const NOME_STATO=Object.fromEntries(STATI_U);
 const VOCI=[["carrozzeria","Carrozzeria"],["manutenzione","Manutenzione"],["freni","Freni"],["pneumatici","Pneumatici"],["meccanica","Meccanica e motore"],["cristalli","Cristalli"],["illuminazione","Impianto illuminazione"],["interni","Interni e sanificazione"],["altro","Altro"]];
 const PRIO=[["alta","Alta"],["normale","Normale"],["bassa","Bassa"]];
 const PRIO_ORD={alta:0,normale:1,bassa:2};
-const RUOLI=[["operatore","Operatore chiavi: cerca, sposta, assegna chiavi"],["officina","Officina / preparatore: chiavi, ripristini, preparazione consegne · niente carico fiscale"],["venditore","Product expert / venditore: consegne e appuntamenti · niente carico fiscale"],["ripristini","Ripristini: chiavi + lavorazione usato"],["foto","Foto: chiavi + lavorazione usato"],["backoffice","Responsabile back office: tutto, carico fiscale compreso"],["usato","Responsabile usato: tutto, carico fiscale compreso"],["admin","Amministratore: tutto, anche import Excel e utenti"]];
+const RUOLI=[["operatore","Operatore chiavi: cerca, sposta, assegna chiavi"],["officina","Officina: chiavi, ripristini usato · niente carico fiscale"],["preparatore","Preparatore: chiavi, preparazione consegne · niente carico fiscale"],["venditore","Product expert / venditore: consegne e appuntamenti · niente carico fiscale"],["ripristini","Ripristini: chiavi + lavorazione usato"],["foto","Foto: chiavi + lavorazione usato"],["backoffice","Responsabile back office: tutto, carico fiscale compreso"],["usato","Responsabile usato: tutto, carico fiscale compreso"],["admin","Amministratore: tutto, anche import Excel e utenti"]];
 const NOME_RUOLO=Object.fromEntries(RUOLI.map(([k,v])=>[k,v.split(":")[0]]));
 const canUsato=()=>S.me&&S.me.ruolo!=="operatore";
 const canFiscale=()=>S.me&&["admin","backoffice","usato"].includes(S.me.ruolo);
@@ -995,7 +995,7 @@ function openUsato(id){
   const r=Object.assign({valoreContratto:"",ivaEsposta:""},ris);
   const edDati=canPresa();
   const inp=(k,l,o={})=>`<label class="f">${l}<input id="u_${k}" ${o.mono?'class="mono"':""} ${o.type?`type="${o.type}"`:""} ${o.im?`inputmode="${o.im}"`:""} value="${esc(f[k]??"")}" ${edDati?"":"disabled"} autocomplete="off"></label>`;
-  const p=openSheet(`<form class="panel" id="uf" role="dialog" aria-modal="true" aria-label="${nuovo?"Presa in carico":"Vettura usata"}">
+  const p=openSheet(`<form class="panel" id="uf" novalidate role="dialog" aria-modal="true" aria-label="${nuovo?"Presa in carico":"Vettura usata"}">
     <div class="phead"><div><h2>${nuovo?"Presa in carico":esc((f.targa||"")+" · "+(f.modello||""))}</h2><p>${nuovo?"Incolla la mail di presa in carico oppure compila a mano.":`${esc(NOME_STATO[f.stato])} ${esc(giorniTxt(giorniStato(f)))}`}</p></div></div>
     ${nuovo?`<details class="raw" open><summary>Incolla il testo della mail di presa in carico</summary>
       <textarea id="u_mail" rows="5" style="width:100%;font:inherit;font-size:14px;margin-top:8px;padding:10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)" placeholder="Apri la mail, seleziona tutto il testo, copia e incolla qui"></textarea>
@@ -1203,7 +1203,7 @@ function openConsegna(id){
   const edAll=canCreaConsegna()||isAdmin();
   const ro=edAll?"":"disabled";
   const ck=(grp,k,l,dis)=>`<label class="chk"><input type="checkbox" data-g="${grp}" data-k="${k}" ${(f[grp]||{})[k]?"checked":""} ${dis?"disabled":""}> ${esc(l)}</label>`;
-  const p=openSheet(`<form class="panel" id="cf" role="dialog" aria-modal="true" aria-label="Consegna">
+  const p=openSheet(`<form class="panel" id="cf" novalidate role="dialog" aria-modal="true" aria-label="Consegna">
     <div class="phead"><div><h2>${nuovo?"Nuova consegna":esc(etich(f)+" · "+(f.cliente||""))}</h2><p>${nuovo?"Il back office la crea una settimana prima: l'officina la vede subito nel calendario.":esc(semaforo(f)[1])}</p></div></div>
     <div class="keybox"><h4>Vettura</h4>
       <div class="grid2"><label class="f">Colore chiave<select id="c_colore" ${nuovo?"":"disabled"}>${COLORI.map(c=>`<option value="${c}" ${f.colore===c?"selected":""}>${SING[c]} (${LETT_C[c]})</option>`).join("")}</select></label>
@@ -1215,7 +1215,7 @@ function openConsegna(id){
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
     <label class="f">Venditore / Product expert<input id="c_venditore" value="${esc(f.venditore||(nuovo&&S.me.ruolo==="venditore"?S.me.nome:""))}" ${ro}></label>
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
-      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}"></label><label class="f">Ora<input type="time" id="c_ora" step="900" value="${esc(f.ora||"")}"></label></div><div id="c_dwarn"></div></div>
+      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}"></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}"></label></div><div id="c_dwarn"></div></div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato»</span></h4>
       ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label><label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel?"":"disabled"}> montato</label></div>`;}).join("")}
       <div class="accrow" style="border-top:0"><b style="font-size:14px">Accessori in omaggio</b></div>
@@ -1350,7 +1350,7 @@ $("btnExportC").onclick=async()=>{
 };
 
 /* =================== Notifiche =================== */
-const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["venditore","backoffice"]],["usato_presa","Nuova presa in carico usato",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto"]]];
+const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["venditore","backoffice"]],["usato_presa","Nuova presa in carico usato",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto"]]];
 const coda=(evento,titolo,testo,link)=>({col:"notifiche_coda",id:`${evento}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,data:{evento,titolo,testo,link:link||"",inviata:false,ts:Date.now()}});
 let MIE={prefs:{},tokens:[]};
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
