@@ -362,6 +362,7 @@ const norm=s=>String(s??"").toUpperCase().replace(/[\s\-\.]/g,"");
 const idOf=(c,n)=>c+"-"+String(n).padStart(3,"0");
 const oggi=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
 const isAdmin=()=>S.me&&S.me.ruolo==="admin";
+const canImport=()=>S.me&&["admin","backoffice","usato"].includes(S.me.ruolo);
 function show(id){for(const x of["boot","auth","app"])$(x).hidden=x!==id;}
 
 /* =================== Archivio: Firebase =================== */
@@ -589,7 +590,7 @@ function render(){
   renderFilters();renderSummary();
   const res=$("results");
   if(S.docs.size===0&&!S.q){
-    res.innerHTML=`<div class="empty"><h2>Il registro è ancora vuoto</h2><p>Qui compariranno tutte le vetture con il numero del cartellino e dove sono la prima e la seconda chiave.</p><p>${isAdmin()?"Per partire, apri <b>Altro → Importa Excel</b> e carica il file del censimento compilato.":"Il registro si riempie quando viene caricato il file del censimento."}</p></div>`;
+    res.innerHTML=`<div class="empty"><h2>Il registro è ancora vuoto</h2><p>Qui compariranno tutte le vetture con il numero del cartellino e dove sono la prima e la seconda chiave.</p><p>${canImport()?"Per partire, apri <b>Altro → Importa Excel</b> e carica il file del censimento compilato.":"Il registro si riempie quando viene caricato il file del censimento."}</p></div>`;
     $("count").textContent="";return;
   }
   const xs=filtered();
@@ -825,7 +826,7 @@ function toIso(v){if(!v)return"";if(v instanceof Date&&!isNaN(v))return new Date
 const luogo=v=>{v=String(v??"").trim();return LUOGHI.find(l=>l.toLowerCase()===v.toLowerCase())||v;};
 $("btnImport").onclick=()=>$("fileImport").click();
 $("fileImport").onchange=async e=>{
-  const file=e.target.files[0];e.target.value="";if(!file)return;
+  const file=e.target.files[0];e.target.value="";if(!file||!canImport())return;
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
   let rows=[];
   try{const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true});const ws=wb.Sheets["Censimento"]||wb.Sheets[wb.SheetNames[0]];rows=XLSX.utils.sheet_to_json(ws,{defval:""});}catch(_){flash("Il file non si apre come Excel. Usa il file «Registro chiavi Dag Auto».","bad");return;}
@@ -886,7 +887,7 @@ const NOME_STATO=Object.fromEntries(STATI_U);
 const VOCI=[["carrozzeria","Carrozzeria"],["manutenzione","Manutenzione"],["freni","Freni"],["pneumatici","Pneumatici"],["meccanica","Meccanica e motore"],["cristalli","Cristalli"],["illuminazione","Impianto illuminazione"],["interni","Interni e sanificazione"],["altro","Altro"]];
 const PRIO=[["alta","Alta"],["normale","Normale"],["bassa","Bassa"]];
 const PRIO_ORD={alta:0,normale:1,bassa:2};
-const RUOLI=[["operatore","Operatore chiavi: cerca, sposta, assegna chiavi"],["officina","Officina: chiavi, ripristini usato · niente carico fiscale"],["preparatore","Preparatore: chiavi, preparazione consegne · niente carico fiscale"],["venditore","Product expert / venditore: consegne e appuntamenti · niente carico fiscale"],["ripristini","Ripristini: chiavi + lavorazione usato"],["foto","Foto: chiavi + lavorazione usato"],["backoffice","Responsabile back office: tutto, carico fiscale compreso"],["usato","Responsabile usato: tutto, carico fiscale compreso"],["admin","Amministratore: tutto, anche import Excel e utenti"]];
+const RUOLI=[["operatore","Operatore chiavi: cerca, sposta, assegna chiavi"],["officina","Officina: chiavi, ripristini usato · niente carico fiscale"],["preparatore","Preparatore: chiavi, preparazione consegne · niente carico fiscale"],["venditore","Product expert / venditore: consegne e appuntamenti · niente carico fiscale"],["ripristini","Ripristini: chiavi + lavorazione usato"],["foto","Foto: chiavi + lavorazione usato"],["backoffice","Responsabile back office: tutto, carico fiscale e import Excel compresi"],["usato","Responsabile usato: tutto, carico fiscale e import Excel compresi"],["admin","Amministratore: tutto, anche creazione utenti"]];
 const NOME_RUOLO=Object.fromEntries(RUOLI.map(([k,v])=>[k,v.split(":")[0]]));
 const canUsato=()=>S.me&&S.me.ruolo!=="operatore";
 const canFiscale=()=>S.me&&["admin","backoffice","usato"].includes(S.me.ruolo);
@@ -1096,7 +1097,7 @@ function vista(v){
   $("vChiavi").hidden=v!=="chiavi";$("vUsato").hidden=v!=="usato";$("vConsegne").hidden=v!=="consegne";$("vArchivio").hidden=v!=="archivio";
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===v));
   $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();
-  $("btnExport").hidden=v!=="chiavi";$("btnExportU").hidden=v!=="usato";$("btnExportC").hidden=v!=="consegne";$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!isAdmin();
+  $("btnExport").hidden=v!=="chiavi";$("btnExportU").hidden=v!=="usato";$("btnExportC").hidden=v!=="consegne";$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!canImport();
   $("h1t").textContent={chiavi:"Chiavi Dag Auto",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio"}[v];
   $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio."}[v];
   try{localStorage.setItem("vista",v);}catch(e){}
@@ -1384,7 +1385,7 @@ $("btnOut").onclick=()=>S.store.logout();
 function avviaApp(store){
   S.store=store;S.me=store.me;show("app");
   $("demoBanner").hidden=!store.demo;
-  $("btnImport").hidden=$("btnUsers").hidden=!isAdmin();
+  $("btnImport").hidden=!canImport();$("btnUsers").hidden=!isAdmin();
   $("whoami").textContent=`Accesso: ${store.me.nome} (${store.me.email})${isAdmin()?" · amministratore":""}`;
   store.onChiavi(list=>{S.docs=new Map(list);render();},()=>flash("Non riesco a leggere il registro. Ricarica la pagina.","bad"));
   store.onLog(l=>{S.log=l;renderLog();});
