@@ -23,13 +23,9 @@ const EVENTI = {
 const ACC_STD = ["chiavi", "giubotto", "prontosoccorso", "gonfiaggio", "portachiavi", "libretto"];
 const PREP = ["targata", "lavaggio"];
 
+// Pronta solo con il flag «Preconsegna fatta» messo da preparatore/officina.
 function pronta(c) {
-  const std = ACC_STD.every((k) => (c.std || {})[k]);
-  const pag = Object.values(c.pag || {}).every((v) => !v.sel || v.fatto);
-  const om = (Array.isArray(c.omaggi) ? c.omaggi : c.omaggio ? [{ testo: c.omaggio, fatto: c.omaggioFatto }] : [])
-    .filter((o) => o && o.testo).every((o) => o.fatto);
-  const prep = PREP.every((k) => (c.prep || {})[k]);
-  return std && pag && om && prep;
+  return !!c.pronta;
 }
 
 // Data e ora della consegna intese all'ora di Roma.
@@ -96,7 +92,7 @@ async function invia(n) {
     if (d.push && d.tokens.length) {
       const r = await admin.messaging().sendEachForMulticast({
         tokens: d.tokens,
-        data: { title: n.titolo || "Chiavi Dag Auto", body: n.testo || "", link, tag: n.evento },
+        data: { title: n.titolo || "Dag Auto Vetture", body: n.testo || "", link, tag: n.evento },
         webpush: { headers: { Urgency: "high", TTL: "86400" }, fcmOptions: { link } },
       });
       push += r.successCount;
@@ -110,9 +106,9 @@ async function invia(n) {
     const m = d.mail && mailer();
     if (m) {
       await m.sendMail({
-        from: `"Chiavi Dag Auto" <${process.env.SMTP_USER}>`,
+        from: `"Dag Auto Vetture" <${process.env.SMTP_USER}>`,
         to: d.email,
-        subject: n.titolo || "Chiavi Dag Auto",
+        subject: n.titolo || "Dag Auto Vetture",
         text: `${n.testo || ""}\n\nApri il registro: ${link}\n\nPer cambiare quali avvisi ricevere: Altro → Notifiche nel registro.`,
       });
       mail++;
