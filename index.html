@@ -1376,7 +1376,7 @@ $("cList").addEventListener("click",e=>{const im=e.target.closest("[data-imp]");
 $("btnImpegno").onclick=()=>openImpegno(null);
 /* =================== Agenda =================== */
 const A={mese:0,chi:""};
-const AGENDA_PERSONE=["Domenico Sperandeo","Nicola Bussolotto","Dino Di Bello","Girolamo De Blasiis"];
+const AGENDA_PERSONE=["Domenico Sperandeo","Nicola Bussolotto","Dino Di Bello","Girolamo De Blasiis","Marco Belisario"];
 function voceAgenda(iso){
   const cs=[...C.docs.entries()].map(([id,c])=>Object.assign({id},c)).filter(c=>c.data===iso&&c.stato!=="annullata"&&(!A.chi||(c.venditore&&(norm(A.chi).includes(norm(c.venditore))||norm(c.venditore).includes(norm(A.chi))))))
     .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${esc(etich(c))} ${esc(c.cliente||"")}</span>`}));
