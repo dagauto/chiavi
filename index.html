@@ -1122,15 +1122,17 @@ function prontaC(c){
 }
 function mancanti(c){let n=0,t=0;for(const[k]of ACC_STD){t++;if(!(c.std||{})[k])n++;}for(const[k,v]of Object.entries(c.pag||{}))if(v.sel){t++;if(!v.fatto)n++;}for(const o of omaggi(c)){t++;if(!o.fatto)n++;}for(const[k]of PREP){t++;if(!(c.prep||{})[k])n++;}return{n,t};}
 function omaggi(c){if(Array.isArray(c.omaggi))return c.omaggi.filter(o=>o&&o.testo);return c.omaggio?[{testo:c.omaggio,fatto:!!c.omaggioFatto}]:[];}
+// Ore lavorative tra adesso e la consegna: sabato e domenica non contano (le vetture non si preparano).
+function oreLavorative(from,to){if(to<=from)return(to-from)/36e5;if(to-from>21*864e5)return(to-from)/36e5;let ms=0,t=from;while(t<to){const d=new Date(t);const nx=Math.min(to,new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime());const g=d.getDay();if(g!==0&&g!==6)ms+=nx-t;t=nx;}return ms/36e5;}
 function quando(c){return c.data?new Date(`${c.data}T${c.ora||"09:00"}:00`):null;}
 function semaforo(c){
   if(c.stato==="consegnata")return["done","Consegnata"];
   if(c.stato==="annullata")return["done","Annullata"];
   if(!c.data)return["warn","Data da fissare"];
   if(prontaC(c))return["ok","Pronta"];
-  const h=(quando(c)-Date.now())/36e5;
-  if(h<24)return["bad",h<0?"Scaduta, non pronta":"Meno di 24 ore, non pronta"];
-  if(h<48)return["warn","Entro 48 ore, in preparazione"];
+  const h=oreLavorative(Date.now(),quando(c).getTime());
+  if(h<24)return["bad",h<0?"Scaduta, non pronta":"Meno di 24 ore lavorative, non pronta"];
+  if(h<48)return["warn","Entro 48 ore lavorative, in preparazione"];
   return["warn","In preparazione"];
 }
 const lunedi=off=>{const d=new Date();d.setHours(0,0,0,0);const g=(d.getDay()+6)%7;d.setDate(d.getDate()-g+7*off);return d;};
@@ -1237,8 +1239,8 @@ function openConsegna(id){
     if(occupato(s)){el.innerHTML=`Dal registro chiavi: <b>${esc(s.modello||"modello non indicato")}</b> · ${esc(s.telaio||"telaio non indicato")}${s.targa?" · "+esc(s.targa):""}`;if(nuovo&&!$("c_targa").value&&s.targa)$("c_targa").value=s.targa;return s;}
     el.innerHTML=`<span style="color:var(--bad)">Il ${SING[col]} ${n} non risulta occupato nel registro chiavi: controlla il numero.</span>`;return null;};
   $("c_numero").addEventListener("input",mostraVett);$("c_colore").addEventListener("change",()=>{mostraVett();if(nuovo)$("c_tipo").value=$("c_colore").value==="VERDE"?"noleggio":"vendita";});mostraVett();
-  const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=(new Date(`${d}T${o}:00`)-Date.now())/36e5;
-    w.innerHTML=h<24?`<div class="banner">Mancano meno di 24 ore: avvisa subito l'officina.</div>`:"";const dup=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.ora&&c.ora===$("c_ora").value&&c.stato!=="annullata");if(dup.length)w.innerHTML+=`<div class="banner">Alla stessa ora c'è già: ${dup.map(([,c])=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}.</div>`;};
+  const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=oreLavorative(Date.now(),new Date(`${d}T${o}:00`).getTime());
+    w.innerHTML=h<24?`<div class="banner">Mancano meno di 24 ore lavorative (sabato e domenica esclusi): avvisa subito i preparatori.</div>`:"";const dup=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.ora&&c.ora===$("c_ora").value&&c.stato!=="annullata");if(dup.length)w.innerHTML+=`<div class="banner">Alla stessa ora c'è già: ${dup.map(([,c])=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}.</div>`;};
   $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);avvData();
   p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked;if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
   const leggi=()=>{
