@@ -158,6 +158,30 @@ input.mono{font-family:var(--f-mono)!important;text-transform:uppercase}
 .voce input[type=checkbox]{width:auto}
 .grid2.tight{gap:8px}
 .keybox.fisc{border-color:var(--rosso);background:var(--rosso-soft)}
+.weeknav{display:flex;align-items:center;gap:8px}
+.weeknav span{flex:1;text-align:center;font-weight:600;font-size:14px}
+.weeknav button{padding:6px 12px}
+.ugrp.today{color:var(--accent)}
+.cnone{padding:2px 4px 6px}
+.ccard{grid-template-columns:64px minmax(0,1fr)}
+.ctime{display:flex;flex-direction:column;align-items:center;gap:6px}
+.ctime b{font-family:var(--f-display);font-size:20px;font-variant-numeric:tabular-nums}
+.ctag{font-family:var(--f-display);font-weight:700;font-size:15px;padding:2px 8px;border-radius:6px;background:var(--cs);color:var(--cc);border:1.5px solid var(--cc)}
+.sem{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px}
+.sem-ok{background:var(--ok-soft);color:var(--ok)} .sem-warn{background:var(--warn-soft);color:var(--warn)} .sem-bad{background:var(--bad-soft);color:var(--bad)} .sem-done{background:var(--sunk);color:var(--muted)}
+.accrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:6px}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+.chk input{width:18px;height:18px}
+.chk.dim{opacity:.45}
+.chkgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:460px){.chkgrid{grid-template-columns:1fr}}
+#printArea{display:none}
+@media print{body>*:not(#printArea){display:none!important}#printArea{display:block;color:#000;font-family:Arial,sans-serif;font-size:12pt}
+.pv h1{font-size:17pt;margin:18px 0}.pv h2{font-size:12pt;background:#ddd;padding:4px 8px;margin:14px 0 6px;border:1px solid #000}
+.pvh{display:flex;justify-content:space-between;align-items:flex-start}.pvh b{font-size:18pt}.pvh span{text-align:right;font-size:10pt;font-weight:700}
+.pvt{width:100%;border-collapse:collapse}.pvt td{border:1px solid #999;padding:6px}.pvt td:nth-child(odd){width:22%;font-weight:700}
+.pbox{display:inline-block;width:14px;height:14px;border:1px solid #000;text-align:center;line-height:14px;margin-right:6px;font-size:10pt}
+.pvd{margin-top:20px}.pvf{display:flex;justify-content:space-between;margin-top:40px}}
 details.raw summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}
 details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;background:var(--bg);border-radius:8px;padding:10px;max-height:200px;overflow:auto}
 .rowmsg{font-size:13px;font-weight:600}
@@ -229,7 +253,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
 
 <!-- Applicazione -->
 <div class="wrap" id="app" hidden>
-  <nav class="tabs" id="tabs" hidden><button data-tab="chiavi" aria-pressed="true">Chiavi</button><button data-tab="usato" aria-pressed="false">Lavorazione usato</button></nav>
+  <nav class="tabs" id="tabs" hidden><button data-tab="chiavi" aria-pressed="true">Chiavi</button><button data-tab="usato" aria-pressed="false">Usato</button><button data-tab="consegne" aria-pressed="false">Consegne</button></nav>
   <div id="demoBanner" class="banner" hidden>Modalità prova: i dati sono esempi e non vengono salvati. Si attiva il registro vero inserendo i dati di Firebase nel file config.js.</div>
   <header class="top">
     <div>
@@ -239,6 +263,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
     <div class="actions">
       <button class="primary" id="btnBolla">+ Aggiungi vettura</button>
       <button class="primary" id="btnPresa" hidden>+ Presa in carico</button>
+      <button class="primary" id="btnConsegna" hidden>+ Consegna</button>
       <button id="btnMore" aria-expanded="false">Altro</button>
     </div>
   </header>
@@ -281,6 +306,16 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
     <div class="count" id="uCount"></div>
     <div id="uList" class="list"></div>
   </div>
+  <div id="vConsegne" hidden>
+    <div class="search">
+      <div class="sbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="cq" type="search" inputmode="search" autocomplete="off" placeholder="Cliente, targa, modello o chiave (es. N.23)" aria-label="Cerca nelle consegne">
+      </div>
+      <div class="weeknav"><button id="cPrev" aria-label="Settimana precedente">‹</button><span id="cWeek"></span><button id="cNext" aria-label="Settimana successiva">›</button><button id="cToday">Oggi</button></div>
+    </div>
+    <div id="cList" class="list"></div>
+  </div>
 
   <section>
     <h2 class="sec">Ultimi movimenti</h2>
@@ -290,6 +325,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
 </div>
 
 <div class="sheet" id="sheet" hidden></div>
+<div id="printArea"></div>
 
 <script src="config.js"></script>
 <script type="module">
@@ -410,7 +446,11 @@ function avviaDemo(){
   const coll={usato:new Map([["FY456AB",{targa:"FY456AB",telaio:"WDD1183441N000013",modello:"CLA 200 (esempio)",km:68200,chiave:"13",venditore:"Rossi",stato:"attesa",priorita:"alta",date:{presa:"2026-10-20",attesa:"2026-10-21"},voci:{carrozzeria:{descrizione:"Paraurti anteriore",stimato:450,effettivo:""},interni:{descrizione:"Sanificazione",stimato:120,effettivo:""}}}],
     ["GH123KL",{targa:"GH123KL",telaio:"WDD2050041R000012",modello:"Classe C 220 d (esempio)",km:91000,chiave:"12",venditore:"Bianchi",stato:"ripristino",priorita:"normale",date:{presa:"2026-10-14",attesa:"2026-10-15",ripristino:"2026-10-22"},voci:{pneumatici:{descrizione:"4 gomme",stimato:600,effettivo:640},freni:{descrizione:"Pastiglie ant.",stimato:180,effettivo:""}}}]]),
     usato_riservato:new Map([["FY456AB",{valoreContratto:18500,ivaEsposta:"No"}],["GH123KL",{valoreContratto:21000,ivaEsposta:"Sì"}]])};
-  const LC={usato:[],usato_riservato:[]};
+  const dd=n=>{const x=new Date();x.setDate(x.getDate()+n);return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+  coll.consegne=new Map([["BLU-003-a",{colore:"BLU",numero:3,tipo:"vendita",telaio:"W1N2539151F000003",modello:"GLC 220 d (esempio)",targa:"",cliente:"Cliente di prova 1",venditore:"De Blasiis",data:dd(1),ora:"10:30",stato:"fissata",std:{chiavi:true,giubotto:true},pag:{tappeti:{sel:true,fatto:false}},prep:{},date:{}}],
+    ["ROSSO-013-b",{colore:"ROSSO",numero:13,tipo:"vendita",telaio:"WDD1183441N000013",modello:"CLA 200 (esempio)",targa:"FY456AB",cliente:"Cliente di prova 2",venditore:"Bussolotto",data:dd(3),ora:"16:00",stato:"fissata",std:{chiavi:true,giubotto:true,prontosoccorso:true,gonfiaggio:true,portachiavi:true,libretto:true},pag:{},prep:{targata:true,lavaggio:true},date:{}}],
+    ["VERDE-001-c",{colore:"VERDE",numero:1,tipo:"noleggio",telaio:"W1V9076331P000001",modello:"Sprinter 317 CDI (esempio)",targa:"GK789CD",cliente:"Noleggio di prova",venditore:"",data:"",ora:"",stato:"richiesta",std:{},pag:{},prep:{},date:{}}]]);
+  const LC={usato:[],usato_riservato:[],consegne:[]};
   const fire=()=>{L.c.forEach(f=>f([...docs.entries()]));L.l.forEach(f=>f(log.slice(0,50)));L.u.forEach(f=>f(utenti));};
   avviaApp({
     demo:true,me:{email:"prova@dagauto.it",nome:"Utente di prova",ruolo:"admin"},
@@ -814,7 +854,7 @@ const NOME_STATO=Object.fromEntries(STATI_U);
 const VOCI=[["carrozzeria","Carrozzeria"],["manutenzione","Manutenzione"],["freni","Freni"],["pneumatici","Pneumatici"],["meccanica","Meccanica e motore"],["cristalli","Cristalli"],["illuminazione","Impianto illuminazione"],["interni","Interni e sanificazione"],["altro","Altro"]];
 const PRIO=[["alta","Alta"],["normale","Normale"],["bassa","Bassa"]];
 const PRIO_ORD={alta:0,normale:1,bassa:2};
-const RUOLI=[["operatore","Operatore chiavi: cerca, sposta, assegna chiavi"],["ripristini","Ripristini: chiavi + lavorazione usato"],["foto","Foto: chiavi + lavorazione usato"],["backoffice","Back office: anche presa in carico e carico fiscale"],["usato","Responsabile usato: anche carico fiscale"],["admin","Amministratore: tutto, anche import Excel e utenti"]];
+const RUOLI=[["operatore","Operatore chiavi: cerca, sposta, assegna chiavi"],["officina","Officina: chiavi, ripristini, preparazione consegne"],["venditore","Product expert: crea consegne e fissa gli appuntamenti"],["ripristini","Ripristini: chiavi + lavorazione usato"],["foto","Foto: chiavi + lavorazione usato"],["backoffice","Back office: anche presa in carico e carico fiscale"],["usato","Responsabile usato: anche carico fiscale"],["admin","Amministratore: tutto, anche import Excel e utenti"]];
 const NOME_RUOLO=Object.fromEntries(RUOLI.map(([k,v])=>[k,v.split(":")[0]]));
 const canUsato=()=>S.me&&S.me.ruolo!=="operatore";
 const canFiscale=()=>S.me&&["admin","backoffice","usato"].includes(S.me.ruolo);
@@ -994,17 +1034,199 @@ $("btnExportU").onclick=async()=>{
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Lavorazione_usato_${oggi()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
 };
 function vista(v){
-  const u=v==="usato"&&canUsato();
-  $("vChiavi").hidden=u;$("vUsato").hidden=!u;
-  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===(u?"usato":"chiavi")));
-  $("btnBolla").hidden=u;$("btnPresa").hidden=!u||!canPresa();
-  $("btnExport").hidden=u;$("btnExportU").hidden=!u;$("btnNew").hidden=u;$("btnImport").hidden=u||!isAdmin();
-  $("h1t").textContent=u?"Lavorazione usato":"Chiavi Dag Auto";
-  $("subt").textContent=u?"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.":"Cerca per targa, telaio, modello o numero del cartellino.";
-  try{localStorage.setItem("vista",u?"usato":"chiavi");}catch(e){}
-  if(u)renderUsato();
+  if(v==="usato"&&!canUsato())v="chiavi";if(v==="consegne"&&!canConsegne())v="chiavi";
+  $("vChiavi").hidden=v!=="chiavi";$("vUsato").hidden=v!=="usato";$("vConsegne").hidden=v!=="consegne";
+  document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===v));
+  $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();
+  $("btnExport").hidden=v!=="chiavi";$("btnExportU").hidden=v!=="usato";$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!isAdmin();
+  $("h1t").textContent={chiavi:"Chiavi Dag Auto",usato:"Lavorazione usato",consegne:"Consegne"}[v];
+  $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina."}[v];
+  try{localStorage.setItem("vista",v);}catch(e){}
+  if(v==="usato")renderUsato();if(v==="consegne")renderConsegne();
 }
 $("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b)vista(b.dataset.tab);});
+
+/* =================== Consegne =================== */
+const ACC_STD=[["chiavi","Chiave e doppia chiave"],["giubotto","Giubotto catarifrangente"],["prontosoccorso","Kit pronto soccorso"],["gonfiaggio","Kit gonfiaggio"],["portachiavi","Portachiavi Mercedes-Benz"],["libretto","Libretto d'uso e manutenzione"]];
+const ACC_PAG=[["autonera","Auto nera"],["bulloni","Bulloni antifurto"],["tappeti","Tappeti in gomma"],["servicecare","Service Care 4"],["advance","Advance 4"],["defence","Defence 48 mesi"],["certified","Certified"],["mapfree","Mapfree"]];
+const PREP=[["targata","Targa montata"],["lavaggio","Lavaggio"]];
+const LETT_C={BLU:"N",ROSSO:"U",VERDE:"V"};
+const C={docs:new Map(),week:0,q:""};
+const canConsegne=()=>S.me&&S.me.ruolo!=="operatore";
+const canCreaConsegna=()=>S.me&&["admin","backoffice","usato","venditore"].includes(S.me.ruolo);
+const etich=c=>`${LETT_C[c.colore]||"?"}.${c.numero||"?"}`;
+function prontaC(c){
+  const std=ACC_STD.every(([k])=>(c.std||{})[k]);
+  const pag=Object.values(c.pag||{}).every(v=>!v.sel||v.fatto);
+  const om=!c.omaggio||c.omaggioFatto;
+  const prep=PREP.every(([k])=>(c.prep||{})[k]);
+  return std&&pag&&om&&prep;
+}
+function mancanti(c){let n=0,t=0;for(const[k]of ACC_STD){t++;if(!(c.std||{})[k])n++;}for(const[k,v]of Object.entries(c.pag||{}))if(v.sel){t++;if(!v.fatto)n++;}if(c.omaggio){t++;if(!c.omaggioFatto)n++;}for(const[k]of PREP){t++;if(!(c.prep||{})[k])n++;}return{n,t};}
+function quando(c){return c.data?new Date(`${c.data}T${c.ora||"09:00"}:00`):null;}
+function semaforo(c){
+  if(c.stato==="consegnata")return["done","Consegnata"];
+  if(c.stato==="annullata")return["done","Annullata"];
+  if(!c.data)return["warn","Data da fissare"];
+  if(prontaC(c))return["ok","Pronta"];
+  const h=(quando(c)-Date.now())/36e5;
+  if(h<48)return["bad",h<0?"Scaduta, non pronta":"Meno di 48 ore, non pronta"];
+  return["warn","In preparazione"];
+}
+const lunedi=off=>{const d=new Date();d.setHours(0,0,0,0);const g=(d.getDay()+6)%7;d.setDate(d.getDate()-g+7*off);return d;};
+const isoD=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+const GIORNI=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica"];
+function settimanaN(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-n+3);const f=new Date(Date.UTC(t.getUTCFullYear(),0,4));return 1+Math.round(((t-f)/864e5-3+((f.getUTCDay()+6)%7))/7);}
+function cardC(c){
+  const[k,l]=semaforo(c);const m=mancanti(c);
+  return`<button class="card ccard" data-c="${esc(c.id)}">
+    <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
+    <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio</span>':""}</span>
+      <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`PE ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
+      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${c.stato!=="consegnata"&&c.stato!=="annullata"?`<span class="kp">Preparazione ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
+}
+function renderConsegne(){
+  if(!canConsegne())return;
+  const all=[...C.docs.entries()].map(([id,d])=>Object.assign({id},d));
+  const q=norm(C.q);
+  if(q){const xs=all.filter(c=>[c.cliente,c.targa,c.telaio,c.modello,c.venditore,etich(c)].some(v=>norm(v).includes(q)));
+    $("cWeek").textContent=`${xs.length} ${plur(xs.length,"risultato","risultati")} per «${C.q}»`;
+    $("cList").innerHTML=xs.length?xs.sort((a,b)=>String(b.data).localeCompare(String(a.data))).map(c=>`<div class="small">${c.data?new Date(c.data).toLocaleDateString("it-IT"):"senza data"}</div>`+cardC(c)).join(""):`<div class="empty"><p>Nessuna consegna trovata.</p></div>`;return;}
+  const lu=lunedi(C.week),dom=new Date(lu);dom.setDate(dom.getDate()+6);
+  $("cWeek").textContent=`Settimana ${settimanaN(lu)} · ${lu.toLocaleDateString("it-IT",{day:"numeric",month:"short"})} – ${dom.toLocaleDateString("it-IT",{day:"numeric",month:"short",year:"numeric"})}`;
+  const aperte=all.filter(c=>c.stato!=="consegnata"&&c.stato!=="annullata");
+  const dafiss=aperte.filter(c=>!c.data);
+  const rosse=aperte.filter(c=>semaforo(c)[0]==="bad");
+  let html="";
+  if(C.week===0&&(rosse.length||dafiss.length)){
+    html+=`<div class="cwarn">${rosse.length?`<div class="banner bad">${rosse.length} ${plur(rosse.length,"consegna","consegne")} entro 48 ore non ${plur(rosse.length,"è pronta","sono pronte")}: ${rosse.map(c=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}</div>`:""}
+      ${dafiss.length?`<h3 class="ugrp">Da fissare con il cliente · ${dafiss.length}</h3>`+dafiss.map(cardC).join(""):""}</div>`;
+  }
+  for(let i=0;i<7;i++){const d=new Date(lu);d.setDate(d.getDate()+i);const iso=isoD(d);
+    const xs=all.filter(c=>c.data===iso&&c.stato!=="annullata").sort((a,b)=>String(a.ora).localeCompare(String(b.ora)));
+    const oggiC=iso===oggi();
+    html+=`<h3 class="ugrp ${oggiC?"today":""}">${GIORNI[i]} ${d.getDate()}${oggiC?" · oggi":""}${xs.length?` · ${xs.length}`:""}</h3>`;
+    html+=xs.length?xs.map(cardC).join(""):`<div class="small cnone">Nessuna consegna</div>`;
+  }
+  $("cList").innerHTML=html;
+}
+function icsDi(c){
+  const d=quando(c);if(!d)return null;const e=new Date(d.getTime()+60*60000);
+  const f=x=>x.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  const esc2=s=>String(s||"").replace(/[,;\\]/g,m=>"\\"+m).replace(/\n/g,"\\n");
+  return["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Dag Auto//Chiavi//IT","BEGIN:VEVENT",`UID:consegna-${c.id}@dagauto`,`DTSTAMP:${f(new Date())}`,`DTSTART:${f(d)}`,`DTEND:${f(e)}`,
+    `SUMMARY:${esc2(`Consegna ${etich(c)} ${c.cliente||""}`)}`,`DESCRIPTION:${esc2([c.modello,c.targa,c.telaio,c.venditore?`PE ${c.venditore}`:""].filter(Boolean).join(" - "))}`,"LOCATION:Dag Auto\\, Via I Maggio 33\\, Manocalzati (AV)","BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:Consegna domani","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
+}
+function stampaVerbale(c){
+  const sel=ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel);
+  const box=v=>`<span class="pbox">${v?"✔":""}</span>`;
+  $("printArea").innerHTML=`<div class="pv"><div class="pvh"><b>Mercedes-Benz</b><span>DAG AUTO S.r.l.<br>Concessionaria ufficiale di vendita ed assistenza Mercedes-Benz</span></div>
+    <h1>Oggetto: Verbale di PREPARAZIONE</h1>
+    <table class="pvt"><tr><td>Targa</td><td>${esc(c.targa||"")}</td><td>Cliente</td><td>${esc(c.cliente||"")}</td></tr>
+    <tr><td>Si consegna al/alla Sig./Sig.ra</td><td colspan="3">${esc(c.consegnatario||c.cliente||"")}</td></tr>
+    <tr><td>Venditore</td><td colspan="3">${esc(c.venditore||"")}</td></tr>
+    <tr><td>Marca e modello</td><td colspan="3">Mercedes-Benz ${esc(c.modello||"")}</td></tr>
+    <tr><td>Telaio</td><td>${esc(c.telaio||"")}</td><td>n° Chiave</td><td>${esc(etich(c))}</td></tr></table>
+    <h2>Accessori standard di preconsegna</h2>${ACC_STD.map(([k,l])=>`<div>${box((c.std||{})[k])} ${esc(l)}</div>`).join("")}
+    <h2>Ulteriori accessori a pagamento</h2>${sel.length?sel.map(([k,l])=>`<div>${box(c.pag[k].fatto)} ${esc(l)}</div>`).join(""):"<div>Nessuno</div>"}
+    <h2>Ulteriori accessori in omaggio</h2><div>${c.omaggio?`${box(c.omaggioFatto)} ${esc(c.omaggio)}`:"Nessuno"}</div>
+    ${c.note?`<h2>Note</h2><div>${esc(c.note)}</div>`:""}
+    <p class="pvd">L'autovettura viene presa in consegna in data: <b>${c.data?new Date(c.data).toLocaleDateString("it-IT"):"____________"}</b> &nbsp; Ore <b>${esc(c.ora||"______")}</b></p>
+    <div class="pvf"><span>Firma officina ____________________</span><span>Firma cliente ____________________</span></div></div>`;
+  window.print();
+}
+function openConsegna(id){
+  const nuovo=!id;
+  const base=nuovo?{stato:"richiesta",tipo:"vendita",colore:"BLU",std:{},pag:{},prep:{},date:{richiesta:oggi()}}:JSON.parse(JSON.stringify(C.docs.get(id)));
+  const f=Object.assign({std:{},pag:{},prep:{},date:{}},JSON.parse(JSON.stringify(base)));
+  const edAll=canCreaConsegna()||isAdmin();
+  const ro=edAll?"":"disabled";
+  const ck=(grp,k,l,dis)=>`<label class="chk"><input type="checkbox" data-g="${grp}" data-k="${k}" ${(f[grp]||{})[k]?"checked":""} ${dis?"disabled":""}> ${esc(l)}</label>`;
+  const p=openSheet(`<form class="panel" id="cf" role="dialog" aria-modal="true" aria-label="Consegna">
+    <div class="phead"><div><h2>${nuovo?"Nuova consegna":esc(etich(f)+" · "+(f.cliente||""))}</h2><p>${nuovo?"Il back office la crea una settimana prima: l'officina la vede subito nel calendario.":esc(semaforo(f)[1])}</p></div></div>
+    <div class="keybox"><h4>Vettura</h4>
+      <div class="grid2"><label class="f">Colore chiave<select id="c_colore" ${nuovo?"":"disabled"}>${COLORI.map(c=>`<option value="${c}" ${f.colore===c?"selected":""}>${SING[c]} (${LETT_C[c]})</option>`).join("")}</select></label>
+      <label class="f">N° chiave<input id="c_numero" inputmode="numeric" value="${esc(f.numero??"")}" ${nuovo?"":"disabled"}></label></div>
+      <div id="c_vett" class="small"></div>
+      <div class="grid2"><label class="f">Targa<input class="mono" id="c_targa" value="${esc(f.targa||"")}" placeholder="vuota se da targare"></label>
+      <label class="f">Tipo<select id="c_tipo" ${ro}><option value="vendita" ${f.tipo==="vendita"?"selected":""}>Vendita</option><option value="noleggio" ${f.tipo==="noleggio"?"selected":""}>Noleggio</option></select></label></div></div>
+    <div class="grid2"><label class="f">Cliente<input id="c_cliente" value="${esc(f.cliente||"")}" ${ro}></label>
+      <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
+    <label class="f">Venditore / Product expert<input id="c_venditore" value="${esc(f.venditore||(nuovo&&S.me.ruolo==="venditore"?S.me.nome:""))}" ${ro}></label>
+    <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
+      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}"></label><label class="f">Ora<input type="time" id="c_ora" step="900" value="${esc(f.ora||"")}"></label></div><div id="c_dwarn"></div></div>
+    <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato»</span></h4>
+      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label><label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel?"":"disabled"}> montato</label></div>`;}).join("")}
+      <div class="accrow"><label class="f" style="flex:1">Accessori in omaggio<input id="c_omaggio" value="${esc(f.omaggio||"")}" ${ro}></label><label class="chk small"><input type="checkbox" id="c_omaggioFatto" ${f.omaggioFatto?"checked":""}> montato</label></div></div>
+    <div class="keybox"><h4>Preparazione officina</h4>
+      <div class="chkgrid">${ACC_STD.map(([k,l])=>ck("std",k,l)).join("")}${PREP.map(([k,l])=>ck("prep",k,l)).join("")}</div></div>
+    <label class="f">Note<textarea id="c_note" rows="2">${esc(f.note||"")}</textarea></label>
+    <div id="e_err"></div>
+    <div class="pfoot"><div class="r" style="margin-left:0;flex-wrap:wrap">${nuovo?"":`<button type="button" id="c_print">Stampa verbale</button><button type="button" id="c_ics">Aggiungi al calendario</button>`}</div>
+      <div class="r">${!nuovo&&f.stato!=="consegnata"?`<button type="button" class="danger" id="c_done">Consegnata</button>`:""}<button type="button" id="c_close">Chiudi</button><button type="submit" class="primary" id="e_save">${nuovo?"Crea consegna":"Salva"}</button></div></div>
+    ${!nuovo&&edAll&&f.stato!=="consegnata"?`<div style="text-align:right"><button type="button" class="link" id="c_annulla">Annulla questa consegna</button></div>`:""}
+  </form>`);
+  $("c_close").onclick=closeSheet;
+  const mostraVett=()=>{const n=parseInt($("c_numero").value,10),col=$("c_colore").value;const el=$("c_vett");
+    if(!(n>=1&&n<=100)){el.textContent="";return null;}const s=slot(col,n);
+    if(occupato(s)){el.innerHTML=`Dal registro chiavi: <b>${esc(s.modello||"modello non indicato")}</b> · ${esc(s.telaio||"telaio non indicato")}${s.targa?" · "+esc(s.targa):""}`;if(nuovo&&!$("c_targa").value&&s.targa)$("c_targa").value=s.targa;return s;}
+    el.innerHTML=`<span style="color:var(--bad)">Il ${SING[col]} ${n} non risulta occupato nel registro chiavi: controlla il numero.</span>`;return null;};
+  $("c_numero").addEventListener("input",mostraVett);$("c_colore").addEventListener("change",()=>{mostraVett();if(nuovo)$("c_tipo").value=$("c_colore").value==="VERDE"?"noleggio":"vendita";});mostraVett();
+  const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=(new Date(`${d}T${o}:00`)-Date.now())/36e5;
+    w.innerHTML=h<24?`<div class="banner">Mancano meno di 24 ore: avvisa subito l'officina.</div>`:"";const dup=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.ora&&c.ora===$("c_ora").value&&c.stato!=="annullata");if(dup.length)w.innerHTML+=`<div class="banner">Alla stessa ora c'è già: ${dup.map(([,c])=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}.</div>`;};
+  $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);avvData();
+  p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked;if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
+  const leggi=()=>{
+    for(const k of["targa","cliente","consegnatario","venditore","data","ora","omaggio","note"])f[k]=$("c_"+k).value.trim();
+    f.targa=f.targa.toUpperCase().replace(/\s/g,"");f.tipo=$("c_tipo").value;f.omaggioFatto=$("c_omaggioFatto").checked;
+    p.querySelectorAll("[data-g]").forEach(i=>{f[i.dataset.g][i.dataset.k]=i.checked;});
+    const pg={};p.querySelectorAll("[data-pag]").forEach(i=>{pg[i.dataset.pag]=pg[i.dataset.pag]||{};pg[i.dataset.pag][i.dataset.pf]=i.checked;});
+    for(const[k,v]of Object.entries(pg)){if(v.sel)f.pag[k]={sel:true,fatto:!!v.fatto};else delete f.pag[k];}
+    if(nuovo){f.colore=$("c_colore").value;f.numero=parseInt($("c_numero").value,10);}
+  };
+  const salvaC=async(extraWrites,logs,msg)=>{
+    $("e_save").disabled=true;
+    try{await S.store.commitU(extraWrites,logs);closeSheet();flash(msg,"ok");}
+    catch(x){$("e_save").disabled=false;$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}
+  };
+  const cid=()=>id||`${f.colore}-${String(f.numero).padStart(3,"0")}-${Date.now().toString(36)}`;
+  p.onsubmit=e=>{e.preventDefault();leggi();
+    if(nuovo){if(!(f.numero>=1&&f.numero<=100)){$("e_err").innerHTML=`<div class="banner bad">Indica il numero della chiave (1–100).</div>`;return;}
+      const s=mostraVett();if(s){f.telaio=s.telaio||"";f.modello=s.modello||"";}
+      const aperta=[...C.docs.values()].find(c=>c.colore===f.colore&&c.numero===f.numero&&c.stato!=="consegnata"&&c.stato!=="annullata");
+      if(aperta){$("e_err").innerHTML=`<div class="banner bad">Per la chiave ${esc(etich(f))} c'è già una consegna aperta (${esc(aperta.cliente||"")}).</div>`;return;}}
+    if(f.data&&!base.data)f.date.fissata=oggi();
+    if(f.stato==="richiesta"&&f.data)f.stato="fissata";
+    if(!f.data&&f.stato==="fissata")f.stato="richiesta";
+    const ora=prontaC(f);if(ora&&!f.date.pronta)f.date.pronta=oggi();if(!ora)delete f.date.pronta;
+    const logs=[];const cod=etich(f);
+    if(nuovo)logs.push({codice:cod,azione:"Consegna creata",dettaglio:[f.cliente,f.modello].filter(Boolean).join(" · ")});
+    else{if(f.data!==base.data||f.ora!==base.ora)logs.push({codice:cod,azione:"Appuntamento consegna",dettaglio:f.data?`${new Date(f.data).toLocaleDateString("it-IT")} ore ${f.ora||"—"}`:"data tolta"});
+      if(ora&&!prontaC(base))logs.push({codice:cod,azione:"Pronta per la consegna",dettaglio:f.cliente||""});
+      if(!logs.length)logs.push({codice:cod,azione:"Consegna aggiornata",dettaglio:f.cliente||""});}
+    salvaC([{col:"consegne",id:cid(),data:f}],logs,nuovo?"Consegna creata.":"Consegna salvata.");
+  };
+  const pr=$("c_print");if(pr)pr.onclick=()=>{leggi();stampaVerbale(f);};
+  const ic=$("c_ics");if(ic)ic.onclick=()=>{leggi();const t=icsDi(f);if(!t){$("e_err").innerHTML=`<div class="banner">Prima fissa data e ora.</div>`;return;}
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/calendar"}));a.download=`Consegna_${etich(f)}.ics`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);};
+  const an=$("c_annulla");if(an)an.onclick=()=>{if(!an.dataset.armed){an.dataset.armed="1";an.textContent="Conferma: annulla la consegna";return;}leggi();f.stato="annullata";f.date.annullata=oggi();salvaC([{col:"consegne",id,data:f}],[{codice:etich(f),azione:"Consegna annullata",dettaglio:f.cliente||""}],"Consegna annullata.");};
+  const dn=$("c_done");if(dn)dn.onclick=()=>{
+    if(!dn.dataset.armed){dn.dataset.armed="1";dn.classList.add("solid");dn.textContent="Conferma consegna";
+      if(f.tipo==="vendita")$("e_err").innerHTML=`<div class="banner">Alla conferma il numero ${esc(etich(f))} si libera nel registro chiavi.</div>`;return;}
+    leggi();f.stato="consegnata";f.date.consegnata=oggi();
+    const w=[{col:"consegne",id,data:f}],logs=[{codice:etich(f),azione:"Consegnata",dettaglio:[f.cliente,f.targa].filter(Boolean).join(" · ")}];
+    const s=slot(f.colore,f.numero);
+    if(f.tipo==="vendita"&&occupato(s)&&(!f.telaio||norm(s.telaio)===norm(f.telaio))){
+      w.push({col:"chiavi",id:s.id,data:{colore:f.colore,numero:f.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}});
+      logs.push({codice:`${LETT[f.colore]} ${f.numero}`,azione:"Numero liberato",dettaglio:`consegnata a ${f.cliente||"cliente"}`});}
+    else if(f.tipo==="noleggio"&&occupato(s))logs.push({codice:`${LETT[f.colore]} ${f.numero}`,azione:"Uscita a noleggio",dettaglio:f.cliente||""});
+    salvaC(w,logs,"Consegna registrata.");
+  };
+}
+$("cList").addEventListener("click",e=>{const b=e.target.closest("[data-c]");if(b)openConsegna(b.dataset.c);});
+$("cPrev").onclick=()=>{C.week--;renderConsegne();};$("cNext").onclick=()=>{C.week++;renderConsegne();};$("cToday").onclick=()=>{C.week=0;renderConsegne();};
+$("cq").addEventListener("input",e=>{C.q=e.target.value.trim();renderConsegne();});
+$("btnConsegna").onclick=()=>openConsegna(null);
 
 /* =================== Avvio =================== */
 $("btnMore").onclick=()=>{const m=$("moreMenu");m.hidden=!m.hidden;$("btnMore").setAttribute("aria-expanded",String(!m.hidden));};
@@ -1018,7 +1240,8 @@ function avviaApp(store){
   store.onLog(l=>{S.log=l;renderLog();});
   if(isAdmin())store.onUtenti(u=>{S.utenti=u;renderUtenti();});
   if(canUsato()){$("tabs").hidden=false;store.onColl("usato",l=>{U.docs=new Map(l);renderUsato();});
-    if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);});}
+    if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);});
+    store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();});}
   $("whoami").textContent=`Accesso: ${store.me.nome} (${store.me.email}) · ${NOME_RUOLO[store.me.ruolo]||store.me.ruolo}`;
   render();
   let v="chiavi";try{v=localStorage.getItem("vista")||"chiavi";}catch(e){}vista(v);

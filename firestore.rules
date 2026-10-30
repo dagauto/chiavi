@@ -1,7 +1,7 @@
 rules_version = '2';
 // Regole di sicurezza del registro chiavi e della lavorazione usato Dag Auto.
 // Entra solo chi ha verificato la propria email ED è presente nell'elenco "utenti".
-// Ruoli: admin, backoffice, usato (responsabile usato), ripristini, foto, operatore.
+// Ruoli: admin, backoffice, usato (responsabile usato), venditore (product expert), officina, ripristini, foto, operatore.
 // Il carico fiscale (usato_riservato) lo vedono solo admin, backoffice e usato.
 // Lo storico movimenti si può solo aggiungere: nessuno può modificarlo o cancellarlo.
 service cloud.firestore {
@@ -47,6 +47,14 @@ service cloud.firestore {
 
     match /usato_riservato/{id} {
       allow read, create, update: if vedeFiscale();
+      allow delete: if admin();
+    }
+
+    match /consegne/{id} {
+      allow read: if lavoraUsato();
+      allow create: if autorizzato() && ruolo() in ["admin", "backoffice", "usato", "venditore"]
+        && request.resource.data.updatedBy == emailUtente();
+      allow update: if lavoraUsato() && request.resource.data.updatedBy == emailUtente();
       allow delete: if admin();
     }
 
