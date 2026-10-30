@@ -1209,6 +1209,7 @@ function openConsegna(id){
   const p=openSheet(`<form class="panel" id="cf" novalidate role="dialog" aria-modal="true" aria-label="Consegna">
     <div class="phead"><div><h2>${nuovo?"Nuova consegna":esc(etich(f)+" · "+(f.cliente||""))}</h2><p>${nuovo?"Il back office la crea una settimana prima: l'officina la vede subito nel calendario.":esc(semaforo(f)[1])}</p></div></div>
     <div class="keybox"><h4>Vettura</h4>
+      ${nuovo?`<label class="f">Cerca la vettura per targa o telaio<input class="mono" id="c_cerca" placeholder="es. GH123AB oppure ultime cifre del telaio" autocomplete="off"></label><div id="c_ris" class="keys" style="flex-wrap:wrap;gap:6px;margin:4px 0 8px"></div>`:""}
       <div class="grid2"><label class="f">Colore chiave<select id="c_colore" ${nuovo?"":"disabled"}>${COLORI.map(c=>`<option value="${c}" ${f.colore===c?"selected":""}>${SING[c]} (${LETT_C[c]})</option>`).join("")}</select></label>
       <label class="f">N° chiave<input id="c_numero" inputmode="numeric" value="${esc(f.numero??"")}" ${nuovo?"":"disabled"}></label></div>
       <div id="c_vett" class="small"></div>
@@ -1239,6 +1240,12 @@ function openConsegna(id){
     if(!(n>=1&&n<=100)){el.textContent="";return null;}const s=slot(col,n);
     if(occupato(s)){el.innerHTML=`Dal registro chiavi: <b>${esc(s.modello||"modello non indicato")}</b> · ${esc(s.telaio||"telaio non indicato")}${s.targa?" · "+esc(s.targa):""}`;if(nuovo&&!$("c_targa").value&&s.targa)$("c_targa").value=s.targa;return s;}
     el.innerHTML=`<span style="color:var(--bad)">Il ${SING[col]} ${n} non risulta occupato nel registro chiavi: controlla il numero.</span>`;return null;};
+  if(nuovo){const cerca=$("c_cerca"),ris=$("c_ris");
+    cerca.addEventListener("input",()=>{const q=cerca.value.toUpperCase().replace(/\s/g,"");if(q.length<3){ris.innerHTML=q?'<span class="small">Scrivi almeno 3 caratteri.</span>':"";return;}
+      const hit=slots().filter(x=>occupato(x)&&((x.targa||"").includes(q)||(x.telaio||"").includes(q))).slice(0,8);
+      ris.innerHTML=hit.length?hit.map(x=>`<button type="button" data-pick="${x.colore}|${x.numero}">${esc(SING[x.colore]+" "+x.numero)} · ${esc(x.targa||"senza targa")} · ${esc((x.telaio||"").slice(-8))} ${esc(x.modello||"")}</button>`).join(""):'<span class="small" style="color:var(--bad)">Nessuna vettura nel registro chiavi con questa targa o telaio.</span>';});
+    ris.addEventListener("click",e=>{const b=e.target.closest("[data-pick]");if(!b)return;const[col,n]=b.dataset.pick.split("|");$("c_colore").value=col;$("c_numero").value=n;$("c_tipo").value=col==="VERDE"?"noleggio":"vendita";$("c_targa").value="";mostraVett();ris.innerHTML="";cerca.value="";});
+    setTimeout(()=>cerca.focus(),50);}
   $("c_numero").addEventListener("input",mostraVett);$("c_colore").addEventListener("change",()=>{mostraVett();if(nuovo)$("c_tipo").value=$("c_colore").value==="VERDE"?"noleggio":"vendita";});mostraVett();
   const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=oreLavorative(Date.now(),new Date(`${d}T${o}:00`).getTime());
     w.innerHTML=h<24?`<div class="banner">Mancano meno di 24 ore lavorative (sabato e domenica esclusi): avvisa subito i preparatori.</div>`:"";const dup=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.ora&&c.ora===$("c_ora").value&&c.stato!=="annullata");if(dup.length)w.innerHTML+=`<div class="banner">Alla stessa ora c'è già: ${dup.map(([,c])=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}.</div>`;};
@@ -1260,7 +1267,7 @@ function openConsegna(id){
   };
   const cid=()=>id||`${f.colore}-${String(f.numero).padStart(3,"0")}-${Date.now().toString(36)}`;
   p.onsubmit=e=>{e.preventDefault();leggi();
-    if(nuovo){if(!(f.numero>=1&&f.numero<=100)){$("e_err").innerHTML=`<div class="banner bad">Indica il numero della chiave (1–100).</div>`;return;}
+    if(nuovo){if(!(f.numero>=1&&f.numero<=100)){$("e_err").innerHTML=`<div class="banner bad">Cerca la vettura per targa o telaio e toccala nei risultati (oppure indica colore e numero chiave).</div>`;return;}
       const s=mostraVett();if(s){f.telaio=s.telaio||"";f.modello=s.modello||"";}
       const aperta=[...C.docs.values()].find(c=>c.colore===f.colore&&c.numero===f.numero&&c.stato!=="consegnata"&&c.stato!=="annullata");
       if(aperta){$("e_err").innerHTML=`<div class="banner bad">Per la chiave ${esc(etich(f))} c'è già una consegna aperta (${esc(aperta.cliente||"")}).</div>`;return;}}
