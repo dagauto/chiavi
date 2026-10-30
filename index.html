@@ -212,7 +212,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
 <!-- Accesso -->
 <div class="wrap" id="auth" hidden>
   <div class="authbox">
-    <div class="brand"><span class="tag cBLU"><b>5</b><small>B · 105</small></span><div><h1>Dag Auto Vetture</h1><p class="sub">Registro chiavi della concessionaria</p></div></div>
+    <div class="brand"><span class="tag cBLU"><b>5</b><small>N · 105</small></span><div><h1>Dag Auto Vetture</h1><p class="sub">Registro chiavi della concessionaria</p></div></div>
 
     <form id="fLogin" class="authform">
       <label class="f">Email<input id="lEmail" type="email" autocomplete="username" required></label>
@@ -349,7 +349,7 @@ const COLORI=["BLU","ROSSO","VERDE"];
 const NOMI={BLU:"Blu · nuove",ROSSO:"Rosse · usate",VERDE:"Verdi · noleggio"};
 const CORTO={BLU:"Blu",ROSSO:"Rosse",VERDE:"Verdi"};
 const SING={BLU:"Blu",ROSSO:"Rossa",VERDE:"Verde"};
-const LETT={BLU:"B",ROSSO:"R",VERDE:"V"};
+const LETT={BLU:"N",ROSSO:"U",VERDE:"V"};const LETT_OLD={BLU:"B",ROSSO:"R",VERDE:"V"};
 const LUOGHI=["Salone","Officina","Garage","Cimitero","Bel Sito"];
 const RETRO="retro cassaforte salone";
 const TIPI_RIP=["Meccanica","Carrozzeria","Sanificazione","Altro"];
@@ -525,15 +525,15 @@ const occupato=s=>s._has&&stato(s)!=="LIBERO";
 const inRip=s=>s.ripristino==="Sì";
 const giorniDa=d=>{if(!d)return 0;return Math.max(0,Math.round((new Date(oggi())-new Date(d))/864e5));};
 const ripTesto=s=>["In ripristino",s.ripristinoTipo,s.ripristinoDove].filter(Boolean).join(" · ")+(s.ripristinoDal?(giorniDa(s.ripristinoDal)===0?" · da oggi":giorniDa(s.ripristinoDal)===1?" · da ieri":` · da ${giorniDa(s.ripristinoDal)} giorni`):"");
-const codice=s=>`${LETT[s.colore]} ${s.numero}`;
+const codice=s=>`${LETT[s.colore]}.${s.numero}`;
 function primoLibero(c,esclusi){return slots().find(s=>s.colore===c&&stato(s)==="LIBERO"&&!(esclusi||[]).includes(s.numero));}
 function telaioUsato(t,eccetto){if(!t)return null;const n=norm(t);return slots().find(s=>s.id!==eccetto&&s._has&&norm(s.telaio)===n)||null;}
 
 function matches(s){
   const q=norm(S.q);if(!q)return true;
   if(/^\d{1,3}$/.test(q)){const n=+q;return s.numero===n||s.numero+100===n;}
-  const c1=LETT[s.colore]+s.numero,c2=LETT[s.colore]+(s.numero+100),lungo=s.colore+s.numero;
-  return [s.targa,s.telaio,s.modello,s.note].some(v=>norm(v).includes(q))||q===c1||q===c2||q===lungo;
+  const sig=[LETT,LETT_OLD].flatMap(L=>[L[s.colore]+s.numero,L[s.colore]+(s.numero+100)]),lungo=s.colore+s.numero;
+  return [s.targa,s.telaio,s.modello,s.note].some(v=>norm(v).includes(q))||sig.includes(q)||q===lungo;
 }
 function filtered(){
   return slots().filter(s=>{
@@ -813,7 +813,7 @@ async function registraBolla(){
   const writes=[],logs=[];
   for(const r of B.righe){const n=parseInt(r.numero,10);
     writes.push({id:idOf(r.colore,n),data:{colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"}});
-    logs.push({codice:`${LETT[r.colore]} ${n}`,azione:r.foto?"Assegnato da foto":"Assegnato a mano",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
+    logs.push({codice:`${LETT[r.colore]}.${n}`,azione:r.foto?"Assegnato da foto":"Assegnato a mano",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
   $("b_save").disabled=true;
   try{await S.store.commit(writes,logs);closeSheet();flash(writes.length===1?"Vettura registrata.":`${writes.length} vetture registrate.`,"ok");}
   catch(e){$("b_save").disabled=false;$("b_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(e))}</div>`;}
@@ -935,7 +935,7 @@ function renderUsato(){
       <span class="ustate s-${esc(u.stato)}">${esc(NOME_STATO[u.stato]||"")}</span>
       <span style="min-width:0">
         <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?'<span class="pill p-Solo-seconda">Priorità alta</span>':u.priorita==="bassa"?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
-        <span class="uinfo">${[u.chiave?`Chiave R ${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
+        <span class="uinfo">${[u.chiave?`Chiave U.${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
         <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${g!=null?`<span class="kp">${esc(giorniTxt(g))}</span>`:""}</span>
       </span></button>`;
   }
@@ -977,7 +977,7 @@ function stampaPerizia(u){
   $("printArea").innerHTML=`<div class="pv"><div class="pvh"><b>Stato d'uso / Perizia</b><span>DAG AUTO S.r.l.<br>Concessionaria Mercedes-Benz</span></div>
     <table class="pvt"><tr><td>Veicolo</td><td>${esc(u.modello||"")}</td><td>Targa</td><td>${esc(u.targa||"")}</td></tr>
     <tr><td>Telaio</td><td>${esc(u.telaio||"")}</td><td>Km check</td><td>${u.km!==""&&u.km!=null?Number(u.km).toLocaleString("it-IT"):""}</td></tr>
-    <tr><td>N° chiave</td><td>${u.chiave?"R "+esc(u.chiave):""}</td><td>Immatricolazione</td><td>${esc(u.immatricolazione||"")}</td></tr></table>
+    <tr><td>N° chiave</td><td>${u.chiave?"U."+esc(u.chiave):""}</td><td>Immatricolazione</td><td>${esc(u.immatricolazione||"")}</td></tr></table>
     <div class="pvg"><div><h2>Segnalazione danni carrozzeria</h2>${car}<div class="pvn">${esc(u.danni||"")}</div>
       <p class="pvs">Simboli: X bollatura · R rigatura · V da verniciare · C differenza colore · P raggio · F incrinatura vetro</p>
       <h2>Accessori e documenti</h2><table class="pvt">${[0,1,2,3,4].map(i=>`<tr><td style="width:8%">${i+1}.</td><td>${esc(acc[i])}</td><td style="width:8%">${i+6}.</td><td>${esc(acc[i+5])}</td></tr>`).join("")}</table></div>
@@ -1056,13 +1056,13 @@ function openUsato(id){
     else if(f.stato!==base.stato&&f.stato==="pronta")writes.push(coda("usato_pronta",`Foto da fare: ${f.targa||""}`,`${desc} è pronta e lavata`,"#usato"));
     if(canFiscale()){const rv={valoreContratto:num($("u_valoreContratto").value),ivaEsposta:$("u_ivaEsposta").value};if(nuovo||rv.valoreContratto!==(r.valoreContratto??"")||rv.ivaEsposta!==(r.ivaEsposta||""))writes.push({col:"usato_riservato",id:nid,data:rv});}
     const cod=f.targa||nid;
-    if(nuovo)logs.push({codice:cod,azione:"Presa in carico",dettaglio:[f.modello,f.chiave?`chiave R ${f.chiave}`:""].filter(Boolean).join(" · ")});
+    if(nuovo)logs.push({codice:cod,azione:"Presa in carico",dettaglio:[f.modello,f.chiave?`chiave U.${f.chiave}`:""].filter(Boolean).join(" · ")});
     else if(f.stato!==base.stato)logs.push({codice:cod,azione:NOME_STATO[f.stato],dettaglio:`da «${NOME_STATO[base.stato]}»`});
     else logs.push({codice:cod,azione:"Scheda usato aggiornata",dettaglio:f.priorita!==base.priorita?`priorità ${f.priorita}`:""});
     // collegamento con il registro chiavi
     let avviso="";
     if(f.chiave){const s=slot("ROSSO",+f.chiave);const stessa=s._has&&((f.telaio&&norm(s.telaio)===norm(f.telaio))||(f.targa&&norm(s.targa)===norm(f.targa)));
-      if(!occupato(s)&&nuovo){writes.push({col:"chiavi",id:s.id,data:{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio,targa:f.targa,modello:f.modello,prima:"Sì",dovePrima:"",seconda:"",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Da presa in carico usato: indicare dove sono le chiavi"}});logs.push({codice:`R ${f.chiave}`,azione:"Assegnato da presa in carico",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")});}
+      if(!occupato(s)&&nuovo){writes.push({col:"chiavi",id:s.id,data:{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio,targa:f.targa,modello:f.modello,prima:"Sì",dovePrima:"",seconda:"",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Da presa in carico usato: indicare dove sono le chiavi"}});logs.push({codice:`U.${f.chiave}`,azione:"Assegnato da presa in carico",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")});}
       else if(occupato(s)&&!stessa&&nuovo)avviso=` Attenzione: la chiave Rossa ${f.chiave} risulta già occupata (${s.targa||s.modello||s.telaio||"altra vettura"}); il registro chiavi non è stato modificato.`;
       const ok=occupato(s)?stessa:nuovo;
       if(ok&&f.stato!==base.stato){
@@ -1080,7 +1080,7 @@ $("uq").addEventListener("input",e=>{U.q=e.target.value.trim();renderUsato();});
 $("btnPresa").onclick=()=>openUsato(null);
 $("btnExportU").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
-  const rows=[...U.docs.entries()].map(([id,u])=>{const t=totali(u);const o={"Targa":u.targa||"","Telaio":u.telaio||"","Modello":u.modello||"","Km":u.km??"","Chiave R":u.chiave||"","Venditore":u.venditore||"","Stato":NOME_STATO[u.stato]||"","Priorità":u.priorita||""};
+  const rows=[...U.docs.entries()].map(([id,u])=>{const t=totali(u);const o={"Targa":u.targa||"","Telaio":u.telaio||"","Modello":u.modello||"","Km":u.km??"","Chiave U":u.chiave||"","Venditore":u.venditore||"","Stato":NOME_STATO[u.stato]||"","Priorità":u.priorita||""};
     for(const[k,l]of STATI_U)o["Data "+l.toLowerCase()]=(u.date||{})[k]||"";
     o["Giorni presa → pubblicata"]=giorniTot(u)??"";
     for(const[k,l]of VOCI){const v=(u.voci||{})[k]||{};o[l+" lavori"]=v.descrizione||"";o[l+" stimato"]=v.stimato??"";o[l+" effettivo"]=v.effettivo??"";}
@@ -1298,8 +1298,8 @@ function openConsegna(id){
     if(f.tipo==="vendita"&&occupato(s)&&(!f.telaio||norm(s.telaio)===norm(f.telaio))){
       const snap=Object.assign({},s);delete snap._has;delete snap.id;snap.uscita=oggi();snap.motivoUscita=`Consegnata a ${f.cliente||"cliente"}`;snap.refs=[norm(s.targa||f.targa),norm(s.telaio||f.telaio)].filter(Boolean);
       w.push({col:"chiavi",id:s.id,data:{colore:f.colore,numero:f.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:`${s.id}-${Date.now().toString(36)}`,data:snap});
-      logs.push({codice:`${LETT[f.colore]} ${f.numero}`,azione:"Numero liberato",dettaglio:`consegnata a ${f.cliente||"cliente"}`});}
-    else if(f.tipo==="noleggio"&&occupato(s))logs.push({codice:`${LETT[f.colore]} ${f.numero}`,azione:"Uscita a noleggio",dettaglio:f.cliente||""});
+      logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Numero liberato",dettaglio:`consegnata a ${f.cliente||"cliente"}`});}
+    else if(f.tipo==="noleggio"&&occupato(s))logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Uscita a noleggio",dettaglio:f.cliente||""});
     salvaC(w,logs,"Consegna registrata.");
   };
 }
@@ -1339,7 +1339,7 @@ async function cercaArchivio(){
     <span class="uinfo">Ripristini stimati ${euro(t.s)}${t.hasE?` · effettivi ${euro(t.e)}`:""}</span>
     <span class="keys">${u.deleted?(isAdmin()?`<button type="button" data-ripristina="${esc(id)}">Ripristina scheda</button>`:""):`<button type="button" data-apriu="${esc(id)}">Apri scheda</button>`}</span></div>`;}).join("");
   if(cs.length)h+=`<h3 class="ugrp">Consegne</h3>`+cs.map(([,c])=>cardC(Object.assign({},c,{id:[...C.docs.entries()].find(([,x])=>x===c)[0]}))).join("");
-  if(st.length)h+=`<h3 class="ugrp">Storico chiavi</h3>`+st.sort((a,b)=>String(b.uscita).localeCompare(String(a.uscita))).map(x=>`<div class="card" style="grid-template-columns:1fr"><span><b>${esc(LETT[x.colore]||"")} ${esc(x.numero)}</b> · ${esc(x.modello||"")} · ${esc(x.targa||"")} · uscita ${x.uscita?new Date(x.uscita).toLocaleDateString("it-IT"):""}</span><span class="uinfo">${esc(x.motivoUscita||"")}${x.telaio?" · "+esc(x.telaio):""}${x.dovePrima?" · prima chiave era in "+esc(x.dovePrima):""}</span></div>`).join("");
+  if(st.length)h+=`<h3 class="ugrp">Storico chiavi</h3>`+st.sort((a,b)=>String(b.uscita).localeCompare(String(a.uscita))).map(x=>`<div class="card" style="grid-template-columns:1fr"><span><b>${esc(LETT[x.colore]||"")}.${esc(x.numero)}</b> · ${esc(x.modello||"")} · ${esc(x.targa||"")} · uscita ${x.uscita?new Date(x.uscita).toLocaleDateString("it-IT"):""}</span><span class="uinfo">${esc(x.motivoUscita||"")}${x.telaio?" · "+esc(x.telaio):""}${x.dovePrima?" · prima chiave era in "+esc(x.dovePrima):""}</span></div>`).join("");
   if(mv.length)h+=`<h3 class="ugrp">Movimenti</h3><div class="log">`+mv.map(l=>{const d=new Date(l.ts);return`<div><span><b>${esc(l.codice)}</b> · ${esc(l.azione)}${l.dettaglio?" — "+esc(l.dettaglio):""}</span><span class="meta">${esc(l.nome||l.email||"")} · ${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})}</span></div>`;}).join("")+`</div>`;
   out.innerHTML=h||`<div class="empty"><p>Nessun dato trovato per «${esc(q)}». I movimenti registrati prima di oggi si trovano solo se contengono la targa nel testo.</p></div>`;
 }
