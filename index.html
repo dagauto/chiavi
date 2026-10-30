@@ -1114,13 +1114,8 @@ const C={docs:new Map(),week:0,q:""};
 const canConsegne=()=>S.me&&S.me.ruolo!=="operatore";
 const canCreaConsegna=()=>S.me&&["admin","backoffice","usato","venditore"].includes(S.me.ruolo);
 const etich=c=>`${LETT_C[c.colore]||"?"}.${c.numero||"?"}`;
-function prontaC(c){
-  const std=ACC_STD.every(([k])=>(c.std||{})[k]);
-  const pag=Object.values(c.pag||{}).every(v=>!v.sel||v.fatto);
-  const om=omaggi(c).every(o=>o.fatto);
-  const prep=PREP.every(([k])=>(c.prep||{})[k]);
-  return std&&pag&&om&&prep;
-}
+// Pronta solo quando preparatore/officina mette il flag «Preconsegna fatta»: le singole voci sono un promemoria, non tutte servono a ogni cliente.
+function prontaC(c){return !!c.pronta;}
 function mancanti(c){let n=0,t=0;for(const[k]of ACC_STD){t++;if(!(c.std||{})[k])n++;}for(const[k,v]of Object.entries(c.pag||{}))if(v.sel){t++;if(!v.fatto)n++;}for(const o of omaggi(c)){t++;if(!o.fatto)n++;}for(const[k]of PREP){t++;if(!(c.prep||{})[k])n++;}return{n,t};}
 function omaggi(c){if(Array.isArray(c.omaggi))return c.omaggi.filter(o=>o&&o.testo);return c.omaggio?[{testo:c.omaggio,fatto:!!c.omaggioFatto}]:[];}
 // Ore lavorative tra adesso e la consegna: sabato e domenica non contano (le vetture non si preparano).
@@ -1129,8 +1124,8 @@ function quando(c){return c.data?new Date(`${c.data}T${c.ora||"09:00"}:00`):null
 function semaforo(c){
   if(c.stato==="consegnata")return["done","Consegnata"];
   if(c.stato==="annullata")return["done","Annullata"];
+  if(prontaC(c))return["ok",c.data?"Pronta":"Pronta · data da fissare"];
   if(!c.data)return["warn","Data da fissare"];
-  if(prontaC(c))return["ok","Pronta"];
   const h=oreLavorative(Date.now(),quando(c).getTime());
   if(h<24)return["bad",h<0?"Scaduta, non pronta":"Meno di 24 ore lavorative, non pronta"];
   if(h<48)return["warn","Entro 48 ore lavorative, in preparazione"];
@@ -1146,7 +1141,7 @@ function cardC(c){
     <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
     <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio</span>':""}</span>
       <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`PE ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
-      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${c.stato!=="consegnata"&&c.stato!=="annullata"?`<span class="kp">Preparazione ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
+      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
 }
 function renderConsegne(){
   if(!canConsegne())return;
@@ -1225,8 +1220,10 @@ function openConsegna(id){
       <div class="accrow" style="border-top:0"><b style="font-size:14px">Accessori in omaggio</b></div>
       <div id="c_omlist">${omaggi(f).map((o,i)=>omRow(o,i,ro)).join("")}</div>
       ${ro?"":`<button type="button" class="link" id="c_omadd">+ Aggiungi omaggio</button>`}</div>
-    <div class="keybox"><h4>Preparazione officina</h4>
-      <div class="chkgrid">${ACC_STD.map(([k,l])=>ck("std",k,l)).join("")}${PREP.map(([k,l])=>ck("prep",k,l)).join("")}</div></div>
+    <div class="keybox"><h4>Preparazione officina <span class="small">spunta solo le voci che servono a questo cliente</span></h4>
+      <div class="chkgrid">${ACC_STD.map(([k,l])=>ck("std",k,l)).join("")}${PREP.map(([k,l])=>ck("prep",k,l)).join("")}</div>
+      <label class="chk" style="margin-top:10px;padding:10px;border:2px solid var(--ok);border-radius:8px;font-weight:600"><input type="checkbox" id="c_pronta" ${f.pronta?"checked":""}> Preconsegna fatta: vettura pronta per la consegna</label>
+      ${f.pronta&&f.prontaDa?`<div class="small">Segnata pronta da ${esc(f.prontaDa)}${f.date&&f.date.pronta?" il "+new Date(f.date.pronta).toLocaleDateString("it-IT"):""}</div>`:""}</div>
     <label class="f">Note<textarea id="c_note" rows="2">${esc(f.note||"")}</textarea></label>
     <div id="e_err"></div>
     <div class="pfoot"><div class="r" style="margin-left:0;flex-wrap:wrap">${nuovo?"":`<button type="button" id="c_print">Stampa verbale</button><button type="button" id="c_ics">Aggiungi al calendario</button>`}</div>
@@ -1259,6 +1256,7 @@ function openConsegna(id){
     const pg={};p.querySelectorAll("[data-pag]").forEach(i=>{pg[i.dataset.pag]=pg[i.dataset.pag]||{};pg[i.dataset.pag][i.dataset.pf]=i.checked;});
     for(const[k,v]of Object.entries(pg)){if(v.sel)f.pag[k]={sel:true,fatto:!!v.fatto};else delete f.pag[k];}
     if(nuovo){f.colore=$("c_colore").value;f.numero=parseInt($("c_numero").value,10);}
+    const pc=$("c_pronta").checked;if(pc&&!base.pronta)f.prontaDa=S.me.nome;if(!pc)delete f.prontaDa;f.pronta=pc;
   };
   const salvaC=async(extraWrites,logs,msg)=>{
     $("e_save").disabled=true;
