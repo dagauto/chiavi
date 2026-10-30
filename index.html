@@ -166,6 +166,8 @@ input.mono{font-family:var(--f-mono)!important;text-transform:uppercase}
 .weeknav button{padding:6px 12px}
 .ugrp.today{color:var(--accent)}
 .cnone{padding:2px 4px 6px}
+.imp{display:flex;gap:8px;align-items:center;width:100%;text-align:left;margin:4px 0;padding:8px 12px;border:1px dashed var(--line);border-radius:10px;background:var(--sunk);font-size:13.5px;color:var(--ink)}
+.imp b{white-space:nowrap}
 .ccard{grid-template-columns:64px minmax(0,1fr)}
 .ctime{display:flex;flex-direction:column;align-items:center;gap:6px}
 .ctime b{font-family:var(--f-display);font-size:20px;font-variant-numeric:tabular-nums}
@@ -268,6 +270,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
       <button class="primary" id="btnBolla">+ Aggiungi vettura</button>
       <button class="primary" id="btnPresa" hidden>+ Presa in carico</button>
       <button class="primary" id="btnConsegna" hidden>+ Consegna</button>
+      <button id="btnImpegno" hidden>+ Impegno PE</button>
       <button id="btnMore" aria-expanded="false">Altro</button>
     </div>
   </header>
@@ -480,7 +483,8 @@ function avviaDemo(){
     ["ROSSO-013-b",{colore:"ROSSO",numero:13,tipo:"vendita",telaio:"WDD1183441N000013",modello:"CLA 200 (esempio)",targa:"FY456AB",cliente:"Cliente di prova 2",venditore:"Bussolotto",data:dd(3),ora:"16:00",stato:"fissata",std:{chiavi:true,giubotto:true,prontosoccorso:true,gonfiaggio:true,portachiavi:true,libretto:true},pag:{},prep:{targata:true,lavaggio:true},date:{}}],
     ["VERDE-001-c",{colore:"VERDE",numero:1,tipo:"noleggio",telaio:"W1V9076331P000001",modello:"Sprinter 317 CDI (esempio)",targa:"GK789CD",cliente:"Noleggio di prova",venditore:"",data:"",ora:"",stato:"richiesta",std:{},pag:{},prep:{},date:{}}]]);
   coll.storico=new Map();coll.notifiche_coda=new Map();
-  const LC={usato:[],usato_riservato:[],consegne:[],storico:[]};
+  coll.impegni=new Map([["imp-demo",{email:"prova@dagauto.it",nome:"Utente di prova",data:dd(3),tutto:false,dalle:"09:00",alle:"12:00",nota:"Appuntamento cliente in sede"}]]);
+  const LC={usato:[],usato_riservato:[],consegne:[],storico:[],impegni:[]};
   const fire=()=>{L.c.forEach(f=>f([...docs.entries()]));L.l.forEach(f=>f(log.slice(0,50)));L.u.forEach(f=>f(utenti));};
   avviaApp({
     demo:true,me:{email:"prova@dagauto.it",nome:"Utente di prova",ruolo:"admin"},
@@ -1096,7 +1100,7 @@ function vista(v){
   if(v==="archivio"&&!canArchivio())v="chiavi";
   $("vChiavi").hidden=v!=="chiavi";$("vUsato").hidden=v!=="usato";$("vConsegne").hidden=v!=="consegne";$("vArchivio").hidden=v!=="archivio";
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===v));
-  $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();
+  $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();$("btnImpegno").hidden=v!=="consegne"||!canImpegni();
   $("btnExport").hidden=v!=="chiavi";$("btnExportU").hidden=v!=="usato";$("btnExportC").hidden=v!=="consegne";$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!canImport();
   $("h1t").textContent={chiavi:"Dag Auto Vetture",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio"}[v];
   $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio."}[v];
@@ -1110,9 +1114,40 @@ const ACC_STD=[["chiavi","Chiave e doppia chiave"],["giubotto","Giubotto catarif
 const ACC_PAG=[["autonera","Auto nera"],["bulloni","Bulloni antifurto"],["tappeti","Tappeti in gomma"],["servicecare","Service Care 4"],["advance","Advance 4"],["defence","Defence 48 mesi"],["certified","Certified"],["mapfree","Mapfree"]];
 const PREP=[["targata","Targa montata"],["lavaggio","Lavaggio"]];
 const LETT_C={BLU:"N",ROSSO:"U",VERDE:"V"};
-const C={docs:new Map(),week:0,q:""};
+const C={docs:new Map(),imp:new Map(),week:0,q:""};
 const canConsegne=()=>S.me&&S.me.ruolo!=="operatore";
 const canCreaConsegna=()=>S.me&&["admin","backoffice","usato","venditore"].includes(S.me.ruolo);
+const canImpegni=canCreaConsegna;
+const canImpTutti=()=>S.me&&["admin","backoffice","usato"].includes(S.me.ruolo);
+const pes=()=>(S.utenti||[]).filter(u=>u.ruolo==="venditore").map(u=>({email:u.email,nome:u.nome||u.email})).sort((a,b)=>a.nome.localeCompare(b.nome));
+const fasciaImp=i=>i.tutto?"tutto il giorno":`${i.dalle||"--:--"}–${i.alle||"--:--"}`;
+function impegniDel(data,nomeOEmail){const k=norm(nomeOEmail);return[...C.imp.entries()].map(([id,i])=>Object.assign({id},i)).filter(i=>i.data===data&&(!k||norm(i.nome)===k||norm(i.email)===k||norm(i.nome).includes(k)||k.includes(norm(i.nome))));}
+function sovrapposto(i,ora){if(i.tutto||!ora)return true;return ora>=(i.dalle||"00:00")&&ora<(i.alle||"23:59");}
+function openImpegno(id){
+  const nuovo=!id;const f=nuovo?{data:oggi(),tutto:false,dalle:"09:00",alle:"13:00",nota:"",email:S.me.email,nome:S.me.nome}:Object.assign({},C.imp.get(id));
+  const mio=f.email===S.me.email;const ed=nuovo||mio||canImpTutti();const ro=ed?"":"disabled";
+  const lista=pes();const scelta=canImpTutti()&&lista.length?`<label class="f">Product expert<select id="i_pe" ${ro}>${(lista.some(p=>p.email===f.email)?lista:[{email:f.email,nome:f.nome}].concat(lista)).map(p=>`<option value="${esc(p.email)}" ${p.email===f.email?"selected":""}>${esc(p.nome)}</option>`).join("")}</select></label>`:`<p class="small">Product expert: <b>${esc(f.nome)}</b></p>`;
+  const p=openSheet(`<form class="panel" id="if" novalidate role="dialog" aria-modal="true" aria-label="Impegno product expert">
+    <div class="phead"><div><h2>${nuovo?"Nuovo impegno":"Impegno"}</h2><p>Il back office lo vede quando fissa le consegne: quel giorno o in quella fascia il product expert non è disponibile.</p></div></div>
+    ${scelta}
+    <div class="grid2"><label class="f">Data<input type="date" id="i_data" value="${esc(f.data||"")}" ${ro}></label>
+      <label class="chk" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="i_tutto" ${f.tutto?"checked":""} ${ro}> Tutto il giorno</label></div>
+    <div class="grid2" id="i_fascia" ${f.tutto?"hidden":""}><label class="f">Dalle<input type="time" id="i_dalle" value="${esc(f.dalle||"")}" ${ro}></label><label class="f">Alle<input type="time" id="i_alle" value="${esc(f.alle||"")}" ${ro}></label></div>
+    <label class="f">Motivo (facoltativo)<input id="i_nota" value="${esc(f.nota||"")}" placeholder="es. appuntamento cliente, ferie, corso Mercedes" ${ro}></label>
+    <div id="e_err"></div>
+    <div class="pfoot">${!nuovo&&ed?`<button type="button" class="danger" id="i_del">Elimina</button>`:"<span></span>"}<div class="r"><button type="button" id="i_close">Chiudi</button>${ed?`<button type="submit" class="primary" id="e_save">${nuovo?"Salva impegno":"Salva"}</button>`:""}</div></div>
+  </form>`);
+  $("i_close").onclick=closeSheet;
+  $("i_tutto").onchange=()=>{$("i_fascia").hidden=$("i_tutto").checked;};
+  const salvaI=async(w,msg)=>{const b=$("e_save");if(b)b.disabled=true;try{await S.store.commitU(w,[]);closeSheet();flash(msg,"ok");}catch(x){if(b)b.disabled=false;$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}};
+  const d=$("i_del");if(d)d.onclick=()=>{if(!d.dataset.armed){d.dataset.armed="1";d.textContent="Conferma eliminazione";return;}salvaI([{col:"impegni",id,del:true}],"Impegno eliminato.");};
+  p.onsubmit=e=>{e.preventDefault();if(!ed)return;
+    const sel=$("i_pe");if(sel){f.email=sel.value;f.nome=(pes().find(x=>x.email===f.email)||{nome:f.nome}).nome;}
+    f.data=$("i_data").value;f.tutto=$("i_tutto").checked;f.dalle=$("i_dalle").value;f.alle=$("i_alle").value;f.nota=$("i_nota").value.trim();
+    if(!f.data){$("e_err").innerHTML=`<div class="banner bad">Indica la data.</div>`;return;}
+    if(!f.tutto&&(!f.dalle||!f.alle||f.alle<=f.dalle)){$("e_err").innerHTML=`<div class="banner bad">Indica l'orario: «alle» deve essere dopo «dalle», oppure spunta «Tutto il giorno».</div>`;return;}
+    delete f.id;salvaI([{col:"impegni",id:id||`imp-${Date.now().toString(36)}`,data:f}],nuovo?"Impegno salvato.":"Impegno aggiornato.");};
+}
 const etich=c=>`${LETT_C[c.colore]||"?"}.${c.numero||"?"}`;
 // Pronta solo quando preparatore/officina mette il flag «Preconsegna fatta»: le singole voci sono un promemoria, non tutte servono a ogni cliente.
 function prontaC(c){return !!c.pronta;}
@@ -1163,8 +1198,10 @@ function renderConsegne(){
   for(let i=0;i<7;i++){const d=new Date(lu);d.setDate(d.getDate()+i);const iso=isoD(d);
     const xs=all.filter(c=>c.data===iso&&c.stato!=="annullata").sort((a,b)=>String(a.ora).localeCompare(String(b.ora)));
     const oggiC=iso===oggi();
+    const im=impegniDel(iso,"").sort((a,b)=>(a.tutto?"0":a.dalle||"").localeCompare(b.tutto?"0":b.dalle||""));
     html+=`<h3 class="ugrp ${oggiC?"today":""}">${GIORNI[i]} ${d.getDate()}${oggiC?" · oggi":""}${xs.length?` · ${xs.length}`:""}</h3>`;
     html+=xs.length?xs.map(cardC).join(""):`<div class="small cnone">Nessuna consegna</div>`;
+    html+=im.map(x=>`<button type="button" class="imp" data-imp="${esc(x.id)}"><b>${esc(fasciaImp(x))}</b><span>${esc(x.nome||"")} non disponibile${x.nota?" · "+esc(x.nota):""}</span></button>`).join("");
   }
   $("cList").innerHTML=html;
 }
@@ -1212,7 +1249,7 @@ function openConsegna(id){
       <label class="f">Tipo<select id="c_tipo" ${ro}><option value="vendita" ${f.tipo==="vendita"?"selected":""}>Vendita</option><option value="noleggio" ${f.tipo==="noleggio"?"selected":""}>Noleggio</option></select></label></div></div>
     <div class="grid2"><label class="f">Cliente<input id="c_cliente" value="${esc(f.cliente||"")}" ${ro}></label>
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
-    <label class="f">Venditore / Product expert<input id="c_venditore" value="${esc(f.venditore||(nuovo&&S.me.ruolo==="venditore"?S.me.nome:""))}" ${ro}></label>
+    <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&S.me.ruolo==="venditore"?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${pes().map(p=>`<option value="${esc(p.nome)}">`).join("")}</datalist></label>
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
       <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}"></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}"></label></div><div id="c_dwarn"></div></div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato»</span></h4>
@@ -1245,8 +1282,12 @@ function openConsegna(id){
     setTimeout(()=>cerca.focus(),50);}
   $("c_numero").addEventListener("input",mostraVett);$("c_colore").addEventListener("change",mostraVett);mostraVett();
   const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=oreLavorative(Date.now(),new Date(`${d}T${o}:00`).getTime());
-    w.innerHTML=h<24?`<div class="banner">Mancano meno di 24 ore lavorative (sabato e domenica esclusi): avvisa subito i preparatori.</div>`:"";const dup=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.ora&&c.ora===$("c_ora").value&&c.stato!=="annullata");if(dup.length)w.innerHTML+=`<div class="banner">Alla stessa ora c'è già: ${dup.map(([,c])=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}.</div>`;};
-  $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);avvData();
+    w.innerHTML=h<24?`<div class="banner">Mancano meno di 24 ore lavorative (sabato e domenica esclusi): avvisa subito i preparatori.</div>`:"";const dup=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.ora&&c.ora===$("c_ora").value&&c.stato!=="annullata");if(dup.length)w.innerHTML+=`<div class="banner">Alla stessa ora c'è già: ${dup.map(([,c])=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}.</div>`;
+    const pe=$("c_venditore").value.trim();if(pe){const im=impegniDel(d,pe);const ora=$("c_ora").value;const hit=im.filter(i=>sovrapposto(i,ora));
+      if(im.length)w.innerHTML+=`<div class="banner ${hit.length?"bad":""}">${esc(pe)} ${hit.length?"non è disponibile":"quel giorno ha impegni"}: ${im.map(i=>esc(fasciaImp(i)+(i.nota?" ("+i.nota+")":""))).join(", ")}.</div>`;
+      const altre=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.stato!=="annullata"&&norm(c.venditore)===norm(pe));
+      if(altre.length)w.innerHTML+=`<div class="banner">${esc(pe)} quel giorno ha già ${altre.length} ${plur(altre.length,"consegna","consegne")}: ${altre.map(([,c])=>esc((c.ora||"--:--")+" "+etich(c))).join(", ")}.</div>`;}};
+  $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);$("c_venditore").addEventListener("input",avvData);avvData();
   p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked;if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
   const leggi=()=>{
     for(const k of["targa","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();
@@ -1303,7 +1344,8 @@ function openConsegna(id){
     salvaC(w,logs,"Consegna registrata.");
   };
 }
-$("cList").addEventListener("click",e=>{const b=e.target.closest("[data-c]");if(b)openConsegna(b.dataset.c);});
+$("cList").addEventListener("click",e=>{const im=e.target.closest("[data-imp]");if(im){openImpegno(im.dataset.imp);return;}const b=e.target.closest("[data-c]");if(b)openConsegna(b.dataset.c);});
+$("btnImpegno").onclick=()=>openImpegno(null);
 $("cPrev").onclick=()=>{C.week--;renderConsegne();};$("cNext").onclick=()=>{C.week++;renderConsegne();};$("cToday").onclick=()=>{C.week=0;renderConsegne();};
 $("cq").addEventListener("input",e=>{C.q=e.target.value.trim();renderConsegne();});
 $("btnConsegna").onclick=()=>openConsegna(null);
@@ -1397,7 +1439,9 @@ function avviaApp(store){
   if(isAdmin())store.onUtenti(u=>{S.utenti=u;renderUtenti();});
   if(canUsato()){$("tabs").hidden=false;store.onColl("usato",l=>{U.docs=new Map(l);renderUsato();});
     if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);});
-    store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();});}
+    store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();});
+    store.onColl("impegni",l=>{C.imp=new Map(l);renderConsegne();});
+    if(!isAdmin())store.onUtenti(u=>{S.utenti=u;});}
   $("whoami").textContent=`Accesso: ${store.me.nome} (${store.me.email}) · ${NOME_RUOLO[store.me.ruolo]||store.me.ruolo}`;
   if(store.onMiePrefs)store.onMiePrefs(d=>{MIE=Object.assign({prefs:{},tokens:[]},d);renderNotifiche();});
   try{if(!store.demo&&localStorage.getItem("pushOn")==="1"&&window.Notification&&Notification.permission==="granted")store.attivaPush().catch(()=>{});}catch(e){}
