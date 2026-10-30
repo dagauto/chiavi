@@ -9,7 +9,7 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((p) => {
   const d = p.data || {};
-  return self.registration.showNotification(d.title || "Chiavi Dag Auto", {
+  return self.registration.showNotification(d.title || "Dag Auto Vetture", {
     body: d.body || "",
     icon: "icon-192.png",
     badge: "icon-192.png",
