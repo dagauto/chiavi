@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Chiavi">
 <title>Chiavi Dag Auto</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -275,6 +278,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
     <button id="btnExportC" hidden>Esporta Excel consegne</button>
     <button id="btnImport" hidden>Importa Excel</button>
     <button id="btnUsers" hidden>Utenti</button>
+    <button id="btnNotif">Notifiche</button>
     <button id="btnOut">Esci</button>
   </div>
   <input type="file" id="fileImport" accept=".xlsx,.xls" hidden>
@@ -427,6 +431,19 @@ async function avviaFirebase(){
       async setUtente(em,data){await F.setDoc(F.doc(db,"utenti",em.toLowerCase()),data);},
       async delUtente(em){await F.deleteDoc(F.doc(db,"utenti",em.toLowerCase()));},
       async logout(){subs.forEach(f=>{try{f()}catch(e){}});subs=[];await A.signOut(auth);location.reload();},
+      onMiePrefs(cb){subs.push(F.onSnapshot(F.doc(db,"notifiche_utenti",email),s=>cb(s.exists()?s.data():{}),()=>{}));},
+      async setMiePrefs(d){await F.setDoc(F.doc(db,"notifiche_utenti",email),Object.assign({},d,{email,aggiornato:Date.now()}),{merge:true});},
+      async attivaPush(){
+        if(!window.FIREBASE_VAPID)throw new Error("Notifiche non ancora configurate: manca la chiave di Firebase Messaging.");
+        const perm=await Notification.requestPermission();if(perm!=="granted")throw new Error("Permesso per le notifiche non concesso.");
+        const M=await import(FB+"firebase-messaging.js");
+        const reg=await navigator.serviceWorker.register("firebase-messaging-sw.js");
+        const token=await M.getToken(M.getMessaging(app),{vapidKey:window.FIREBASE_VAPID,serviceWorkerRegistration:reg});
+        if(!token)throw new Error("Il dispositivo non ha restituito un codice per le notifiche.");
+        await F.setDoc(F.doc(db,"notifiche_utenti",email),{email,tokens:F.arrayUnion(token),aggiornato:Date.now()},{merge:true});
+        M.onMessage(M.getMessaging(app),p=>{const d=p.data||{};flash(`${d.title||""}: ${d.body||""}`,"ok");});
+        return token;
+      },
     };
     avviaApp(store);
   }
@@ -461,7 +478,7 @@ function avviaDemo(){
   coll.consegne=new Map([["BLU-003-a",{colore:"BLU",numero:3,tipo:"vendita",telaio:"W1N2539151F000003",modello:"GLC 220 d (esempio)",targa:"",cliente:"Cliente di prova 1",venditore:"De Blasiis",data:dd(1),ora:"10:30",stato:"fissata",std:{chiavi:true,giubotto:true},pag:{tappeti:{sel:true,fatto:false}},prep:{},date:{}}],
     ["ROSSO-013-b",{colore:"ROSSO",numero:13,tipo:"vendita",telaio:"WDD1183441N000013",modello:"CLA 200 (esempio)",targa:"FY456AB",cliente:"Cliente di prova 2",venditore:"Bussolotto",data:dd(3),ora:"16:00",stato:"fissata",std:{chiavi:true,giubotto:true,prontosoccorso:true,gonfiaggio:true,portachiavi:true,libretto:true},pag:{},prep:{targata:true,lavaggio:true},date:{}}],
     ["VERDE-001-c",{colore:"VERDE",numero:1,tipo:"noleggio",telaio:"W1V9076331P000001",modello:"Sprinter 317 CDI (esempio)",targa:"GK789CD",cliente:"Noleggio di prova",venditore:"",data:"",ora:"",stato:"richiesta",std:{},pag:{},prep:{},date:{}}]]);
-  coll.storico=new Map();
+  coll.storico=new Map();coll.notifiche_coda=new Map();
   const LC={usato:[],usato_riservato:[],consegne:[],storico:[]};
   const fire=()=>{L.c.forEach(f=>f([...docs.entries()]));L.l.forEach(f=>f(log.slice(0,50)));L.u.forEach(f=>f(utenti));};
   avviaApp({
@@ -475,6 +492,7 @@ function avviaDemo(){
     async setUtente(em,d){utenti=utenti.filter(u=>u.email!==em).concat([Object.assign({email:em},d)]);fire();},
     async delUtente(em){utenti=utenti.filter(u=>u.email!==em);fire();},
     async logout(){location.reload();},
+    onMiePrefs(cb){cb({});},async setMiePrefs(){},async attivaPush(){throw new Error("In modalità prova le notifiche non si attivano.");},
   });
 }
 
@@ -1031,6 +1049,10 @@ function openUsato(id){
     if(f.stato!==base.stato||nuovo)f.date[f.stato]=f.date[f.stato]||oggi();
     if(f.stato!==base.stato&&!nuovo)f.date[f.stato]=oggi();
     const writes=[{col:"usato",id:nid,data:f}],logs=[];
+    const desc=[f.targa,f.modello].filter(Boolean).join(" · ");
+    if(nuovo)writes.push(coda("usato_presa",`Presa in carico ${f.targa||""}`,`${desc}${f.chiave?" · chiave R "+f.chiave:""}`,"#usato"));
+    else if(f.stato!==base.stato&&f.stato==="attesa")writes.push(coda("usato_attesa",`Usato da ripristinare: ${f.targa||""}`,`${desc} · priorità ${f.priorita||"normale"}`,"#usato"));
+    else if(f.stato!==base.stato&&f.stato==="pronta")writes.push(coda("usato_pronta",`Foto da fare: ${f.targa||""}`,`${desc} è pronta e lavata`,"#usato"));
     if(canFiscale()){const rv={valoreContratto:num($("u_valoreContratto").value),ivaEsposta:$("u_ivaEsposta").value};if(nuovo||rv.valoreContratto!==(r.valoreContratto??"")||rv.ivaEsposta!==(r.ivaEsposta||""))writes.push({col:"usato_riservato",id:nid,data:rv});}
     const cod=f.targa||nid;
     if(nuovo)logs.push({codice:cod,azione:"Presa in carico",dettaglio:[f.modello,f.chiave?`chiave R ${f.chiave}`:""].filter(Boolean).join(" · ")});
@@ -1248,7 +1270,12 @@ function openConsegna(id){
     else{if(f.data!==base.data||f.ora!==base.ora)logs.push({codice:cod,azione:"Appuntamento consegna",dettaglio:f.data?`${new Date(f.data).toLocaleDateString("it-IT")} ore ${f.ora||"—"}`:"data tolta"});
       if(ora&&!prontaC(base))logs.push({codice:cod,azione:"Pronta per la consegna",dettaglio:f.cliente||""});
       if(!logs.length)logs.push({codice:cod,azione:"Consegna aggiornata",dettaglio:f.cliente||""});}
-    salvaC([{col:"consegne",id:cid(),data:f}],logs,nuovo?"Consegna creata.":"Consegna salvata.");
+    const qw=[],sig=etich(f),chi=[f.cliente,f.modello].filter(Boolean).join(" · ");
+    const quandoTxt=f.data?`${new Date(f.data).toLocaleDateString("it-IT")} ore ${f.ora||"--:--"}`:"data da fissare";
+    if(nuovo)qw.push(coda("consegna_nuova",`Nuova consegna ${sig}`,`${chi} · ${quandoTxt}. Prepara la vettura.`,"#consegne"));
+    else if(f.data&&(f.data!==base.data||f.ora!==base.ora)){f.avviso24h=false;qw.push(coda("consegna_fissata",`Consegna ${sig}: ${quandoTxt}`,`${chi}${base.data?" · spostata dal "+new Date(base.data).toLocaleDateString("it-IT"):""}`,"#consegne"));}
+    if(ora&&!prontaC(base)&&!nuovo)qw.push(coda("consegna_pronta",`Consegna ${sig} pronta`,`${chi} · ${quandoTxt}`,"#consegne"));
+    salvaC([{col:"consegne",id:cid(),data:f},...qw],logs,nuovo?"Consegna creata.":"Consegna salvata.");
   };
   const pr=$("c_print");if(pr)pr.onclick=()=>{leggi();stampaVerbale(f);};
   const ic=$("c_ics");if(ic)ic.onclick=()=>{leggi();const t=icsDi(f);if(!t){$("e_err").innerHTML=`<div class="banner">Prima fissa data e ora.</div>`;return;}
@@ -1322,6 +1349,33 @@ $("btnExportC").onclick=async()=>{
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Consegne_${oggi()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
 };
 
+/* =================== Notifiche =================== */
+const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["venditore","backoffice"]],["usato_presa","Nuova presa in carico usato",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto"]]];
+const coda=(evento,titolo,testo,link)=>({col:"notifiche_coda",id:`${evento}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,data:{evento,titolo,testo,link:link||"",inviata:false,ts:Date.now()}});
+let MIE={prefs:{},tokens:[]};
+const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const standalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
+function statoPush(){
+  if(!("Notification" in window)||!("serviceWorker" in navigator))return isIOS()&&!standalone()?["warn","Su iPhone le notifiche funzionano solo aprendo il sito dall'icona sulla schermata Home: Condividi → Aggiungi a Home, poi apri da lì."]:["bad","Questo browser non supporta le notifiche."];
+  if(Notification.permission==="denied")return["bad","Notifiche bloccate per questo sito: riattivale dalle impostazioni del browser."];
+  if(Notification.permission==="granted"&&localStorage.getItem("pushOn")==="1")return["ok","Notifiche attive su questo dispositivo."];
+  return["warn","Notifiche non ancora attive su questo dispositivo."];
+}
+function renderNotifiche(){
+  const box=$("n_body");if(!box)return;
+  const r=S.me.ruolo,[k,msg]=(()=>{try{return statoPush();}catch(e){return["warn",""];}})();
+  box.innerHTML=`<div class="banner ${k==="ok"?"ok":k==="bad"?"bad":""}">${esc(msg)}</div>
+    ${k!=="ok"?`<button type="button" class="primary" id="n_on">Attiva le notifiche su questo dispositivo</button>`:`<button type="button" id="n_test">Mandami una notifica di prova</button>`}
+    <div class="keybox"><h4>Cosa ricevere <span class="small">telefono · email a ${esc(S.me.email)}</span></h4>
+    ${EVENTI.map(([ev,nome,ruoli])=>{const base=ruoli.includes(r);const p=(MIE.prefs||{})[ev]||{};const pu=p.push!==undefined?p.push:base,em=p.email!==undefined?p.email:base;
+      return`<div class="accrow"><span style="flex:1;min-width:0;font-size:14px">${esc(nome)}${base?'':' <span class="small">(non del tuo ruolo)</span>'}</span><label class="chk small"><input type="checkbox" data-ev="${ev}" data-ch="push" ${pu?"checked":""}> telefono</label><label class="chk small"><input type="checkbox" data-ev="${ev}" data-ch="email" ${em?"checked":""}> email</label></div>`;}).join("")}</div>
+    <p class="small">Gli avvisi arrivano entro qualche minuto. Le preferenze valgono su tutti i tuoi dispositivi.</p>`;
+  const on=$("n_on");if(on)on.onclick=async()=>{on.disabled=true;try{await S.store.attivaPush();try{localStorage.setItem("pushOn","1");}catch(e){}flash("Notifiche attivate su questo dispositivo.","ok");}catch(e){flash(e&&e.message?e.message:"Non sono riuscito ad attivare le notifiche.","bad");}renderNotifiche();};
+  const t=$("n_test");if(t)t.onclick=async()=>{try{await S.store.commitU([Object.assign(coda("test","Prova notifica","Se leggi questo messaggio le notifiche funzionano."),{})],[]);flash("Notifica di prova in coda: arriva entro qualche minuto.","ok");}catch(e){flash(erroreScrittura(e),"bad");}};
+  box.onchange=async e=>{const i=e.target;if(!i.dataset.ev)return;MIE.prefs=MIE.prefs||{};MIE.prefs[i.dataset.ev]=Object.assign({},MIE.prefs[i.dataset.ev],{[i.dataset.ch]:i.checked});try{await S.store.setMiePrefs({prefs:MIE.prefs});}catch(x){flash(erroreScrittura(x),"bad");}};
+}
+$("btnNotif").onclick=()=>{openSheet(`<div class="panel" role="dialog" aria-modal="true" aria-label="Notifiche"><div class="phead"><div><h2>Notifiche</h2><p>Scegli quali avvisi ricevere sul telefono e per email.</p></div></div><div id="n_body"></div><div class="pfoot"><div class="r"><button id="n_close">Chiudi</button></div></div></div>`);$("n_close").onclick=closeSheet;renderNotifiche();};
+
 /* =================== Avvio =================== */
 $("btnMore").onclick=()=>{const m=$("moreMenu");m.hidden=!m.hidden;$("btnMore").setAttribute("aria-expanded",String(!m.hidden));};
 $("btnOut").onclick=()=>S.store.logout();
@@ -1337,8 +1391,12 @@ function avviaApp(store){
     if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);});
     store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();});}
   $("whoami").textContent=`Accesso: ${store.me.nome} (${store.me.email}) · ${NOME_RUOLO[store.me.ruolo]||store.me.ruolo}`;
+  if(store.onMiePrefs)store.onMiePrefs(d=>{MIE=Object.assign({prefs:{},tokens:[]},d);renderNotifiche();});
+  try{if(!store.demo&&localStorage.getItem("pushOn")==="1"&&window.Notification&&Notification.permission==="granted")store.attivaPush().catch(()=>{});}catch(e){}
   render();
-  let v="chiavi";try{v=localStorage.getItem("vista")||"chiavi";}catch(e){}vista(v);
+  let v="chiavi";try{v=localStorage.getItem("vista")||"chiavi";}catch(e){}
+  const hv=location.hash.replace("#","");if(["chiavi","usato","consegne","archivio"].includes(hv))v=hv;vista(v);
+  window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(["chiavi","usato","consegne","archivio"].includes(h))vista(h);});
 }
 if(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.apiKey){avviaFirebase().catch(()=>{show("boot");$("boot").innerHTML=`<div class="banner bad">Non riesco a collegarmi al registro. Controlla la connessione e ricarica la pagina.</div>`;});}
 else avviaDemo();

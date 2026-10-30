@@ -64,6 +64,17 @@ service cloud.firestore {
       allow update, delete: if admin();
     }
 
+    match /notifiche_coda/{id} {
+      allow create: if autorizzato() && request.resource.data.inviata == false;
+      allow read: if admin();
+      allow update, delete: if false;
+    }
+
+    match /notifiche_utenti/{email} {
+      allow read, write: if autorizzato() && email == emailUtente();
+      allow read: if admin();
+    }
+
     match /movimenti/{id} {
       allow read: if autorizzato();
       allow create: if autorizzato() && request.resource.data.email == emailUtente();
