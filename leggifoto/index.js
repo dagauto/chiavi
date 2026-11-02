@@ -59,7 +59,13 @@ Ti mando la foto di un documento di una vettura usata: può essere la carta di c
 - km: chilometri indicati nella scheda stato d'uso, solo cifre.
 - danni: elenco breve dei danni di carrozzeria/interni segnati nella scheda stato d'uso, separati da virgola.
 - accessori: accessori e documenti presenti (es. "doppia chiave", "libretto service", "ruota di scorta"), uno per voce.
-- note: altre annotazioni utili scritte sulla scheda.
+- note: altre annotazioni utili scritte sulla scheda (es. "Rientro", numero pratica, chiavi consegnate).
+- voci: le righe della colonna PERIZIA (esame tecnico per valutazione costi di ripristino). Per ogni lavoro scritto crea una voce con
+  sezione = una tra carrozzeria, manutenzione, freni, pneumatici, meccanica, cristalli, illuminazione, interni, altro
+  (Manut./tagliando = manutenzione; Meccanica e Motore = meccanica; Impianto illuminazione = illuminazione);
+  descrizione = il lavoro scritto a mano, sistemato in italiano leggibile (es. "Porta ant. sx (bollo)", "Tagliando", "Pastiglie ant. 40%");
+  stimato = il costo in euro scritto accanto, solo il numero (0 se non c'è). Una barra "/" o una riga vuota vuol dire nessun lavoro: non creare la voce.
+  Se in una sezione ci sono più righe con più importi crea una voce per riga.
 - sicuro: true se targa e telaio si leggono chiaramente, false se hai dovuto indovinare.
 Se un dato non c'è lascia la stringa vuota (o la lista vuota). Non inventare nulla.
 In "tipo_documento" scrivi libretto, stato d'uso o altro.`;
@@ -69,8 +75,9 @@ const SCHEMA_USATO = {
     tipo_documento: { type: "STRING" }, targa: { type: "STRING" }, telaio: { type: "STRING" }, modello: { type: "STRING" },
     immatricolazione: { type: "STRING" }, exProprietario: { type: "STRING" }, km: { type: "STRING" }, danni: { type: "STRING" },
     accessori: { type: "ARRAY", items: { type: "STRING" } }, note: { type: "STRING" }, sicuro: { type: "BOOLEAN" },
+    voci: { type: "ARRAY", items: { type: "OBJECT", properties: { sezione: { type: "STRING", enum: ["carrozzeria", "manutenzione", "freni", "pneumatici", "meccanica", "cristalli", "illuminazione", "interni", "altro"] }, descrizione: { type: "STRING" }, stimato: { type: "NUMBER" } }, required: ["sezione", "descrizione", "stimato"] } },
   },
-  required: ["tipo_documento", "targa", "telaio", "modello", "immatricolazione", "exProprietario", "km", "danni", "accessori", "note", "sicuro"],
+  required: ["tipo_documento", "targa", "telaio", "modello", "immatricolazione", "exProprietario", "km", "danni", "accessori", "note", "sicuro", "voci"],
 };
 
 async function tokenGoogle() {
@@ -128,6 +135,7 @@ functions.http("leggifoto", async (req, res) => {
         exProprietario: String(dati.exProprietario || "").trim(), km: String(dati.km || "").replace(/\D/g, ""),
         danni: String(dati.danni || "").trim(), accessori: (dati.accessori || []).map((x) => String(x).trim()).filter(Boolean).slice(0, 10),
         note: String(dati.note || "").trim(), sicuro: dati.sicuro !== false,
+        voci: (dati.voci || []).filter((v) => v && v.sezione && (v.descrizione || v.stimato)).map((v) => ({ sezione: v.sezione, descrizione: String(v.descrizione || "").trim(), stimato: Number(v.stimato) || 0 })),
       };
       console.log("letta foto usato", email, out.tipo);
       return res.json(out);
