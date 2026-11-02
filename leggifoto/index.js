@@ -47,6 +47,32 @@ const SCHEMA = {
   required: ["tipo_documento", "vetture"],
 };
 
+// Presa in carico usato: libretto (carta di circolazione) e scheda stato d'uso / perizia.
+const ISTRUZIONI_USATO = `Sei l'addetto alla presa in carico delle vetture usate di una concessionaria Mercedes-Benz italiana.
+Ti mando la foto di un documento di una vettura usata: può essere la carta di circolazione (libretto) oppure la scheda
+"stato d'uso" / perizia compilata a mano o stampata (con km, danni, accessori, note). Estrai solo quello che c'è scritto:
+- targa: targa italiana (libretto campo A), maiuscolo senza spazi.
+- telaio: VIN di 17 caratteri (libretto campo E), maiuscolo senza spazi; nei VIN non esistono I, O, Q (sono 1 o 0).
+- modello: marca e modello brevi (libretto D.1 + D.3, es. "Mercedes GLC 220 d 4MATIC"; ometti "Mercedes-Benz" se è Mercedes).
+- immatricolazione: data di prima immatricolazione (libretto campo B) nel formato GG/MM/AAAA.
+- exProprietario: intestatario (libretto campi C.2.1 / C.2.2, cognome e nome o ragione sociale).
+- km: chilometri indicati nella scheda stato d'uso, solo cifre.
+- danni: elenco breve dei danni di carrozzeria/interni segnati nella scheda stato d'uso, separati da virgola.
+- accessori: accessori e documenti presenti (es. "doppia chiave", "libretto service", "ruota di scorta"), uno per voce.
+- note: altre annotazioni utili scritte sulla scheda.
+- sicuro: true se targa e telaio si leggono chiaramente, false se hai dovuto indovinare.
+Se un dato non c'è lascia la stringa vuota (o la lista vuota). Non inventare nulla.
+In "tipo_documento" scrivi libretto, stato d'uso o altro.`;
+const SCHEMA_USATO = {
+  type: "OBJECT",
+  properties: {
+    tipo_documento: { type: "STRING" }, targa: { type: "STRING" }, telaio: { type: "STRING" }, modello: { type: "STRING" },
+    immatricolazione: { type: "STRING" }, exProprietario: { type: "STRING" }, km: { type: "STRING" }, danni: { type: "STRING" },
+    accessori: { type: "ARRAY", items: { type: "STRING" } }, note: { type: "STRING" }, sicuro: { type: "BOOLEAN" },
+  },
+  required: ["tipo_documento", "targa", "telaio", "modello", "immatricolazione", "exProprietario", "km", "danni", "accessori", "note", "sicuro"],
+};
+
 async function tokenGoogle() {
   const r = await fetch("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", {
     headers: { "Metadata-Flavor": "Google" },
@@ -78,12 +104,13 @@ functions.http("leggifoto", async (req, res) => {
     if (!u.email_verified || !(await db.doc(`utenti/${email}`).get()).exists) return res.status(403).json({ errore: "Utente non autorizzato" });
 
     const { immagine, mime } = req.body || {};
+    const usato = (req.body || {}).modo === "usato";
     if (!immagine || typeof immagine !== "string" || immagine.length > 8e6) return res.status(400).json({ errore: "Foto mancante o troppo grande" });
 
     const url = `https://aiplatform.googleapis.com/v1/projects/${PROGETTO}/locations/${LUOGO}/publishers/google/models/${MODELLO}:generateContent`;
     const corpo = {
-      contents: [{ role: "user", parts: [{ text: ISTRUZIONI }, { inlineData: { mimeType: mime || "image/jpeg", data: immagine } }] }],
-      generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: SCHEMA },
+      contents: [{ role: "user", parts: [{ text: usato ? ISTRUZIONI_USATO : ISTRUZIONI }, { inlineData: { mimeType: mime || "image/jpeg", data: immagine } }] }],
+      generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: usato ? SCHEMA_USATO : SCHEMA },
     };
     const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${await tokenGoogle()}`, "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
     const j = await r.json();
@@ -94,6 +121,17 @@ functions.http("leggifoto", async (req, res) => {
     const testo = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("") || "{}";
     let dati;
     try { dati = JSON.parse(testo); } catch (e) { dati = { tipo_documento: "", vetture: [] }; }
+    if (usato) {
+      const out = {
+        tipo: dati.tipo_documento || "", targa: pulisciTarga(dati.targa), telaio: pulisciTelaio(dati.telaio),
+        modello: String(dati.modello || "").trim(), immatricolazione: String(dati.immatricolazione || "").trim(),
+        exProprietario: String(dati.exProprietario || "").trim(), km: String(dati.km || "").replace(/\D/g, ""),
+        danni: String(dati.danni || "").trim(), accessori: (dati.accessori || []).map((x) => String(x).trim()).filter(Boolean).slice(0, 10),
+        note: String(dati.note || "").trim(), sicuro: dati.sicuro !== false,
+      };
+      console.log("letta foto usato", email, out.tipo);
+      return res.json(out);
+    }
     const vetture = (dati.vetture || [])
       .map((v) => ({ telaio: pulisciTelaio(v.telaio), modello: String(v.modello || "").trim(), targa: pulisciTarga(v.targa), colore: String(v.colore || "").trim(), sicuro: v.sicuro !== false }))
       .filter((v) => v.telaio.length >= 11);
