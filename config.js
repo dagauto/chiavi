@@ -11,3 +11,6 @@ window.FIREBASE_CONFIG = {
 
 // Chiave pubblica per le notifiche push (Cloud Messaging > Certificati web push).
 window.FIREBASE_VAPID = "BDFAQDOD-Ccnmhrq8BjRk0Vqeq3-XW5YGuFOZKked5UMa1kP_PQyibrz6IM2d7AVew5kCcy1mHfxmRvDdWgn9yo";
+
+// Lettura foto con intelligenza artificiale (funzione leggifoto su Google Cloud).
+window.LEGGIFOTO_URL = "https://leggifoto-mzcdl2pgqa-oc.a.run.app";
