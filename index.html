@@ -1133,7 +1133,7 @@ function openUsato(id){
     <div class="grid2"><label class="f">Prima chiave in<select id="u_dovePrima">${LUOGHI.map(l=>`<option>${l}</option>`).join("")}<option value="">Non c'è</option></select></label>
       <label class="f">Seconda chiave (${RETRO})<select id="u_seconda"><option value="Sì">Sì, c'è</option><option value="No">Non c'è</option></select></label></div>`:""}
     <div class="grid2">${inp("immatricolazione","Immatricolazione")}${inp("venditore","Venditore")}</div>
-    <div class="grid2">${inp("scadBollo","Scadenza bollo")}${inp("scadRevisione","Scadenza revisione")}</div>
+    <div class="grid2">${inp("scadBollo","Scadenza bollo (MM/AAAA)")}${inp("scadRevisione","Scadenza revisione (MM/AAAA)")}</div>
     <div class="grid2">${inp("exProprietario","Ex proprietario")}${inp("ritiroPermuta","Ritiro permuta su contratto")}</div>
     ${canFiscale()?`<div class="keybox fisc"><h4>Carico fiscale <span class="small">visibile solo ad amministratori, back office e responsabile usato</span></h4>
       <div class="grid2"><label class="f">Valore da contratto (€)<input id="u_valoreContratto" inputmode="decimal" value="${esc(r.valoreContratto)}"></label>
@@ -1314,6 +1314,15 @@ function openImpegno(id){
     delete f.id;salvaI([{col:"impegni",id:id||`imp-${Date.now().toString(36)}`,data:f}],nuovo?"Impegno salvato.":"Impegno aggiornato.");};
 }
 const etich=c=>`${LETT_C[c.colore]||"?"}.${c.numero||"?"}`;
+// Scadenze bollo/revisione dalla scheda usato con la stessa targa o telaio (accetta GG/MM/AAAA, MM/AAAA, AAAA-MM-GG).
+function scadData(s){s=String(s||"").trim();let m;
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)))return`${m[1]}-${m[2]}-${m[3]}`;
+  if((m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/))){let y=+m[3];if(y<100)y+=2000;return`${y}-${String(m[2]).padStart(2,"0")}-${String(m[1]).padStart(2,"0")}`;}
+  if((m=s.match(/^(\d{1,2})[\/.\-](\d{4})$/))){const y=+m[2],mo=+m[1];return`${y}-${String(mo).padStart(2,"0")}-${String(new Date(y,mo,0).getDate()).padStart(2,"0")}`;}
+  return"";}
+function usatoDi(c){const t=norm(c.targa),v=norm(c.telaio);if(!t&&!v)return null;for(const u of U.docs.values()){if(u.deleted)continue;if((t&&norm(u.targa)===t)||(v&&norm(u.telaio)===v))return u;}return null;}
+function scadenzeC(c){if(c.stato==="consegnata"||c.stato==="annullata")return[];const u=usatoDi(c);if(!u)return[];const rif=c.data||oggi();const out=[];
+  for(const[k,l]of[["scadBollo","Bollo scaduto"],["scadRevisione","Revisione scaduta"]]){const d=scadData(u[k]);if(d&&d<rif)out.push(`${l} il ${d.split("-").reverse().join("/")}`);}return out;}
 // Pronta solo quando preparatore/officina mette il flag «Preconsegna fatta»: le singole voci sono un promemoria, non tutte servono a ogni cliente.
 function prontaC(c){return !!c.pronta;}
 function mancanti(c){let n=0,t=0;for(const[k]of ACC_STD){t++;if(!(c.std||{})[k])n++;}for(const[k,v]of Object.entries(c.pag||{}))if(v.sel){t++;if(!v.fatto)n++;}for(const o of omaggi(c)){t++;if(!o.fatto)n++;}for(const[k]of PREP){t++;if(!(c.prep||{})[k])n++;}return{n,t};}
@@ -1341,7 +1350,7 @@ function cardC(c){
     <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
     <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio breve</span>':c.tipo==="lungo"?'<span class="pill p-Doppia">Noleggio lungo</span>':""}</span>
       <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`PE ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
-      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
+      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${scadenzeC(c).map(x=>`<span class="kp miss">${esc(x)}</span>`).join("")}${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
 }
 function renderConsegne(){
   if(!canConsegne())return;
@@ -1405,6 +1414,7 @@ function openConsegna(id){
   const ck=(grp,k,l,dis)=>`<label class="chk"><input type="checkbox" data-g="${grp}" data-k="${k}" ${(f[grp]||{})[k]?"checked":""} ${dis?"disabled":""}> ${esc(l)}</label>`;
   const p=openSheet(`<form class="panel" id="cf" novalidate role="dialog" aria-modal="true" aria-label="Consegna">
     <div class="phead"><div><h2>${nuovo?"Nuova consegna":esc(etich(f)+" · "+(f.cliente||""))}</h2><p>${nuovo?"Il back office la crea una settimana prima: l'officina la vede subito nel calendario.":esc(semaforo(f)[1])}</p></div></div>
+    ${scadenzeC(f).length?`<div class="banner bad">${esc(scadenzeC(f).join(" · "))}: da rinnovare prima della consegna.</div>`:""}
     <div class="keybox"><h4>Vettura</h4>
       ${nuovo?`<label class="f">Cerca la vettura per targa o telaio<input class="mono" id="c_cerca" placeholder="es. GH123AB oppure ultime cifre del telaio" autocomplete="off"></label><div id="c_ris" class="keys" style="flex-wrap:wrap;gap:6px;margin:4px 0 8px"></div>`:""}
       <div class="grid2"><label class="f">Colore chiave<select id="c_colore" ${nuovo?"":"disabled"}>${COLORI.map(c=>`<option value="${c}" ${f.colore===c?"selected":""}>${SING[c]} (${LETT_C[c]})</option>`).join("")}</select></label>
@@ -1603,7 +1613,7 @@ $("btnExportC").onclick=async()=>{
 };
 
 /* =================== Notifiche =================== */
-const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","movimentatore","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","movimentatore","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","movimentatore","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["usato_presa","Nuova presa in carico usato",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","movimentatore"]]];
+const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","movimentatore","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","movimentatore","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","movimentatore","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con bollo o revisione scaduti",["officina","backoffice"]],["usato_presa","Nuova presa in carico usato",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","movimentatore"]]];
 const coda=(evento,titolo,testo,link)=>({col:"notifiche_coda",id:`${evento}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,data:{evento,titolo,testo,link:link||"",inviata:false,ts:Date.now()}});
 let MIE={prefs:{},tokens:[]};
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -1640,7 +1650,7 @@ function avviaApp(store){
   store.onChiavi(list=>{S.docs=new Map(list);render();},()=>flash("Non riesco a leggere il registro. Ricarica la pagina.","bad"));
   store.onLog(l=>{S.log=l;renderLog();});
   if(isAdmin())store.onUtenti(u=>{S.utenti=u;renderUtenti();});
-  if(canUsato()){$("tabs").hidden=false;const ta=document.querySelector('#tabs [data-tab="archivio"]');if(ta)ta.hidden=!canArchivio();store.onColl("usato",l=>{U.docs=new Map(l);renderUsato();});
+  if(canUsato()){$("tabs").hidden=false;const ta=document.querySelector('#tabs [data-tab="archivio"]');if(ta)ta.hidden=!canArchivio();store.onColl("usato",l=>{U.docs=new Map(l);renderUsato();renderConsegne();});
     if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);});
     store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();renderAgenda();});
     if(vedeImpegni())store.onColl("impegni",l=>{C.imp=new Map(l);renderConsegne();renderAgenda();});
