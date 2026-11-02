@@ -146,6 +146,7 @@ input.mono{font-family:var(--f-mono)!important;text-transform:uppercase}
 .opt span{font-size:13px;color:var(--muted)}
 .rip{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:6px;background:var(--warn-soft);color:var(--warn)}
 .rip.att{background:var(--bad-soft);color:var(--bad)}
+.rip.ven{background:var(--ok-soft);color:var(--ok)}.rip.esp{background:var(--blu-soft);color:var(--blu)}
 .keybox.ripbox{border-color:var(--warn)}
 .tabs{display:flex;gap:4px;background:var(--sunk);padding:4px;border-radius:12px;align-self:flex-start;max-width:100%;overflow-x:auto;scrollbar-width:none}
 .tabs button{border:0;background:none;padding:8px 12px;border-radius:9px;color:var(--muted);white-space:nowrap}
@@ -529,7 +530,8 @@ function avviaDemo(){
 function slots(){const out=[];for(const c of COLORI)for(let n=1;n<=100;n++){const d=S.docs.get(idOf(c,n));out.push(Object.assign({id:idOf(c,n),colore:c,numero:n,_has:!!d},d||{}));}return out;}
 const slot=(c,n)=>{const d=S.docs.get(idOf(c,n));return Object.assign({id:idOf(c,n),colore:c,numero:n,_has:!!d},d||{});};
 function stato(s){
-  if(!s._has)return"Non censito";
+  if(!s._has)return"LIBERO";
+  if(!s.telaio&&!s.targa&&!s.modello&&s.prima!=="Sì"&&s.seconda!=="Sì")return"LIBERO";
   const p=s.prima,q=s.seconda;
   if(p==="Sì"&&q==="Sì")return"Doppia";
   if(p==="Sì"&&q==="No")return"Solo prima";
@@ -552,6 +554,8 @@ const cls=st=>"p-"+st.replace(/\s/g,"-");
 const occupato=s=>s._has&&stato(s)!=="LIBERO";
 const inRip=s=>s.ripristino==="Sì";
 const inAtt=s=>s.attesa==="Sì"&&s.ripristino!=="Sì";
+const ggTesto=d=>d?(giorniDa(d)===0?"da oggi":giorniDa(d)===1?"da ieri":`da ${giorniDa(d)} giorni`):"";
+const espTesto=s=>["Conto esposizione",ggTesto(s.esposizioneDal)].filter(Boolean).join(" · ");
 const attTesto=s=>["In attesa di ripristino",DT,s.danni].filter(Boolean).join(" · ")+(s.attesaDal?(giorniDa(s.attesaDal)===0?" · da oggi":giorniDa(s.attesaDal)===1?" · da ieri":` · da ${giorniDa(s.attesaDal)} giorni`):"");
 const giorniDa=d=>{if(!d)return 0;return Math.max(0,Math.round((new Date(oggi())-new Date(d))/864e5));};
 const ripTesto=s=>["In ripristino",s.ripristinoTipo,s.ripristinoDove].filter(Boolean).join(" · ")+(s.ripristinoDal?(giorniDa(s.ripristinoDal)===0?" · da oggi":giorniDa(s.ripristinoDal)===1?" · da ieri":` · da ${giorniDa(s.ripristinoDal)} giorni`):"");
@@ -578,6 +582,8 @@ function filtered(){
       case"liberi":return st==="LIBERO";
       case"daverif":return st==="Non censito"||st==="Da controllare";
       case"rip":return inRip(s)||inAtt(s);
+      case"vendute":return occupato(s)&&s.venduta==="Sì";
+      case"esposizione":return occupato(s)&&s.esposizione==="Sì";
     }return true;
   });
 }
@@ -589,7 +595,7 @@ function chipRow(el,items,cur,onPick,lbl){
 }
 function renderFilters(){
   chipRow($("fColore"),[[null,"Tutti i colori"],...COLORI.map(c=>[c,CORTO[c],"c-"+c])],S.col,v=>{S.col=v;render();});
-  chipRow($("fStato"),[["incasa","In casa"],["avvisi","Con avvisi"],["una","Una sola chiave"],["rip","Ripristino / in attesa"],["liberi","Numeri liberi"],["daverif","Da censire"]],S.stato,v=>{S.stato=v||"incasa";render();});
+  chipRow($("fStato"),[["incasa","In casa"],["avvisi","Con avvisi"],["una","Una sola chiave"],["rip","Ripristino / in attesa"],["vendute","Già vendute"],["esposizione","Conto esposizione"],["liberi","Numeri liberi"],["daverif","Da censire"]],S.stato,v=>{S.stato=v||"incasa";render();});
   chipRow($("fLuogo"),[[null,"Ovunque"],...LUOGHI.map(l=>[l,l]),["RETRO","Seconde · retro salone"]],S.luogo,v=>{S.luogo=v;render();},"Prima chiave in:");
 }
 function renderSummary(){
@@ -612,7 +618,7 @@ function card(s){
       <span class="ctitle">${s.targa?`<span class="targa">${esc(s.targa)}</span>`:""}<span class="modello">${esc(s.modello||(s._has?"Modello non indicato":"Numero non ancora censito"))}</span><span class="pill ${cls(st)}">${esc(st)}</span></span>
       ${s.telaio?`<span class="telaio">${esc(s.telaio)}</span>`:""}
       ${occupato(s)?`<span class="keys">${keyPills(s)}</span>`:""}
-      ${inRip(s)?`<span class="rip">${esc(ripTesto(s))}</span>`:inAtt(s)?`<span class="rip att">${esc(attTesto(s))}</span>`:""}
+      ${inRip(s)?`<span class="rip">${esc(ripTesto(s))}</span>`:inAtt(s)?`<span class="rip att">${esc(attTesto(s))}</span>`:""}${s.venduta==="Sì"?` <span class="rip ven">Venduta${s.cliente?" · "+esc(s.cliente):""}</span>`:""}${s.esposizione==="Sì"?` <span class="rip esp">${esc(espTesto(s))}</span>`:""}
       ${av?`<span class="avv">${esc(av)}</span>`:""}
     </span></button>`;
 }
@@ -645,10 +651,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)
 const erroreScrittura=e=>e&&String(e.code||"").includes("permission")?"Non hai il permesso di fare questa modifica.":"Salvataggio non riuscito. Controlla la connessione e riprova.";
 
 /* =================== Scheda vettura =================== */
-const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
+const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["venduta","Venduta"],["cliente","Cliente"],["esposizione","Conto esposizione"],["esposizioneDal","In conto esposizione dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
 function openEditor(id,assegna){
   const base=slots().find(s=>s.id===id);if(!base)return;
-  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",attesa:"",attesaDal:"",danni:"",controllatoDa:"",dataControllo:"",note:""},base);
+  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",venduta:"",cliente:"",esposizione:"",esposizioneDal:"",attesa:"",attesaDal:"",danni:"",controllatoDa:"",dataControllo:"",note:""},base);
   const libero=!occupato(base);
   if(assegna&&libero){f.prima="Sì";f.dovePrima="Salone";f.seconda=base.colore==="BLU"?"Sì":"";f.dataControllo=oggi();f.controllatoDa=S.me.nome;}
   const seg=k=>`<span class="seg" data-k="${k}">${["Sì","No"].map(v=>`<button type="button" data-v="${v}" aria-pressed="${f[k]===v}">${v}</button>`).join("")}</span>`;
@@ -661,6 +667,9 @@ function openEditor(id,assegna){
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
     <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
+    <div class="keybox"><h4><span>Già venduta<br><span class="small">vettura nuova arrivata già venduta a un cliente</span></span> ${seg("venduta")}</h4>
+      <div id="e_venbox" ${f.venduta==="Sì"?"":"hidden"}><label class="f" style="margin-top:8px">Cliente (facoltativo)<input id="e_cliente" value="${esc(f.cliente||"")}" autocomplete="off"></label></div></div>
+    <div class="keybox"><h4><span>Conto esposizione<br><span class="small">${f.esposizione==="Sì"?esc(espTesto(f)):"numero impegnato, si contano i giorni"}</span></span> ${seg("esposizione")}</h4></div>
     <div class="keybox ripbox"><h4><span>Danni di trasporto<br><span class="small">${inAtt(base)?esc(attTesto(base)):"la vettura va in attesa di ripristino"}</span></span> ${seg("attesa")}</h4>
       <div id="e_attbox" ${f.attesa==="Sì"?"":"hidden"}><label class="f" style="margin-top:8px">Descrizione dei danni<textarea id="e_danni" rows="2" placeholder="es. graffio portiera posteriore sx, cerchio anteriore dx">${esc(f.danni||"")}</textarea></label></div></div>
     ${`<div class="keybox ripbox"><h4><span>In ripristino<br><span class="small">${inRip(base)?esc(ripTesto(base)):"officina, sanificazione o carrozziere"}</span></span> ${seg("ripristino")}</h4>
@@ -683,6 +692,8 @@ function openEditor(id,assegna){
   ed.addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(!b)return;const k=b.parentElement.dataset.k;f[k]=f[k]===b.dataset.v?"":b.dataset.v;press(k);
     if(k==="prima"&&f.prima!=="Sì"){f.dovePrima="";press("dovePrima");}
     if(k==="dovePrima"&&f.dovePrima){f.prima="Sì";press("prima");}
+    if(k==="venduta"){$("e_venbox").hidden=f.venduta!=="Sì";}
+    if(k==="esposizione"){if(f.esposizione==="Sì"){if(!f.esposizioneDal)f.esposizioneDal=oggi();}else f.esposizioneDal="";}
     if(k==="attesa"){$("e_attbox").hidden=f.attesa!=="Sì";if(f.attesa==="Sì"){if(!f.attesaDal)f.attesaDal=oggi();}else f.attesaDal="";}
     if(k==="ripristinoTipo"&&f.ripristinoTipo&&f.ripristino!=="Sì"){f.ripristino="Sì";press("ripristino");$("e_ripbox").hidden=false;if(!f.ripristinoDal)f.ripristinoDal=oggi();}
     if((k==="ripristino"||k==="ripristinoTipo")&&f.ripristino==="Sì"&&f.attesa==="Sì"){f.attesa="";f.attesaDal="";press("attesa");$("e_attbox").hidden=true;if(!f.ripristinoTipo){f.ripristinoTipo=DT;press("ripristinoTipo");}}
@@ -698,6 +709,7 @@ function openEditor(id,assegna){
   };
   ed.onsubmit=e=>{e.preventDefault();
     for(const k of["telaio","targa","modello","motivo","controllatoDa","dataControllo","note"])f[k]=$("e_"+k).value.trim();
+    f.cliente=f.venduta==="Sì"&&$("e_cliente")?$("e_cliente").value.trim():"";if(f.venduta!=="Sì")f.venduta="";if(f.esposizione!=="Sì"){f.esposizione="";f.esposizioneDal="";}
     if($("e_ripristinoDove"))f.ripristinoDove=f.ripristino==="Sì"?$("e_ripristinoDove").value.trim():"";
     if($("e_danni"))f.danni=$("e_danni").value.trim();if(f.attesa!=="Sì"){f.attesa="";f.attesaDal="";}
     if(f.ripristino!=="Sì")f.ripristino="";
@@ -841,7 +853,6 @@ function controllaRiga(r,i){
   if(B.righe.some((x,j)=>j!==i&&x.colore===r.colore&&parseInt(x.numero,10)===n))return["bad","Numero già usato per un'altra vettura di questa bolla."];
   const s=slot(r.colore,n);
   if(occupato(s))return["bad",`Il ${SING[r.colore]} ${n} è occupato${s.targa||s.modello?" ("+(s.targa||s.modello)+")":""}.`];
-  if(!s._has)return["warn",`Il ${SING[r.colore]} ${n} non è ancora censito: controlla che i ganci ${n} e ${n+100} siano vuoti.`];
   if(r.dubbio)return["warn",`Controlla il telaio carattere per carattere: la foto non era nitida. Prima al ${n}, seconda al ${n+100}.`];
   return["ok",`Prima al ${n}, seconda al ${n+100} nel ${RETRO}.`];
 }
@@ -860,12 +871,14 @@ function renderRighe(){
         <label class="f">Prima chiave in<select data-f="dovePrima">${LUOGHI.map(l=>`<option ${r.dovePrima===l?"selected":""}>${l}</option>`).join("")}<option value="" ${!r.dovePrima?"selected":""}>Non c'è</option></select></label>
         <label class="f">Seconda chiave (${RETRO})<select data-f="seconda"><option value="Sì" ${r.seconda==="Sì"?"selected":""}>Sì, c'è</option><option value="No" ${r.seconda==="No"?"selected":""}>Non c'è</option></select></label>
       </div>
+      <div class="grid2"><label class="chk" style="margin-top:6px"><input type="checkbox" data-f="venduta" ${r.venduta?"checked":""}> Già venduta</label><label class="chk" style="margin-top:6px"><input type="checkbox" data-f="esposizione" ${r.esposizione?"checked":""}> Conto esposizione</label></div>
+      ${r.venduta?`<label class="f">Cliente (facoltativo)<input data-f="cliente" value="${esc(r.cliente||"")}" autocomplete="off"></label>`:""}
       <label class="chk" style="margin-top:6px"><input type="checkbox" data-f="danni" ${r.danni?"checked":""}> Danni di trasporto: in attesa di ripristino</label>
       ${r.danni?`<label class="f">Descrizione danni<input data-f="danniDescr" value="${esc(r.danniDescr||"")}" placeholder="es. graffio portiera post. sx, cerchio ant. dx" autocomplete="off"></label>`:""}
       <div class="rowmsg ${k}" data-msg>${esc(m)}</div>
     </div>`;}).join("");
   box.oninput=e=>{const t=e.target,row=t.closest(".vrow");if(!row||!t.dataset.f)return;const r=B.righe[+row.dataset.i];
-    if(t.dataset.f==="danni"){r.danni=t.checked;renderRighe();return;}
+    if(["danni","venduta","esposizione"].includes(t.dataset.f)){r[t.dataset.f]=t.checked;renderRighe();return;}
     let v=t.value;if(t.dataset.f==="telaio"||t.dataset.f==="targa")v=v.toUpperCase().replace(/\s/g,"");if(t.dataset.f==="telaio")r.dubbio=false;r[t.dataset.f]=v;
     if(t.dataset.f==="dovePrima")r.prima=v?"Sì":"No";
     const[k,m]=controllaRiga(r,+row.dataset.i);const mm=row.querySelector("[data-msg]");mm.className="rowmsg "+k;mm.textContent=m;};
@@ -880,7 +893,7 @@ async function registraBolla(){
   if(errs.length){$("b_err").innerHTML=`<div class="banner bad">Sistema prima ${errs.length===1?"la vettura evidenziata":"le "+errs.length+" vetture evidenziate"}: ${esc(errs[0][1])}</div>`;return;}
   const writes=[],logs=[];
   for(const r of B.righe){const n=parseInt(r.numero,10);
-    writes.push({id:idOf(r.colore,n),data:Object.assign({colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"},r.danni?{attesa:"Sì",attesaDal:oggi(),danni:(r.danniDescr||"").trim()}:{})});
+    writes.push({id:idOf(r.colore,n),data:Object.assign({colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"},r.danni?{attesa:"Sì",attesaDal:oggi(),danni:(r.danniDescr||"").trim()}:{},r.venduta?{venduta:"Sì",cliente:(r.cliente||"").trim()}:{},r.esposizione?{esposizione:"Sì",esposizioneDal:oggi()}:{})});
     if(r.danni)logs.push({codice:`${LETT[r.colore]}.${n}`,azione:"In attesa di ripristino",dettaglio:[DT,(r.danniDescr||"").trim()].filter(Boolean).join(" · ")});
     logs.push({codice:`${LETT[r.colore]}.${n}`,azione:r.foto?"Assegnato da foto":"Assegnato a mano",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
   $("b_save").disabled=true;
@@ -920,7 +933,7 @@ $("fileImport").onchange=async e=>{
 };
 $("btnExport").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
-  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Seconda chiave":s.seconda||"","Stato":stato(s),"In ripristino":s.ripristino||"","Lavoro ripristino":s.ripristinoTipo||"","Dove ripristino":s.ripristinoDove||"","In attesa di ripristino":s.attesa||"","Danni di trasporto":s.danni||"","In ripristino dal":s.ripristinoDal||"","Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
+  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Seconda chiave":s.seconda||"","Stato":stato(s),"In ripristino":s.ripristino||"","Lavoro ripristino":s.ripristinoTipo||"","Dove ripristino":s.ripristinoDove||"","Venduta":s.venduta||"","Cliente":s.cliente||"","Conto esposizione":s.esposizione||"","In esposizione dal":s.esposizioneDal||"","Giorni esposizione":s.esposizione==="Sì"&&s.esposizioneDal?giorniDa(s.esposizioneDal):"","In attesa di ripristino":s.attesa||"","Danni di trasporto":s.danni||"","In ripristino dal":s.ripristinoDal||"","Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
   const ws=XLSX.utils.json_to_sheet(rows);ws["!cols"]=[9,9,10,20,11,18,11,12,12,16,11,14,20,13,30,30,14,13,30].map(w=>({wch:w}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Censimento");
   const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
@@ -1165,7 +1178,7 @@ function vista(v){
   if(v==="archivio"&&!canArchivio())v="chiavi";if(v==="agenda"&&!canConsegne())v="chiavi";
   $("vAgenda").hidden=v!=="agenda";$("vChiavi").hidden=v!=="chiavi";$("vUsato").hidden=v!=="usato";$("vConsegne").hidden=v!=="consegne";$("vArchivio").hidden=v!=="archivio";
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===v));
-  $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();$("btnImpegno").hidden=!["consegne","agenda"].includes(v)||!canImpegni();
+  $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();$("btnImpegno").hidden=v!=="agenda"||!canImpegni();
   $("btnExport").hidden=v!=="chiavi";$("btnExportU").hidden=v!=="usato";$("btnExportC").hidden=v!=="consegne";$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!canImport();
   $("h1t").textContent={chiavi:"Dag Auto Vetture",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio",agenda:"Agenda"}[v];
   $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio.",agenda:"Consegne, appuntamenti, corsi e permessi."}[v];
