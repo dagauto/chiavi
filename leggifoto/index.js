@@ -97,7 +97,7 @@ functions.http("leggifoto", async (req, res) => {
   res.set("Vary", "Origin");
   if (req.method === "OPTIONS") {
     res.set("Access-Control-Allow-Methods", "POST");
-    res.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Firebase-AppCheck");
     res.set("Access-Control-Max-Age", "3600");
     return res.status(204).send("");
   }
@@ -109,6 +109,10 @@ functions.http("leggifoto", async (req, res) => {
     const u = await admin.auth().verifyIdToken(m[1]);
     const email = String(u.email || "").toLowerCase();
     if (!u.email_verified || !(await db.doc(`utenti/${email}`).get()).exists) return res.status(403).json({ errore: "Utente non autorizzato" });
+    // App Check: accetta solo richieste che arrivano dall'app Dag Auto Vetture.
+    const ac = req.get("x-firebase-appcheck") || "";
+    try { if (!ac) throw new Error("manca"); await admin.appCheck().verifyToken(ac); }
+    catch (e) { console.warn("App Check rifiutato", email, String(e.message || e)); return res.status(401).json({ errore: "App non riconosciuta" }); }
 
     const { immagine, mime } = req.body || {};
     const usato = (req.body || {}).modo === "usato";

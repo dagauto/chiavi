@@ -8,7 +8,7 @@ mkdir -p ~/leggifoto && cd ~/leggifoto
 for f in index.js package.json; do curl -sf -o $f "https://raw.githubusercontent.com/dagauto/chiavi/main/leggifoto/$f"; done
 T=$(gcloud auth print-access-token)
 SCELTO=""; LUOGO=""
-for L in global europe-west8 europe-west1; do
+for L in europe-west8 europe-west1 europe-west4 europe-west3 global; do
   for M in gemini-3.8-flash gemini-3.7-flash gemini-3.6-flash gemini-3.5-flash; do
     H=aiplatform.googleapis.com; [ "$L" != global ] && H=$L-aiplatform.googleapis.com
     R=$(curl -s -X POST -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
