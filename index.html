@@ -1135,6 +1135,10 @@ function openUsato(id){
           if(!r.ok)throw new Error(r.status);const d=await r.json();
           n+=metti("targa",d.targa)+metti("telaio",d.telaio)+metti("modello",d.modello)+metti("immatricolazione",d.immatricolazione)+metti("exProprietario",d.exProprietario)+metti("km",d.km);
           n+=aggiungi("u_danni",d.danni,", ");for(const a of d.accessori||[])n+=aggiungi("u_accdoc",a,"\n");n+=aggiungi("u_note",d.note,"\n");
+          for(const v of d.voci||[]){const el=p.querySelector(`[data-voce="${v.sezione}"]`);if(!el)continue;const ds=el.querySelector('[data-vf="descrizione"]'),st=el.querySelector('[data-vf="stimato"]');
+            if(v.descrizione&&!ds.value.toLowerCase().includes(v.descrizione.toLowerCase())){ds.value=ds.value.trim()?ds.value.trim()+"; "+v.descrizione:v.descrizione;n++;}
+            if(v.stimato){st.value=String((num(st.value)||0)+v.stimato);}}
+          if((d.voci||[]).length)aggTot();
           if(d.targa||d.telaio)dubbio=dubbio||!d.sicuro;
         }catch(e){msgF(`<span style="color:var(--bad)">Non sono riuscito a leggere la foto ${i+1}. Riprova o compila a mano.</span>`);return;}}
       msgF(n?`<span style="color:var(--ok)">Ho compilato ${n} ${n===1?"campo":"campi"}.</span> ${dubbio?'<b style="color:var(--warn)">Controlla targa e telaio: la foto non era nitida.</b>':"Controlla i dati prima di registrare."}`:"Nella foto non ho trovato dati nuovi da inserire.");};
