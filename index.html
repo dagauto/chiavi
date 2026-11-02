@@ -680,6 +680,7 @@ function openEditor(id,assegna){
       <label class="f">Modello<input id="e_modello" value="${esc(f.modello)}" autocomplete="off"></label>
     </div>
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
+    ${base.colore==="ROSSO"&&!libero?citBox(f.targa):""}
     <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI]).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
     <div class="keybox"><h4><span>Già venduta<br><span class="small">vettura nuova arrivata già venduta a un cliente</span></span> ${seg("venduta")}</h4>
@@ -1087,6 +1088,10 @@ function stampaPerizia(u){
 }
 /* --- scheda usato --- */
 const citnow=(targa,rep)=>`https://portal.autoimaging.co.uk/Vehicles/DAG_Auto_SRL#/Portal/2169/published/vehicles/3980/${rep}/${encodeURIComponent(String(targa).toUpperCase().replace(/[^A-Z0-9]/g,""))}`;
+const citBox=targa=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return"";const b=(rep,l)=>`<a class="btn" role="button" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" data-cit="${esc(t)}" href="${citnow(t,rep)}">${l}</a>`;
+  return`<div class="keybox"><h4>Foto CitNOW <span class="small">si aprono nel portale CitNOW</span></h4><div class="grid2">${b("10653","Foto DAG Used")}${b("10652","Foto MB Certified")}</div>
+  <div class="small cit-msg">Premendo il pulsante la targa viene copiata: se CitNOW non apre la vettura, incollala nella sua ricerca.</div></div>`;};
+document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[data-cit]");if(!a)return;try{navigator.clipboard&&navigator.clipboard.writeText(a.dataset.cit).catch(()=>{});}catch(_){}const m=a.closest(".keybox")&&a.closest(".keybox").querySelector(".cit-msg");if(m)m.innerHTML=`Targa <b>${esc(a.dataset.cit)}</b> copiata: se CitNOW non apre la vettura, incollala nella sua ricerca.`;});
 function openUsato(id){
   const nuovo=!id;
   const base=nuovo?{stato:"presa",priorita:"normale",marca:"MERCEDES",date:{presa:oggi()},voci:{}}:Object.assign({},U.docs.get(id));
@@ -1101,8 +1106,7 @@ function openUsato(id){
       <div class="grid2"><button type="button" id="u_bLib">Foto del libretto</button><button type="button" id="u_bStato">Foto dello stato d'uso</button></div>
       <input type="file" id="u_fLib" accept="image/*" capture="environment" hidden><input type="file" id="u_fStato" accept="image/*" multiple hidden>
       <div id="u_fmsg" class="small" style="margin-top:6px"></div></div>`:""}
-    ${!nuovo&&f.targa?`<div class="keybox"><h4>Foto CitNOW <span class="small">si aprono nel portale CitNOW</span></h4>
-      <div class="grid2"><a class="btn" role="button" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="${citnow(f.targa,"10653")}">Foto DAG Used</a><a class="btn" role="button" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="${citnow(f.targa,"10652")}">Foto MB Certified</a></div></div>`:""}
+    ${!nuovo?citBox(f.targa):""}
     ${!nuovo?`<div class="keybox"><h4>Stato</h4><div class="places" data-k="stato">${STATI_U.map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}">${l}</button>`).join("")}</div>
       <div class="small">${STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`).join(" · ")}</div></div>`:""}
     <div class="keybox"><h4>Priorità di ripristino <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
