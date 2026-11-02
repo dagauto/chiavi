@@ -1079,16 +1079,20 @@ function openUsato(id){
   const edDati=canPresa();
   const inp=(k,l,o={})=>`<label class="f">${l}<input id="u_${k}" ${o.mono?'class="mono"':""} ${o.type?`type="${o.type}"`:""} ${o.im?`inputmode="${o.im}"`:""} value="${esc(f[k]??"")}" ${edDati?"":"disabled"} autocomplete="off"></label>`;
   const p=openSheet(`<form class="panel" id="uf" novalidate role="dialog" aria-modal="true" aria-label="${nuovo?"Presa in carico":"Vettura usata"}">
-    <div class="phead"><div><h2>${nuovo?"Presa in carico":esc((f.targa||"")+" · "+(f.modello||""))}</h2><p>${nuovo?"Incolla la mail di presa in carico oppure compila a mano.":`${esc(NOME_STATO[f.stato])} ${esc(giorniTxt(giorniStato(f)))}`}</p></div></div>
-    ${nuovo?`<details class="raw" open><summary>Incolla il testo della mail di presa in carico</summary>
-      <textarea id="u_mail" rows="5" style="width:100%;font:inherit;font-size:14px;margin-top:8px;padding:10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)" placeholder="Apri la mail, seleziona tutto il testo, copia e incolla qui"></textarea>
-      <button type="button" id="u_parse" style="margin-top:8px">Compila dai dati della mail</button></details>`:""}
+    <div class="phead"><div><h2>${nuovo?"Presa in carico":esc((f.targa||"")+" · "+(f.modello||""))}</h2><p>${nuovo?"Fotografa libretto e stato d'uso: la scheda si compila da sola. Controlla e registra.":`${esc(NOME_STATO[f.stato])} ${esc(giorniTxt(giorniStato(f)))}`}</p></div></div>
+    ${nuovo?`<div class="keybox"><h4>Foto dei documenti <span class="small">la scheda si compila da sola</span></h4>
+      <div class="grid2"><button type="button" id="u_bLib">Foto del libretto</button><button type="button" id="u_bStato">Foto dello stato d'uso</button></div>
+      <input type="file" id="u_fLib" accept="image/*" capture="environment" hidden><input type="file" id="u_fStato" accept="image/*" multiple hidden>
+      <div id="u_fmsg" class="small" style="margin-top:6px"></div></div>`:""}
     ${!nuovo?`<div class="keybox"><h4>Stato</h4><div class="places" data-k="stato">${STATI_U.map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}">${l}</button>`).join("")}</div>
       <div class="small">${STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`).join(" · ")}</div></div>`:""}
     <div class="keybox"><h4>Priorità di ripristino <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
     <div class="grid2">${inp("targa","Targa",{mono:1})}${inp("modello","Modello")}</div>
     ${inp("telaio","Telaio",{mono:1})}
-    <div class="grid2">${inp("km","Km",{im:"numeric"})}${inp("chiave","N° chiave (rossa)",{im:"numeric"})}</div>
+    <div class="grid2">${inp("km","Km",{im:"numeric"})}${inp("chiave","N° chiave rossa (U)",{im:"numeric"})}</div>
+    ${nuovo?`<div id="u_chmsg" class="small"></div>
+    <div class="grid2"><label class="f">Prima chiave in<select id="u_dovePrima">${LUOGHI.map(l=>`<option>${l}</option>`).join("")}<option value="">Non c'è</option></select></label>
+      <label class="f">Seconda chiave (${RETRO})<select id="u_seconda"><option value="Sì">Sì, c'è</option><option value="No">Non c'è</option></select></label></div>`:""}
     <div class="grid2">${inp("immatricolazione","Immatricolazione")}${inp("venditore","Venditore")}</div>
     <div class="grid2">${inp("scadBollo","Scadenza bollo")}${inp("scadRevisione","Scadenza revisione")}</div>
     <div class="grid2">${inp("exProprietario","Ex proprietario")}${inp("ritiroPermuta","Ritiro permuta su contratto")}</div>
@@ -1115,7 +1119,29 @@ function openUsato(id){
   p.querySelector(".voci").addEventListener("input",aggTot);p.querySelector(".voci").addEventListener("change",aggTot);aggTot();
   $("u_close").onclick=closeSheet;
   const upr=$("u_print");if(upr)upr.onclick=()=>{leggiVoci();const g=Object.assign({},f,{danni:$("u_danni").value.trim(),accessoriDoc:$("u_accdoc").value.split("\n").map(x=>x.trim()).filter(Boolean)});stampaPerizia(g);};
-  if(nuovo)$("u_parse").onclick=()=>{const d=leggiMail($("u_mail").value);let n=0;
+  if(nuovo){
+    const ch=$("u_chiave");const lib=primoLibero("ROSSO");if(ch&&!ch.value&&lib)ch.value=lib.numero;
+    const chMsg=()=>{const n=parseInt(ch.value,10);const m=$("u_chmsg");if(!m)return;if(!n){m.textContent="Senza numero la vettura non entra nel registro chiavi.";return;}if(!(n>=1&&n<=100)){m.innerHTML='<span style="color:var(--bad)">Il numero va da 1 a 100.</span>';return;}const s=slot("ROSSO",n);
+      m.innerHTML=occupato(s)?`<span style="color:var(--bad)">La Rossa ${n} è occupata (${esc(s.targa||s.modello||s.telaio||"altra vettura")}).</span>${lib?` Primo libero: <b>${lib.numero}</b>.`:""}`:`Entra nel registro chiavi come <b>U.${n}</b>: prima al ${n}, seconda al ${n+100} nel ${RETRO}.`;};
+    ch.addEventListener("input",chMsg);chMsg();
+    const msgF=t=>{$("u_fmsg").innerHTML=t;};
+    const metti=(k,v)=>{const i=$("u_"+k);if(i&&v&&!i.value.trim()){i.value=v;return 1;}return 0;};
+    const aggiungi=(id,v,sep)=>{const i=$(id);if(!i||!v)return 0;const cur=i.value.trim();if(cur.includes(v))return 0;i.value=cur?cur+sep+v:v;return 1;};
+    const leggiU=async files=>{if(!files.length)return;
+      if(!window.LEGGIFOTO_URL||!S.store.idToken){msgF("Lettura delle foto non disponibile qui: compila a mano.");return;}
+      let n=0,dubbio=false;
+      for(let i=0;i<files.length;i++){msgF(`Leggo la foto ${i+1} di ${files.length}…`);
+        try{const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken()},body:JSON.stringify({modo:"usato",immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
+          if(!r.ok)throw new Error(r.status);const d=await r.json();
+          n+=metti("targa",d.targa)+metti("telaio",d.telaio)+metti("modello",d.modello)+metti("immatricolazione",d.immatricolazione)+metti("exProprietario",d.exProprietario)+metti("km",d.km);
+          n+=aggiungi("u_danni",d.danni,", ");for(const a of d.accessori||[])n+=aggiungi("u_accdoc",a,"\n");n+=aggiungi("u_note",d.note,"\n");
+          if(d.targa||d.telaio)dubbio=dubbio||!d.sicuro;
+        }catch(e){msgF(`<span style="color:var(--bad)">Non sono riuscito a leggere la foto ${i+1}. Riprova o compila a mano.</span>`);return;}}
+      msgF(n?`<span style="color:var(--ok)">Ho compilato ${n} ${n===1?"campo":"campi"}.</span> ${dubbio?'<b style="color:var(--warn)">Controlla targa e telaio: la foto non era nitida.</b>':"Controlla i dati prima di registrare."}`:"Nella foto non ho trovato dati nuovi da inserire.");};
+    $("u_bLib").onclick=()=>$("u_fLib").click();$("u_bStato").onclick=()=>$("u_fStato").click();
+    $("u_fLib").onchange=e=>{leggiU([...e.target.files]);e.target.value="";};$("u_fStato").onchange=e=>{leggiU([...e.target.files]);e.target.value="";};
+  }
+  if(nuovo&&$("u_parse"))$("u_parse").onclick=()=>{const d=leggiMail($("u_mail").value);let n=0;
     for(const k of["targa","modello","telaio","km","chiave","immatricolazione","venditore","scadBollo","scadRevisione","exProprietario","ritiroPermuta"])if(d[k]){const i=$("u_"+k);if(i){i.value=d[k];n++;}}
     if(d.marca&&d.marca.toUpperCase()!=="MERCEDES"&&$("u_modello")&&!$("u_modello").value.toUpperCase().startsWith(d.marca.toUpperCase()))$("u_modello").value=d.marca+" "+$("u_modello").value;
     if(canFiscale()){if(d.valoreContratto!==undefined&&d.valoreContratto!==""){$("u_valoreContratto").value=d.valoreContratto;n++;}if(d.ivaEsposta){$("u_ivaEsposta").value=d.ivaEsposta;n++;}}
@@ -1144,7 +1170,7 @@ function openUsato(id){
     // collegamento con il registro chiavi
     let avviso="";
     if(f.chiave){const s=slot("ROSSO",+f.chiave);const stessa=s._has&&((f.telaio&&norm(s.telaio)===norm(f.telaio))||(f.targa&&norm(s.targa)===norm(f.targa)));
-      if(!occupato(s)&&nuovo){writes.push({col:"chiavi",id:s.id,data:{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio,targa:f.targa,modello:f.modello,prima:"Sì",dovePrima:"",seconda:"",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Da presa in carico usato: indicare dove sono le chiavi"}});logs.push({codice:`U.${f.chiave}`,azione:"Assegnato da presa in carico",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")});}
+      if(!occupato(s)&&nuovo){writes.push({col:"chiavi",id:s.id,data:{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio,targa:f.targa,modello:f.modello,prima:$("u_dovePrima")&&$("u_dovePrima").value?"Sì":"No",dovePrima:$("u_dovePrima")?$("u_dovePrima").value:"",seconda:$("u_seconda")?$("u_seconda").value:"",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Da presa in carico usato"}});logs.push({codice:`U.${f.chiave}`,azione:"Assegnato da presa in carico",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")});}
       else if(occupato(s)&&!stessa&&nuovo)avviso=` Attenzione: la chiave Rossa ${f.chiave} risulta già occupata (${s.targa||s.modello||s.telaio||"altra vettura"}); il registro chiavi non è stato modificato.`;
       const ok=occupato(s)?stessa:nuovo;
       if(ok&&f.stato!==base.stato){
