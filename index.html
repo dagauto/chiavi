@@ -421,13 +421,22 @@ async function avviaFirebase(){
   $("fReset").onsubmit=async e=>{e.preventDefault();err("pErr");try{await A.sendPasswordResetEmail(auth,$("pEmail").value.trim(),torna());$("pErr").innerHTML=`<div class="banner ok">Email inviata. Segui il link per scegliere la nuova password.</div>`;}catch(x){err("pErr",errAuth(x));}};
   $("vDone").onclick=async()=>{err("vErr");try{await auth.currentUser.reload();if(auth.currentUser.emailVerified){await auth.currentUser.getIdToken(true);entra(auth.currentUser);}else err("vErr","L'email non risulta ancora confermata. Apri il link nell'email e riprova.");}catch(x){err("vErr",errAuth(x));}};
   $("vResend").onclick=async()=>{try{await A.sendEmailVerification(auth.currentUser,torna());$("vErr").innerHTML=`<div class="banner ok">Email inviata di nuovo.</div>`;}catch(x){err("vErr",errAuth(x));}};
-  $("nRetry").onclick=()=>entra(auth.currentUser);
+  $("nRetry").onclick=async()=>{const b=$("nRetry");b.disabled=true;b.textContent="Controllo…";try{await entra(auth.currentUser);}finally{b.disabled=false;b.textContent="Riprova";}};
 
   let subs=[];
   async function entra(u){
+    // Il permesso dipende dal "pass" di accesso: lo rinnovo sempre, così vale subito la conferma dell'email
+    // e l'autorizzazione appena data dall'amministratore (prima restava il pass vecchio fino a un'ora).
+    try{await u.reload();await u.getIdToken(true);}catch(e){}
+    u=auth.currentUser||u;
+    if(!u.emailVerified){vista("fVerify");$("vEmail").textContent=u.email;return;}
     const email=u.email.toLowerCase();
     let info=null;
-    try{const s=await F.getDoc(F.doc(db,"utenti",email));if(s.exists())info=s.data();}catch(e){}
+    for(let t=0;t<2&&!info;t++){
+      try{const s=await (F.getDocFromServer?F.getDocFromServer(F.doc(db,"utenti",email)):F.getDoc(F.doc(db,"utenti",email)));if(s.exists())info=s.data();}
+      catch(e){try{const s=await F.getDoc(F.doc(db,"utenti",email));if(s.exists())info=s.data();}catch(_){}}
+      if(!info&&t===0){await new Promise(r=>setTimeout(r,1200));try{await u.getIdToken(true);}catch(e){}}
+    }
     if(!info){vista("fNot");$("nEmail").textContent=email;return;}
     const store={
       demo:false,
@@ -480,7 +489,6 @@ async function avviaFirebase(){
   A.onAuthStateChanged(auth,u=>{
     if(S.store)return;
     if(!u){vista("fLogin");return;}
-    if(!u.emailVerified){vista("fVerify");$("vEmail").textContent=u.email;return;}
     entra(u);
   });
 }
