@@ -142,7 +142,7 @@ async function controllo24h() {
   }
 }
 
-// Bollo / revisione scaduti alla data di consegna (dalla scheda usato con la stessa targa o telaio).
+// Bollo / revisione scaduti alla data di consegna o in scadenza entro 30 giorni (dalla scheda usato con la stessa targa o telaio).
 const norm = (s) => String(s ?? "").toUpperCase().replace(/[\s\-.]/g, "");
 function scadData(s) {
   s = String(s || "").trim(); let m;
@@ -163,15 +163,17 @@ async function controlloScadenze() {
     const u = usati.find((x) => (t && norm(x.targa) === t) || (v && norm(x.telaio) === v));
     if (!u) continue;
     const rif = c.data || oggi;
-    const sc = [["scadBollo", "bollo scaduto"], ["scadRevisione", "revisione scaduta"]]
-      .map(([k, l]) => [l, scadData(u[k])]).filter(([, d]) => d && d < rif)
-      .map(([l, d]) => `${l} il ${d.split("-").reverse().join("/")}`);
+    const lim = new Date(rif + "T12:00:00Z"); lim.setUTCDate(lim.getUTCDate() + 30);
+    const fine = lim.toISOString().slice(0, 10);
+    const sc = [["scadBollo", "bollo"], ["scadRevisione", "revisione"]]
+      .map(([k, l]) => [l, scadData(u[k])]).filter(([, d]) => d && d <= fine)
+      .map(([l, d]) => `${l} ${d < rif ? (l === "bollo" ? "scaduto" : "scaduta") : "in scadenza"} il ${d.split("-").reverse().join("/")}`);
     if (!sc.length) continue;
     const sigla = `${{ BLU: "N", ROSSO: "U", VERDE: "V" }[c.colore] || "?"}.${c.numero}`;
     await db.collection("notifiche_coda").add({
       evento: "consegna_scadenze",
       titolo: `Consegna ${sigla}: ${sc.join(", ")}`,
-      testo: `${c.cliente || "Cliente"} · ${c.targa || c.modello || ""}${c.data ? " · consegna il " + c.data.split("-").reverse().join("/") : ""}. Da rinnovare prima della consegna.`,
+      testo: `${c.cliente || "Cliente"} · ${c.targa || c.modello || ""}${c.data ? " · consegna il " + c.data.split("-").reverse().join("/") : ""}. Controlla e rinnova prima della consegna.`,
       link: "#consegne",
       inviata: false,
       ts: Date.now(),
