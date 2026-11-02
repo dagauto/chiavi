@@ -14,3 +14,6 @@ window.FIREBASE_VAPID = "BDFAQDOD-Ccnmhrq8BjRk0Vqeq3-XW5YGuFOZKked5UMa1kP_PQyibr
 
 // Lettura foto con intelligenza artificiale (funzione leggifoto su Google Cloud).
 window.LEGGIFOTO_URL = "https://leggifoto-mzcdl2pgqa-oc.a.run.app";
+
+// App Check (reCAPTCHA Enterprise): protegge database e lettura foto da richieste esterne.
+window.APPCHECK_KEY = "6LewqwwuAAAAAE2AFgsPQDmjB9MlyNeuoIlu7Xiv";
