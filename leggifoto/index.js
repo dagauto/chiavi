@@ -60,12 +60,22 @@ Ti mando la foto di un documento di una vettura usata: può essere la carta di c
 - danni: elenco breve dei danni di carrozzeria/interni segnati nella scheda stato d'uso, separati da virgola.
 - accessori: accessori e documenti presenti (es. "doppia chiave", "libretto service", "ruota di scorta"), uno per voce.
 - note: altre annotazioni utili scritte sulla scheda (es. "Rientro", numero pratica, chiavi consegnate).
-- voci: le righe della colonna PERIZIA (esame tecnico per valutazione costi di ripristino). Per ogni lavoro scritto crea una voce con
-  sezione = una tra carrozzeria, manutenzione, freni, pneumatici, meccanica, cristalli, illuminazione, interni, altro
-  (Manut./tagliando = manutenzione; Meccanica e Motore = meccanica; Impianto illuminazione = illuminazione);
-  descrizione = il lavoro scritto a mano, sistemato in italiano leggibile (es. "Porta ant. sx (bollo)", "Tagliando", "Pastiglie ant. 40%");
-  stimato = il costo in euro scritto accanto, solo il numero (0 se non c'è). Una barra "/" o una riga vuota vuol dire nessun lavoro: non creare la voce.
-  Se in una sezione ci sono più righe con più importi crea una voce per riga.
+- voci: i costi di ripristino, RAGGRUPPATI PER SEZIONE: al massimo UNA voce per ogni sezione, mai una voce per ogni pezzo.
+  Il documento può essere il nuovo "VERBALE DI PERIZIA" Dag Auto (tabelle Carrozzeria A–O, Interni 1–8, Altri esterni,
+  Dotazioni, Pneumatici, Stato meccanica, eventuale retro "Perizia aggiuntiva al rientro") oppure la vecchia scheda con la colonna PERIZIA.
+  Considera solo le righe segnate con R (riparare) o S (sostituire) oppure con un importo; ignora quelle con N (normale usura) senza importo e quelle vuote o con "/".
+  Sezioni (usa esattamente questi nomi):
+  carrozzeria = tabella Carrozzeria (A–O) + calotte retrovisori; interni = tabella Interni (1–8);
+  cristalli = parabrezza, lunotto, vetri laterali; illuminazione = fari e fanali;
+  pneumatici = tabella Pneumatici e dischi ruota/cerchi; meccanica = Stato meccanica, motore, batterie (modulo batterie con KO o anomalie);
+  manutenzione = tagliando, manutenzione; freni = freni, pastiglie, dischi freno;
+  altro = Dotazioni mancanti o da sostituire (es. 2ª chiave, kit riparazione) e quello che non rientra altrove.
+  Per ogni sezione: descrizione = elenco breve e compatto dei pezzi, separati da virgola, con R o S tra parentesi
+  (es. "Porta ant. dx (R), paraurti post. (S), parafango post. sx (R)"; per i pneumatici es. "Ant. sx e ant. dx da sostituire, 2 mm");
+  stimato = il subtotale della sezione se è scritto, altrimenti la somma degli importi della sezione (0 se non ci sono importi).
+  Se c'è anche il retro "Perizia aggiuntiva al rientro", aggiungi quei danni nelle stesse sezioni scrivendo "al rientro" accanto al pezzo.
+- Nel verbale: "km" è il campo KM in alto; "accessori" sono le Dotazioni presenti (non segnate R o S); in "note" metti
+  esterno/interno pulito SI/NO, numero verbale, tipo pneumatici e le note di stato meccanica se brevi.
 - sicuro: true se targa e telaio si leggono chiaramente, false se hai dovuto indovinare.
 Se un dato non c'è lascia la stringa vuota (o la lista vuota). Non inventare nulla.
 In "tipo_documento" scrivi libretto, stato d'uso o altro.`;
@@ -89,6 +99,19 @@ async function tokenGoogle() {
 }
 
 const pulisciTelaio = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/O/g, "0").replace(/I/g, "1").replace(/Q/g, "0");
+// Una sola voce per sezione: unisce descrizioni e somma gli importi.
+function raggruppa(voci) {
+  const g = new Map();
+  for (const v of voci || []) {
+    if (!v || !v.sezione || !(v.descrizione || v.stimato)) continue;
+    const x = g.get(v.sezione) || { sezione: v.sezione, parti: [], stimato: 0 };
+    const d = String(v.descrizione || "").trim();
+    if (d && !x.parti.some((p) => p.toLowerCase() === d.toLowerCase())) x.parti.push(d);
+    x.stimato += Number(v.stimato) || 0;
+    g.set(v.sezione, x);
+  }
+  return [...g.values()].map((x) => ({ sezione: x.sezione, descrizione: x.parti.join(", ").slice(0, 300), stimato: Math.round(x.stimato) }));
+}
 const pulisciTarga = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 functions.http("leggifoto", async (req, res) => {
@@ -139,7 +162,7 @@ functions.http("leggifoto", async (req, res) => {
         exProprietario: String(dati.exProprietario || "").trim(), km: String(dati.km || "").replace(/\D/g, ""),
         danni: String(dati.danni || "").trim(), accessori: (dati.accessori || []).map((x) => String(x).trim()).filter(Boolean).slice(0, 10),
         note: String(dati.note || "").trim(), sicuro: dati.sicuro !== false,
-        voci: (dati.voci || []).filter((v) => v && v.sezione && (v.descrizione || v.stimato)).map((v) => ({ sezione: v.sezione, descrizione: String(v.descrizione || "").trim(), stimato: Number(v.stimato) || 0 })),
+        voci: raggruppa(dati.voci),
       };
       console.log("letta foto usato", email, out.tipo);
       return res.json(out);
