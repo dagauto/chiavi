@@ -871,7 +871,7 @@ function renderRighe(){
         <label class="f">Prima chiave in<select data-f="dovePrima">${LUOGHI.map(l=>`<option ${r.dovePrima===l?"selected":""}>${l}</option>`).join("")}<option value="" ${!r.dovePrima?"selected":""}>Non c'è</option></select></label>
         <label class="f">Seconda chiave (${RETRO})<select data-f="seconda"><option value="Sì" ${r.seconda==="Sì"?"selected":""}>Sì, c'è</option><option value="No" ${r.seconda==="No"?"selected":""}>Non c'è</option></select></label>
       </div>
-      <div class="grid2"><label class="chk" style="margin-top:6px"><input type="checkbox" data-f="venduta" ${r.venduta?"checked":""}> Già venduta</label><label class="chk" style="margin-top:6px"><input type="checkbox" data-f="esposizione" ${r.esposizione?"checked":""}> Conto esposizione</label></div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" data-f="venduta" ${r.venduta?"checked":""}> Già venduta</label>
       ${r.venduta?`<label class="f">Cliente (facoltativo)<input data-f="cliente" value="${esc(r.cliente||"")}" autocomplete="off"></label>`:""}
       <label class="chk" style="margin-top:6px"><input type="checkbox" data-f="danni" ${r.danni?"checked":""}> Danni di trasporto: in attesa di ripristino</label>
       ${r.danni?`<label class="f">Descrizione danni<input data-f="danniDescr" value="${esc(r.danniDescr||"")}" placeholder="es. graffio portiera post. sx, cerchio ant. dx" autocomplete="off"></label>`:""}
