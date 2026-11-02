@@ -243,7 +243,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
       <p class="small" style="margin:0">Usa l'email di lavoro. L'accesso funziona solo dopo che l'amministratore ha autorizzato la tua email.</p>
       <label class="f">Nome e cognome<input id="rNome" autocomplete="name" required></label>
       <label class="f">Email<input id="rEmail" type="email" autocomplete="username" required></label>
-      <label class="f">Password (almeno 8 caratteri)<input id="rPass" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="f">Password (almeno 10 caratteri, con lettere e numeri)<input id="rPass" type="password" autocomplete="new-password" minlength="10" required></label>
       <div id="rErr"></div>
       <button class="primary" type="submit">Crea l'accesso</button>
       <button type="button" class="link" data-go="fLogin">Ho già l'accesso</button>
@@ -397,6 +397,9 @@ function show(id){for(const x of["boot","auth","app"])$(x).hidden=x!==id;}
 async function avviaFirebase(){
   const [{initializeApp},A,F]=await Promise.all([import(FB+"firebase-app.js"),import(FB+"firebase-auth.js"),import(FB+"firebase-firestore.js")]);
   const app=initializeApp(window.FIREBASE_CONFIG);
+  // App Check: il database e la lettura foto accettano solo richieste che arrivano da questa app.
+  let appCheck=null;
+  if(window.APPCHECK_KEY){try{const AC=await import(FB+"firebase-app-check.js");appCheck=AC.initializeAppCheck(app,{provider:new AC.ReCaptchaEnterpriseProvider(window.APPCHECK_KEY),isTokenAutoRefreshEnabled:true});window.__acTok=async()=>{try{return (await AC.getToken(appCheck,false)).token;}catch(e){return "";}};}catch(e){console.warn("App Check",e);}}
   const auth=A.getAuth(app);auth.languageCode="it";
   let db;try{db=F.initializeFirestore(app,{localCache:F.persistentLocalCache()});}catch(e){db=F.getFirestore(app);}
   const torna=()=>({url:location.href.split("#")[0]});
@@ -404,7 +407,7 @@ async function avviaFirebase(){
   const errAuth=e=>{const c=(e&&e.code)||"";
     if(c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found"))return"Email o password non corrette.";
     if(c.includes("email-already-in-use"))return"Esiste già un accesso con questa email: usa «Ho già l'accesso».";
-    if(c.includes("weak-password"))return"La password deve avere almeno 8 caratteri.";
+    if(c.includes("weak-password")||c.includes("password-does-not-meet"))return"La password deve avere almeno 10 caratteri, con lettere e numeri.";
     if(c.includes("invalid-email"))return"L'email non è scritta correttamente.";
     if(c.includes("too-many-requests"))return"Troppi tentativi. Aspetta qualche minuto e riprova.";
     if(c.includes("network"))return"Connessione assente. Controlla la rete e riprova.";
@@ -415,6 +418,7 @@ async function avviaFirebase(){
   document.querySelectorAll("[data-out]").forEach(b=>b.onclick=()=>A.signOut(auth));
   $("fLogin").onsubmit=async e=>{e.preventDefault();err("lErr");try{await A.signInWithEmailAndPassword(auth,$("lEmail").value.trim(),$("lPass").value);}catch(x){err("lErr",errAuth(x));}};
   $("fReg").onsubmit=async e=>{e.preventDefault();err("rErr");
+    const pw=$("rPass").value;if(pw.length<10||!/[A-Za-z]/.test(pw)||!/\d/.test(pw)){err("rErr","La password deve avere almeno 10 caratteri, con lettere e numeri.");return;}
     try{const c=await A.createUserWithEmailAndPassword(auth,$("rEmail").value.trim(),$("rPass").value);
       await A.updateProfile(c.user,{displayName:$("rNome").value.trim()});
       await A.sendEmailVerification(c.user,torna());vista("fVerify");$("vEmail").textContent=c.user.email;}catch(x){err("rErr",errAuth(x));}};
@@ -470,6 +474,7 @@ async function avviaFirebase(){
       async delUtente(em){await F.deleteDoc(F.doc(db,"utenti",em.toLowerCase()));},
       async logout(){subs.forEach(f=>{try{f()}catch(e){}});subs=[];await A.signOut(auth);location.reload();},
       async idToken(){return auth.currentUser.getIdToken();},
+      async appCheckToken(){return window.__acTok?await window.__acTok():"";},
       onMiePrefs(cb){subs.push(F.onSnapshot(F.doc(db,"notifiche_utenti",email),s=>cb(s.exists()?s.data():{}),()=>{}));},
       async setMiePrefs(d){await F.setDoc(F.doc(db,"notifiche_utenti",email),Object.assign({},d,{email,aggiornato:Date.now()}),{merge:true});},
       async attivaPush(){
@@ -815,7 +820,7 @@ async function leggiFoto(files){
       const tutte=[];
       for(let i=0;i<files.length;i++){
         prog(`Leggo la foto ${i+1} di ${files.length} con l'intelligenza artificiale…`,(i+.3)/files.length);
-        const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken()},body:JSON.stringify({immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
+        const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken(),"X-Firebase-AppCheck":S.store.appCheckToken?await S.store.appCheckToken():""},body:JSON.stringify({immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
         if(!r.ok)throw new Error("http "+r.status);
         const j=await r.json();for(const v of j.vetture||[])tutte.push(v);
         B.testo=(B.testo+`\nFoto ${i+1}: ${j.tipo||"documento"} · ${(j.vetture||[]).length} vetture`).trim();
@@ -1142,7 +1147,7 @@ function openUsato(id){
       if(!window.LEGGIFOTO_URL||!S.store.idToken){msgF("Lettura delle foto non disponibile qui: compila a mano.");return;}
       let n=0,dubbio=false;
       for(let i=0;i<files.length;i++){msgF(`Leggo la foto ${i+1} di ${files.length}…`);
-        try{const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken()},body:JSON.stringify({modo:"usato",immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
+        try{const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken(),"X-Firebase-AppCheck":S.store.appCheckToken?await S.store.appCheckToken():""},body:JSON.stringify({modo:"usato",immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
           if(!r.ok)throw new Error(r.status);const d=await r.json();
           n+=metti("targa",d.targa)+metti("telaio",d.telaio)+metti("modello",d.modello)+metti("immatricolazione",d.immatricolazione)+metti("exProprietario",d.exProprietario)+metti("km",d.km);
           n+=aggiungi("u_danni",d.danni,", ");for(const a of d.accessori||[])n+=aggiungi("u_accdoc",a,"\n");n+=aggiungi("u_note",d.note,"\n");
