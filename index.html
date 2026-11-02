@@ -1003,7 +1003,7 @@ const canVoci=()=>ha(...GEST,"officina","ripristini");
 const canExcel=()=>ha(...GEST,"officina");
 const canLibera=()=>ha(...GEST,"venditore","productexpert");
 const soloSposta=()=>ha("venditore","productexpert","bdc");
-const statiPermessi=()=>ha(...GEST)?STATI_U.map(([k])=>k):ha("officina","ripristini")?["ripristino","pronta"]:ha("movimentatore")?["ripristino","pronta","foto"]:ha("foto")?["foto"]:ha("venditore","productexpert")?["pubblicata"]:[];
+const statiPermessi=()=>ha(...GEST)?STATI_U.map(([k])=>k):ha("officina","ripristini")?["ripristino","pronta"]:ha("movimentatore")?["ripristino","pronta","foto"]:ha("foto")?["foto"]:ha("venditore","productexpert")?["foto","pubblicata"]:[];
 const U={docs:new Map(),ris:new Map(),q:"",stato:null};
 const euro=n=>(n===""||n==null||isNaN(n))?"—":Number(n).toLocaleString("it-IT",{style:"currency",currency:"EUR",maximumFractionDigits:0});
 const num=v=>{if(v===""||v==null)return "";const n=parseFloat(String(v).replace(/\./g,"").replace(",",".").replace(/[^\d.\-]/g,""));return isNaN(n)?"":n;};
@@ -1118,8 +1118,8 @@ function openUsato(id){
   const inp=(k,l,o={})=>`<label class="f">${l}<input id="u_${k}" ${o.mono?'class="mono"':""} ${o.type?`type="${o.type}"`:""} ${o.im?`inputmode="${o.im}"`:""} value="${esc(f[k]??"")}" ${edDati?"":"disabled"} autocomplete="off"></label>`;
   const p=openSheet(`<form class="panel" id="uf" novalidate role="dialog" aria-modal="true" aria-label="${nuovo?"Presa in carico":"Vettura usata"}">
     <div class="phead"><div><h2>${nuovo?"Presa in carico":esc((f.targa||"")+" · "+(f.modello||""))}</h2><p>${nuovo?"Fotografa libretto e stato d'uso: la scheda si compila da sola. Controlla e registra.":`${esc(NOME_STATO[f.stato])} ${esc(giorniTxt(giorniStato(f)))}`}</p></div></div>
-    ${nuovo?`<div class="keybox"><h4>Foto dei documenti <span class="small">la scheda si compila da sola</span></h4>
-      <div class="grid2"><button type="button" id="u_bLib">Foto del libretto</button><button type="button" id="u_bStato">Foto dello stato d'uso</button></div>
+    ${nuovo||canVoci()?`<div class="keybox"><h4>Foto dei documenti <span class="small">${nuovo?"la scheda si compila da sola":"aggiunge ripristini e danni della perizia"}</span></h4>
+      <div class="grid2">${nuovo?`<button type="button" id="u_bLib">Foto del libretto</button>`:""}<button type="button" id="u_bStato">${nuovo?"Foto dello stato d'uso":"Foto della perizia"}</button></div>
       <input type="file" id="u_fLib" accept="image/*" capture="environment" hidden><input type="file" id="u_fStato" accept="image/*" multiple hidden>
       <div id="u_fmsg" class="small" style="margin-top:6px"></div></div>`:""}
     ${!nuovo&&fotoOk(f.stato)?citBox(f.targa):""}
@@ -1147,7 +1147,7 @@ function openUsato(id){
     <label class="f">Accessori e documenti (uno per riga, max 10)<textarea id="u_accdoc" rows="3">${esc((f.accessoriDoc||[]).join("\n"))}</textarea></label>
     <label class="f">Note<textarea id="u_note" rows="2">${esc(f.note||"")}</textarea></label>
     <div id="e_err"></div>
-    <div class="pfoot">${!nuovo?`<button type="button" id="u_print">Stampa perizia</button>`:""}${!nuovo&&isAdmin()?`<button type="button" class="danger" id="u_del">Elimina scheda</button>`:"<span></span>"}
+    <div class="pfoot">${!nuovo?`<button type="button" id="u_print">Stampa perizia</button>`:""}${!nuovo&&ha(...GEST)?`<button type="button" class="danger" id="u_del">Elimina scheda</button>`:"<span></span>"}
       <div class="r"><button type="button" id="u_close">Annulla</button><button type="submit" class="primary" id="e_save">${nuovo?"Registra presa in carico":"Salva"}</button></div></div>
   </form>`);
   const soloStato=!nuovo&&!canVoci();
@@ -1167,8 +1167,10 @@ function openUsato(id){
     const chMsg=()=>{const n=parseInt(ch.value,10);const m=$("u_chmsg");if(!m)return;if(!n){m.textContent="Senza numero la vettura non entra nel registro chiavi.";return;}if(!(n>=1&&n<=100)){m.innerHTML='<span style="color:var(--bad)">Il numero va da 1 a 100.</span>';return;}const s=slot("ROSSO",n);
       m.innerHTML=occupato(s)?`<span style="color:var(--bad)">La Rossa ${n} è occupata (${esc(s.targa||s.modello||s.telaio||"altra vettura")}).</span>${lib?` Primo libero: <b>${lib.numero}</b>.`:""}`:`Entra nel registro chiavi come <b>U.${n}</b>: prima al ${n}, seconda al ${n+100} nel ${RETRO}.`;};
     ch.addEventListener("input",chMsg);chMsg();
+  }
+  if($("u_fmsg")){
     const msgF=t=>{$("u_fmsg").innerHTML=t;};
-    const metti=(k,v)=>{const i=$("u_"+k);if(i&&v&&!i.value.trim()){i.value=v;return 1;}return 0;};
+    const metti=(k,v)=>{const i=$("u_"+k);if(i&&v&&!i.disabled&&!i.value.trim()){i.value=v;return 1;}return 0;};
     const aggiungi=(id,v,sep)=>{const i=$(id);if(!i||!v)return 0;const cur=i.value.trim();if(cur.includes(v))return 0;i.value=cur?cur+sep+v:v;return 1;};
     const leggiU=async files=>{if(!files.length)return;
       if(!window.LEGGIFOTO_URL||!S.store.idToken){msgF("Lettura delle foto non disponibile qui: compila a mano.");return;}
@@ -1184,8 +1186,8 @@ function openUsato(id){
           if((d.voci||[]).length)aggTot();
           if(d.targa||d.telaio)dubbio=dubbio||!d.sicuro;
         }catch(e){msgF(`<span style="color:var(--bad)">Non sono riuscito a leggere la foto ${i+1}. Riprova o compila a mano.</span>`);return;}}
-      msgF(n?`<span style="color:var(--ok)">Ho compilato ${n} ${n===1?"campo":"campi"}.</span> ${dubbio?'<b style="color:var(--warn)">Controlla targa e telaio: la foto non era nitida.</b>':"Controlla i dati prima di registrare."}`:"Nella foto non ho trovato dati nuovi da inserire.");};
-    $("u_bLib").onclick=()=>$("u_fLib").click();$("u_bStato").onclick=()=>$("u_fStato").click();
+      msgF(n?`<span style="color:var(--ok)">Ho compilato ${n} ${n===1?"campo":"campi"}.</span> ${dubbio?'<b style="color:var(--warn)">Controlla targa e telaio: la foto non era nitida.</b>':(nuovo?"Controlla i dati prima di registrare.":"Controlla i dati e tocca Salva.")}`:"Nella foto non ho trovato dati nuovi da inserire.");};
+    if($("u_bLib"))$("u_bLib").onclick=()=>$("u_fLib").click();$("u_bStato").onclick=()=>$("u_fStato").click();
     $("u_fLib").onchange=e=>{leggiU([...e.target.files]);e.target.value="";};$("u_fStato").onchange=e=>{leggiU([...e.target.files]);e.target.value="";};
   }
   if(nuovo&&$("u_parse"))$("u_parse").onclick=()=>{const d=leggiMail($("u_mail").value);let n=0;
@@ -1272,7 +1274,7 @@ const canCreaConsegna=()=>ha(...GEST);
 const canAppConsegna=()=>ha(...GEST,"productexpert");
 const canPrepConsegna=()=>ha(...GEST,"officina","movimentatore","ripristini","preparatore");
 const canConsegnata=()=>ha(...GEST,"venditore","productexpert");
-const canImpegni=()=>ha(...GEST,"productexpert");
+const canImpegni=()=>ha(...GEST,"productexpert","venditore");
 const canImpTutti=()=>ha(...GEST);
 const vedeImpegni=()=>ha(...GEST,"venditore","productexpert","bdc");
 const FORZA=["venditore","productexpert","usato","backoffice","admin","bdc"];
@@ -1580,7 +1582,7 @@ async function cercaArchivio(){
   if(us.length)h+=`<h3 class="ugrp">Lavorazione usato</h3>`+us.map(([id,u])=>{const t=totali(u);return`<div class="card" style="grid-template-columns:1fr"><span><b>${esc(u.targa||"")}</b> · ${esc(u.modello||"")} · ${esc(NOME_STATO[u.stato]||"")}${u.deleted?` · <span style="color:var(--bad)">eliminata il ${esc(u.deletedAt||"")}</span>`:""}</span>
     <span class="uinfo">${STATI_U.filter(([k])=>(u.date||{})[k]).map(([k,l])=>`${l}: ${new Date(u.date[k]).toLocaleDateString("it-IT")}`).join(" · ")}</span>
     <span class="uinfo">Ripristini stimati ${euro(t.s)}${t.hasE?` · effettivi ${euro(t.e)}`:""}</span>
-    <span class="keys">${u.deleted?(isAdmin()?`<button type="button" data-ripristina="${esc(id)}">Ripristina scheda</button>`:""):`<button type="button" data-apriu="${esc(id)}">Apri scheda</button>`}</span></div>`;}).join("");
+    <span class="keys">${u.deleted?(ha(...GEST)?`<button type="button" data-ripristina="${esc(id)}">Ripristina scheda</button>`:""):`<button type="button" data-apriu="${esc(id)}">Apri scheda</button>`}</span></div>`;}).join("");
   if(cs.length)h+=`<h3 class="ugrp">Consegne</h3>`+cs.map(([,c])=>cardC(Object.assign({},c,{id:[...C.docs.entries()].find(([,x])=>x===c)[0]}))).join("");
   if(st.length)h+=`<h3 class="ugrp">Storico chiavi</h3>`+st.sort((a,b)=>String(b.uscita).localeCompare(String(a.uscita))).map(x=>`<div class="card" style="grid-template-columns:1fr"><span><b>${esc(LETT[x.colore]||"")}.${esc(x.numero)}</b> · ${esc(x.modello||"")} · ${esc(x.targa||"")} · uscita ${x.uscita?new Date(x.uscita).toLocaleDateString("it-IT"):""}</span><span class="uinfo">${esc(x.motivoUscita||"")}${x.telaio?" · "+esc(x.telaio):""}${x.dovePrima?" · prima chiave era in "+esc(x.dovePrima):""}</span></div>`).join("");
   if(mv.length)h+=`<h3 class="ugrp">Movimenti</h3><div class="log">`+mv.map(l=>{const d=new Date(l.ts);return`<div><span><b>${esc(l.codice)}</b> · ${esc(l.azione)}${l.dettaglio?" — "+esc(l.dettaglio):""}</span><span class="meta">${esc(l.nome||l.email||"")} · ${d.toLocaleDateString("it-IT")} ${d.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})}</span></div>`;}).join("")+`</div>`;
