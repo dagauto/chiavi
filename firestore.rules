@@ -1,7 +1,8 @@
 rules_version = '2';
 // Regole di sicurezza del registro chiavi e della lavorazione usato Dag Auto.
 // Entra solo chi ha verificato la propria email ED è presente nell'elenco "utenti".
-// Ruoli: admin, backoffice, usato (responsabile usato), venditore (product expert), officina, ripristini, foto, operatore.
+// Ruoli: admin, backoffice, usato (responsabile usato), productexpert, venditore, movimentatore, officina,
+// ripristini, preparatore, foto, operatore (solo chiavi).
 // Il carico fiscale (usato_riservato) lo vedono solo admin, backoffice e usato.
 // Lo storico movimenti si può solo aggiungere: nessuno può modificarlo o cancellarlo.
 service cloud.firestore {
@@ -27,21 +28,49 @@ service cloud.firestore {
     function vedeFiscale() {
       return autorizzato() && ruolo() in ["admin", "backoffice", "usato"];
     }
-
-    match /chiavi/{id} {
-      allow read: if autorizzato();
-      allow create, update: if autorizzato()
-        && request.resource.data.colore in ["BLU", "ROSSO", "VERDE"]
+    function gestione() {
+      return autorizzato() && ruolo() in ["admin", "backoffice", "usato"];
+    }
+    function vuota(d) {
+      return d.get("telaio", "") == "" && d.get("targa", "") == "" && d.get("modello", "") == "";
+    }
+    function chiaveValida() {
+      return request.resource.data.colore in ["BLU", "ROSSO", "VERDE"]
         && request.resource.data.numero is int
         && request.resource.data.numero >= 1 && request.resource.data.numero <= 100
         && request.resource.data.updatedBy == emailUtente();
+    }
+    function cambia() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+    function statoIn(l) {
+      return request.resource.data.get("stato", "") == resource.data.get("stato", "") || request.resource.data.get("stato", "") in l;
+    }
+
+    // Tutti inseriscono vetture e lavorano sulle chiavi. Liberare il numero (vettura uscita): solo gestione e venditori.
+    // Venditori e product expert su una vettura presente possono solo spostarla.
+    match /chiavi/{id} {
+      allow read: if autorizzato();
+      allow create: if autorizzato() && chiaveValida();
+      allow update: if autorizzato() && chiaveValida()
+        && (vuota(resource.data) || !vuota(request.resource.data) || ruolo() in ["admin", "backoffice", "usato", "venditore", "productexpert"])
+        && (!(ruolo() in ["venditore", "productexpert", "bdc"]) || vuota(resource.data) || vuota(request.resource.data)
+            || cambia().hasOnly(["dovePrima", "prima", "noleggioDal", "noleggioCliente", "ripristino", "ripristinoTipo", "ripristinoDove", "ripristinoDal", "updatedAt", "updatedBy"]));
       allow delete: if admin();
     }
 
     match /usato/{id} {
       allow read: if lavoraUsato();
       allow create: if vedeFiscale() && request.resource.data.updatedBy == emailUtente();
-      allow update: if lavoraUsato() && request.resource.data.updatedBy == emailUtente();
+      // Gestione: tutto. Officina e ripristini: voci e stati «in ripristino» / «pronta».
+      // Movimentatore, foto, venditori: solo lo stato, ognuno i suoi.
+      allow update: if lavoraUsato() && request.resource.data.updatedBy == emailUtente()
+        && (gestione()
+          || (ruolo() in ["officina", "ripristini"] && statoIn(["ripristino", "pronta"]))
+          || (cambia().hasOnly(["stato", "date", "updatedAt", "updatedBy"])
+              && ((ruolo() == "movimentatore" && statoIn(["ripristino", "pronta", "foto"]))
+                || (ruolo() == "foto" && statoIn(["foto"]))
+                || (ruolo() in ["venditore", "productexpert"] && statoIn(["pubblicata"])))));
       allow delete: if admin();
     }
 
@@ -52,14 +81,23 @@ service cloud.firestore {
 
     match /consegne/{id} {
       allow read: if lavoraUsato();
-      allow create: if autorizzato() && ruolo() in ["admin", "backoffice", "usato", "venditore"]
-        && request.resource.data.updatedBy == emailUtente();
+      allow create: if gestione() && request.resource.data.updatedBy == emailUtente();
       allow update: if lavoraUsato() && request.resource.data.updatedBy == emailUtente();
       allow delete: if admin();
     }
 
+    // Impegni / appuntamenti: li vedono gestione e venditori; li scrivono il product expert (i suoi) e la gestione.
+    match /impegni/{id} {
+      allow read: if autorizzato() && ruolo() in ["admin", "backoffice", "usato", "venditore", "productexpert", "bdc"];
+      allow create: if autorizzato() && request.resource.data.updatedBy == emailUtente()
+        && ((ruolo() == "productexpert" && request.resource.data.email == emailUtente()) || gestione());
+      allow update: if autorizzato() && request.resource.data.updatedBy == emailUtente()
+        && ((ruolo() == "productexpert" && resource.data.email == emailUtente() && request.resource.data.email == emailUtente()) || gestione());
+      allow delete: if autorizzato() && ((ruolo() == "productexpert" && resource.data.email == emailUtente()) || gestione());
+    }
+
     match /storico/{id} {
-      allow read: if lavoraUsato();
+      allow read: if gestione();
       allow create: if autorizzato();
       allow update, delete: if admin();
     }
