@@ -16,6 +16,7 @@ const EVENTI = {
   consegna_fissata: ["officina", "movimentatore", "preparatore", "backoffice"],
   consegna_24h: ["officina", "movimentatore", "preparatore", "backoffice", "admin"],
   consegna_pronta: ["productexpert", "backoffice"],
+  consegna_scadenze: ["officina", "backoffice"],
   usato_presa: ["usato", "admin"],
   usato_attesa: ["ripristini", "officina"],
   usato_pronta: ["foto", "movimentatore"],
@@ -141,8 +142,47 @@ async function controllo24h() {
   }
 }
 
+// Bollo / revisione scaduti alla data di consegna (dalla scheda usato con la stessa targa o telaio).
+const norm = (s) => String(s ?? "").toUpperCase().replace(/[\s\-.]/g, "");
+function scadData(s) {
+  s = String(s || "").trim(); let m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
+  if ((m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/))) { let y = +m[3]; if (y < 100) y += 2000; return `${y}-${String(m[2]).padStart(2, "0")}-${String(m[1]).padStart(2, "0")}`; }
+  if ((m = s.match(/^(\d{1,2})[/.-](\d{4})$/))) { const y = +m[2], mo = +m[1]; return `${y}-${String(mo).padStart(2, "0")}-${String(new Date(y, mo, 0).getDate()).padStart(2, "0")}`; }
+  return "";
+}
+async function controlloScadenze() {
+  const snap = await db.collection("consegne").where("stato", "in", ["fissata", "richiesta"]).get();
+  const daFare = snap.docs.filter((d) => !d.data().avvisoScad);
+  if (!daFare.length) return;
+  const usati = (await db.collection("usato").get()).docs.map((d) => d.data()).filter((u) => !u.deleted);
+  const oggi = new Date().toISOString().slice(0, 10);
+  for (const doc of daFare) {
+    const c = doc.data();
+    const t = norm(c.targa), v = norm(c.telaio);
+    const u = usati.find((x) => (t && norm(x.targa) === t) || (v && norm(x.telaio) === v));
+    if (!u) continue;
+    const rif = c.data || oggi;
+    const sc = [["scadBollo", "bollo scaduto"], ["scadRevisione", "revisione scaduta"]]
+      .map(([k, l]) => [l, scadData(u[k])]).filter(([, d]) => d && d < rif)
+      .map(([l, d]) => `${l} il ${d.split("-").reverse().join("/")}`);
+    if (!sc.length) continue;
+    const sigla = `${{ BLU: "N", ROSSO: "U", VERDE: "V" }[c.colore] || "?"}.${c.numero}`;
+    await db.collection("notifiche_coda").add({
+      evento: "consegna_scadenze",
+      titolo: `Consegna ${sigla}: ${sc.join(", ")}`,
+      testo: `${c.cliente || "Cliente"} · ${c.targa || c.modello || ""}${c.data ? " · consegna il " + c.data.split("-").reverse().join("/") : ""}. Da rinnovare prima della consegna.`,
+      link: "#consegne",
+      inviata: false,
+      ts: Date.now(),
+    });
+    await doc.ref.update({ avvisoScad: true });
+  }
+}
+
 functions.cloudEvent("elabora", async () => {
   await controllo24h();
+  try { await controlloScadenze(); } catch (e) { console.error("Controllo scadenze", e); }
   const q = await db.collection("notifiche_coda").where("inviata", "==", false).limit(50).get();
   for (const d of q.docs) {
     try {
