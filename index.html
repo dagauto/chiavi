@@ -377,6 +377,7 @@ const CORTO={BLU:"Blu",ROSSO:"Rosse",VERDE:"Verdi"};
 const SING={BLU:"Blu",ROSSO:"Rossa",VERDE:"Verde"};
 const LETT={BLU:"N",ROSSO:"U",VERDE:"V"};const LETT_OLD={BLU:"B",ROSSO:"R",VERDE:"V"};
 const LUOGHI=["Salone","Officina","Garage","Cimitero","Bel Sito"];
+const FUORI="Fuori a noleggio";
 const RETRO="retro cassaforte salone";
 const TIPI_RIP=["Danni di trasporto","Meccanica","Carrozzeria","Sanificazione","Altro"];
 const DT="Danni di trasporto";
@@ -582,6 +583,7 @@ function filtered(){
       case"liberi":return st==="LIBERO";
       case"daverif":return st==="Non censito"||st==="Da controllare";
       case"rip":return inRip(s)||inAtt(s);
+      case"noleggio":return occupato(s)&&s.dovePrima===FUORI;
       case"vendute":return occupato(s)&&s.venduta==="Sì";
       case"esposizione":return occupato(s)&&s.esposizione==="Sì";
     }return true;
@@ -595,7 +597,7 @@ function chipRow(el,items,cur,onPick,lbl){
 }
 function renderFilters(){
   chipRow($("fColore"),[[null,"Tutti i colori"],...COLORI.map(c=>[c,CORTO[c],"c-"+c])],S.col,v=>{S.col=v;render();});
-  chipRow($("fStato"),[["incasa","In casa"],["avvisi","Con avvisi"],["una","Una sola chiave"],["rip","Ripristino / in attesa"],["vendute","Già vendute"],["esposizione","Conto esposizione"],["liberi","Numeri liberi"],["daverif","Da censire"]],S.stato,v=>{S.stato=v||"incasa";render();});
+  chipRow($("fStato"),[["incasa","In casa"],["avvisi","Con avvisi"],["una","Una sola chiave"],["rip","Ripristino / in attesa"],["noleggio","Fuori a noleggio"],["vendute","Già vendute"],["esposizione","Conto esposizione"],["liberi","Numeri liberi"],["daverif","Da censire"]],S.stato,v=>{S.stato=v||"incasa";render();});
   chipRow($("fLuogo"),[[null,"Ovunque"],...LUOGHI.map(l=>[l,l]),["RETRO","Seconde · retro salone"]],S.luogo,v=>{S.luogo=v;render();},"Prima chiave in:");
 }
 function renderSummary(){
@@ -606,7 +608,7 @@ function renderSummary(){
   }).join("");
 }
 function keyPills(s){
-  const p=s.prima==="Sì"?`<span class="kp"><strong>1ª</strong> ${esc(s.dovePrima||"dove?")}</span>`:s.prima==="No"?`<span class="kp miss"><strong>1ª</strong> manca</span>`:`<span class="kp"><strong>1ª</strong> da controllare</span>`;
+  const p=s.prima==="Sì"?`<span class="kp"><strong>1ª</strong> ${esc(s.dovePrima===FUORI?FUORI+(s.noleggioDal?" · "+ggTesto(s.noleggioDal):""):(s.dovePrima||"dove?"))}</span>`:s.prima==="No"?`<span class="kp miss"><strong>1ª</strong> manca</span>`:`<span class="kp"><strong>1ª</strong> da controllare</span>`;
   const q=s.seconda==="Sì"?`<span class="kp"><strong>2ª</strong> retro salone</span>`:s.seconda==="No"?`<span class="kp miss"><strong>2ª</strong> manca</span>`:`<span class="kp"><strong>2ª</strong> da controllare</span>`;
   return p+q;
 }
@@ -651,10 +653,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)
 const erroreScrittura=e=>e&&String(e.code||"").includes("permission")?"Non hai il permesso di fare questa modifica.":"Salvataggio non riuscito. Controlla la connessione e riprova.";
 
 /* =================== Scheda vettura =================== */
-const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["venduta","Venduta"],["cliente","Cliente"],["esposizione","Conto esposizione"],["esposizioneDal","In conto esposizione dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
+const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["noleggioDal","Fuori a noleggio dal"],["venduta","Venduta"],["cliente","Cliente"],["esposizione","Conto esposizione"],["esposizioneDal","In conto esposizione dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
 function openEditor(id,assegna){
   const base=slots().find(s=>s.id===id);if(!base)return;
-  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",venduta:"",cliente:"",esposizione:"",esposizioneDal:"",attesa:"",attesaDal:"",danni:"",controllatoDa:"",dataControllo:"",note:""},base);
+  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",noleggioDal:"",venduta:"",cliente:"",esposizione:"",esposizioneDal:"",attesa:"",attesaDal:"",danni:"",controllatoDa:"",dataControllo:"",note:""},base);
   const libero=!occupato(base);
   if(assegna&&libero){f.prima="Sì";f.dovePrima="Salone";f.seconda=base.colore==="BLU"?"Sì":"";f.dataControllo=oggi();f.controllatoDa=S.me.nome;}
   const seg=k=>`<span class="seg" data-k="${k}">${["Sì","No"].map(v=>`<button type="button" data-v="${v}" aria-pressed="${f[k]===v}">${v}</button>`).join("")}</span>`;
@@ -665,7 +667,7 @@ function openEditor(id,assegna){
       <label class="f">Modello<input id="e_modello" value="${esc(f.modello)}" autocomplete="off"></label>
     </div>
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
-    <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
+    <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI]).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
     <div class="keybox"><h4><span>Già venduta<br><span class="small">vettura nuova arrivata già venduta a un cliente</span></span> ${seg("venduta")}</h4>
       <div id="e_venbox" ${f.venduta==="Sì"?"":"hidden"}><label class="f" style="margin-top:8px">Cliente (facoltativo)<input id="e_cliente" value="${esc(f.cliente||"")}" autocomplete="off"></label></div></div>
@@ -692,6 +694,7 @@ function openEditor(id,assegna){
   ed.addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(!b)return;const k=b.parentElement.dataset.k;f[k]=f[k]===b.dataset.v?"":b.dataset.v;press(k);
     if(k==="prima"&&f.prima!=="Sì"){f.dovePrima="";press("dovePrima");}
     if(k==="dovePrima"&&f.dovePrima){f.prima="Sì";press("prima");}
+    if(k==="dovePrima")f.noleggioDal=f.dovePrima===FUORI?(base.dovePrima===FUORI&&base.noleggioDal?base.noleggioDal:oggi()):"";
     if(k==="venduta"){$("e_venbox").hidden=f.venduta!=="Sì";}
     if(k==="esposizione"){if(f.esposizione==="Sì"){if(!f.esposizioneDal)f.esposizioneDal=oggi();}else f.esposizioneDal="";}
     if(k==="attesa"){$("e_attbox").hidden=f.attesa!=="Sì";if(f.attesa==="Sì"){if(!f.attesaDal)f.attesaDal=oggi();}else f.attesaDal="";}
@@ -933,7 +936,7 @@ $("fileImport").onchange=async e=>{
 };
 $("btnExport").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
-  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Seconda chiave":s.seconda||"","Stato":stato(s),"In ripristino":s.ripristino||"","Lavoro ripristino":s.ripristinoTipo||"","Dove ripristino":s.ripristinoDove||"","Venduta":s.venduta||"","Cliente":s.cliente||"","Conto esposizione":s.esposizione||"","In esposizione dal":s.esposizioneDal||"","Giorni esposizione":s.esposizione==="Sì"&&s.esposizioneDal?giorniDa(s.esposizioneDal):"","In attesa di ripristino":s.attesa||"","Danni di trasporto":s.danni||"","In ripristino dal":s.ripristinoDal||"","Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
+  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Fuori a noleggio dal":s.dovePrima===FUORI?(s.noleggioDal||""):"","Seconda chiave":s.seconda||"","Stato":stato(s),"In ripristino":s.ripristino||"","Lavoro ripristino":s.ripristinoTipo||"","Dove ripristino":s.ripristinoDove||"","Venduta":s.venduta||"","Cliente":s.cliente||"","Conto esposizione":s.esposizione||"","In esposizione dal":s.esposizioneDal||"","Giorni esposizione":s.esposizione==="Sì"&&s.esposizioneDal?giorniDa(s.esposizioneDal):"","In attesa di ripristino":s.attesa||"","Danni di trasporto":s.danni||"","In ripristino dal":s.ripristinoDal||"","Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
   const ws=XLSX.utils.json_to_sheet(rows);ws["!cols"]=[9,9,10,20,11,18,11,12,12,16,11,14,20,13,30,30,14,13,30].map(w=>({wch:w}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Censimento");
   const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
@@ -1289,7 +1292,7 @@ function cardC(c){
   const[k,l]=semaforo(c);const m=mancanti(c);
   return`<button class="card ccard" data-c="${esc(c.id)}">
     <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
-    <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio</span>':""}</span>
+    <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio breve</span>':c.tipo==="lungo"?'<span class="pill p-Doppia">Noleggio lungo</span>':""}</span>
       <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`PE ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
       <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
 }
@@ -1362,7 +1365,7 @@ function openConsegna(id){
       <div id="c_vett" class="small"></div>
       <div class="grid2"><label class="f">Targa<input class="mono" id="c_targa" value="${esc(f.targa||"")}" placeholder="vuota se da targare" autocomplete="off"></label>
       <label class="f">Telaio<input class="mono" id="c_telaio" value="${esc(f.telaio||"")}" placeholder="17 caratteri" maxlength="24" autocomplete="off"></label></div>
-      <div class="grid2"><label class="f">Tipo<select id="c_tipo" ${ro}><option value="vendita" ${f.tipo==="vendita"?"selected":""}>Vendita</option><option value="noleggio" ${f.tipo==="noleggio"?"selected":""}>Noleggio</option></select></label></div></div>
+      <div class="grid2"><label class="f">Tipo<select id="c_tipo" ${ro}><option value="vendita" ${f.tipo==="vendita"?"selected":""}>Vendita</option><option value="noleggio" ${f.tipo==="noleggio"?"selected":""}>Noleggio breve</option><option value="lungo" ${f.tipo==="lungo"?"selected":""}>Noleggio lungo termine</option></select></label></div></div>
     <div class="grid2"><label class="f">Cliente<input id="c_cliente" value="${esc(f.cliente||"")}" ${ro}></label>
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
     <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&S.me.ruolo==="venditore"?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
@@ -1448,15 +1451,17 @@ function openConsegna(id){
   const an=$("c_annulla");if(an)an.onclick=()=>{if(!an.dataset.armed){an.dataset.armed="1";an.textContent="Conferma: annulla la consegna";return;}leggi();f.stato="annullata";f.date.annullata=oggi();salvaC([{col:"consegne",id,data:f}],[{codice:etich(f),azione:"Consegna annullata",dettaglio:f.cliente||""}],"Consegna annullata.");};
   const dn=$("c_done");if(dn)dn.onclick=()=>{
     if(!dn.dataset.armed){dn.dataset.armed="1";dn.classList.add("solid");dn.textContent="Conferma consegna";
-      if(f.tipo==="vendita")$("e_err").innerHTML=`<div class="banner">Alla conferma il numero ${esc(etich(f))} si libera nel registro chiavi.</div>`;return;}
+      const tp=$("c_tipo")?$("c_tipo").value:f.tipo;
+      $("e_err").innerHTML=tp==="noleggio"?`<div class="banner">Noleggio breve: alla conferma la prima chiave risulta «${FUORI}» e il numero ${esc(etich(f))} resta occupato.</div>`:`<div class="banner">Alla conferma il numero ${esc(etich(f))} si libera nel registro chiavi.</div>`;return;}
     leggi();f.stato="consegnata";f.date.consegnata=oggi();
     const w=[{col:"consegne",id,data:f}],logs=[{codice:etich(f),azione:"Consegnata",dettaglio:[f.cliente,f.targa].filter(Boolean).join(" · ")}];
     const s=slot(f.colore,f.numero);
-    if(f.tipo==="vendita"&&occupato(s)&&(!f.telaio||norm(s.telaio)===norm(f.telaio))){
+    if((f.tipo==="vendita"||f.tipo==="lungo")&&occupato(s)&&(!f.telaio||norm(s.telaio)===norm(f.telaio))){
       const snap=Object.assign({},s);delete snap._has;delete snap.id;snap.uscita=oggi();snap.motivoUscita=`Consegnata a ${f.cliente||"cliente"}`;snap.refs=[norm(s.targa||f.targa),norm(s.telaio||f.telaio)].filter(Boolean);
       w.push({col:"chiavi",id:s.id,data:{colore:f.colore,numero:f.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:`${s.id}-${Date.now().toString(36)}`,data:snap});
       logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Numero liberato",dettaglio:`consegnata a ${f.cliente||"cliente"}`});}
-    else if(f.tipo==="noleggio"&&occupato(s))logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Uscita a noleggio",dettaglio:f.cliente||""});
+    else if(f.tipo==="noleggio"&&occupato(s)){w.push({col:"chiavi",id:s.id,merge:true,data:{colore:f.colore,numero:f.numero,prima:"Sì",dovePrima:FUORI,noleggioDal:oggi(),noleggioCliente:f.cliente||""}});
+      logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Uscita a noleggio breve",dettaglio:`prima chiave con ${f.cliente||"il cliente"}, seconda in cassaforte`});}
     salvaC(w,logs,"Consegna registrata.");
   };
 }
