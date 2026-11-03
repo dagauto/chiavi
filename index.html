@@ -1029,7 +1029,7 @@ function listaU(){
   const q=norm(U.q);
   return [...U.docs.entries()].map(([id,d])=>Object.assign({id},d)).filter(u=>{
     if(q)return [u.targa,u.telaio,u.modello,u.chiave,u.venditore].some(v=>norm(v).includes(q));
-    if(U.stato==="vendita")return IN_VENDITA.includes(u.stato);
+    if(U.stato==="vendita")return inVendita(u);
     if(U.stato)return u.stato===U.stato;
     return u.stato!=="pubblicata";
   }).filter(u=>!u.deleted).sort((a,b)=>{
@@ -1043,7 +1043,7 @@ function listaU(){
 function renderUsato(){
   if(!canUsato())return;
   const all=[...U.docs.values()].filter(u=>!u.deleted);
-  chipRow($("uStato"),[[null,"Da lavorare"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`]),["vendita",`Disponibili alla vendita · ${all.filter(u=>IN_VENDITA.includes(u.stato)).length}`]],U.stato,v=>{U.stato=v;renderUsato();});
+  chipRow($("uStato"),[[null,"Da lavorare"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`]),["vendita",`Disponibili alla vendita · ${all.filter(inVendita).length}`]],U.stato,v=>{U.stato=v;renderUsato();});
   const pub=all.filter(u=>giorniTot(u)!=null),media=pub.length?Math.round(pub.reduce((a,u)=>a+giorniTot(u),0)/pub.length):null;
   const aperte=all.filter(u=>u.stato!=="pubblicata");let ts=0,te=0;aperte.forEach(u=>{const t=totali(u);ts+=t.s;te+=t.e;});
   $("uSummary").innerHTML=`<div class="sum"><h3>APERTE</h3><dl><dt>Vetture</dt><dd>${aperte.length}</dd><dt>Priorità alta</dt><dd>${aperte.filter(u=>u.priorita==="alta").length}</dd></dl></div>
@@ -1121,10 +1121,10 @@ function repCitnow(u){if(!u)return["10653","10652"];const mb=/MERCEDES/i.test(u.
   const imm=dataImm(u.immatricolazione),km=num(u.km);if(!imm||km==="")return["10653","10652"];const lim=new Date(imm);lim.setFullYear(lim.getFullYear()+6);return lim>new Date()&&km<=150000?["10652"]:["10653"];}
 const usatoTarga=targa=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return null;for(const d of U.docs.values())if(!d.deleted&&String(d.targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"")===t)return d;return null;};
 const fotoTarga=targa=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return false;for(const d of U.docs.values())if(String(d.targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"")===t&&fotoOk(d.stato))return true;return false;};
-const citBox=(targa,u)=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return"";const reps=repCitnow(u);const b=(rep,l)=>`<a class="btn" role="button" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" data-cit="${esc(t)}" href="${citnow(t,rep)}">${l}</a>`;
+const citBox=(targa,u)=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return"";const reps=repCitnow(u);const b=(rep,l)=>`<a class="btn" role="button" style="text-align:center;text-decoration:none" target="citnow" data-cit="${esc(t)}" href="${citnow(t,rep)}">${l}</a>`;
   return`<div class="keybox"><h4>Foto CitNOW <span class="small">si aprono nel portale CitNOW</span></h4><div class="${reps.length>1?"grid2":""}">${reps.map(r=>b(r,r==="10652"?"Foto MB Certified":"Foto DAG Used")).join("")}</div>
-  <div class="small cit-msg">Premendo il pulsante la targa viene copiata: se CitNOW non apre la vettura, incollala nella sua ricerca.</div></div>`;};
-document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[data-cit]");if(!a)return;try{navigator.clipboard&&navigator.clipboard.writeText(a.dataset.cit).catch(()=>{});}catch(_){}const m=a.closest(".keybox")&&a.closest(".keybox").querySelector(".cit-msg");if(m)m.innerHTML=`Targa <b>${esc(a.dataset.cit)}</b> copiata: se CitNOW non apre la vettura, incollala nella sua ricerca.`;});
+  <div class="small cit-msg">Se CitNOW apre il login o la pagina generica: accedi spuntando «Salvare le credenziali?», torna qui e premi di nuovo il pulsante. La targa viene anche copiata, per incollarla nella ricerca di CitNOW.</div></div>`;};
+document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[data-cit]");if(!a)return;try{navigator.clipboard&&navigator.clipboard.writeText(a.dataset.cit).catch(()=>{});}catch(_){}const m=a.closest(".keybox")&&a.closest(".keybox").querySelector(".cit-msg");if(m)m.innerHTML=`Targa <b>${esc(a.dataset.cit)}</b> copiata. Se CitNOW mostra il login o la pagina generica, accedi (spunta «Salvare le credenziali?»), torna qui e premi di nuovo il pulsante.`;});
 function openUsato(id){
   const nuovo=!id;
   const base=nuovo?{stato:"presa",priorita:"normale",marca:"MERCEDES",date:{presa:oggi()},voci:{}}:Object.assign({},U.docs.get(id));
@@ -1257,6 +1257,8 @@ function openUsato(id){
     catch(x){$("e_save").disabled=false;$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}
   };
 }
+// Disponibile alla vendita: da «pronta» in poi e con il prezzo di vendita inserito.
+function inVendita(u){return IN_VENDITA.includes(u.stato)&&!!u.prezzoVendita&&parseFloat(String(u.prezzoVendita).replace(',','.'))>0;}
 $("uList").addEventListener("click",e=>{const b=e.target.closest("[data-u]");if(b)openUsato(b.dataset.u);});
 // Copia «IVA esposta» dal carico fiscale alla scheda usato, perché i venditori la vedano (solo il dato Sì/No, non il valore).
 let ivaFatta=false;
