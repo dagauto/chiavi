@@ -293,6 +293,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
     <button id="btnNew">Primo numero libero</button>
     <button id="btnExport">Esporta Excel</button>
     <button id="btnExportU" hidden>Esporta Excel usato</button>
+    <button id="btnTracciato" hidden>Esporta tracciato Dettaglio Usato</button>
     <button id="btnExportC" hidden>Esporta Excel consegne</button>
     <button id="btnImport" hidden>Importa Excel</button>
     <button id="btnUsers" hidden>Utenti</button>
@@ -572,7 +573,10 @@ const ggTesto=d=>d?(giorniDa(d)===0?"da oggi":giorniDa(d)===1?"da ieri":`da ${gi
 const espTesto=s=>["Conto esposizione",ggTesto(s.esposizioneDal)].filter(Boolean).join(" · ");
 const attTesto=s=>["In attesa di ripristino",DT,s.danni].filter(Boolean).join(" · ")+(s.attesaDal?(giorniDa(s.attesaDal)===0?" · da oggi":giorniDa(s.attesaDal)===1?" · da ieri":` · da ${giorniDa(s.attesaDal)} giorni`):"");
 const giorniDa=d=>{if(!d)return 0;return Math.max(0,Math.round((new Date(oggi())-new Date(d))/864e5));};
-const ripTesto=s=>["In ripristino",s.ripristinoTipo,s.ripristinoDove].filter(Boolean).join(" · ")+(s.ripristinoDal?(giorniDa(s.ripristinoDal)===0?" · da oggi":giorniDa(s.ripristinoDal)===1?" · da ieri":` · da ${giorniDa(s.ripristinoDal)} giorni`):"");
+// Giorni lavorativi (sabato e domenica esclusi): usati solo per il ripristino.
+const giorniLav=d=>{if(!d)return 0;const t=new Date(String(d).slice(0,10)+"T12:00:00"),fine=new Date(oggi()+"T12:00:00");if(isNaN(t))return 0;let n=0;while(t<fine){t.setDate(t.getDate()+1);const g=t.getDay();if(g!==0&&g!==6)n++;}return n;};
+const lavTxt=n=>n===0?"da oggi":n===1?"da 1 giorno lavorativo":`da ${n} giorni lavorativi`;
+const ripTesto=s=>["In ripristino",s.ripristinoTipo,s.ripristinoDove].filter(Boolean).join(" · ")+(s.ripristinoDal?" · "+lavTxt(giorniLav(s.ripristinoDal)):"");
 const codice=s=>`${LETT[s.colore]}.${s.numero}`;
 function primoLibero(c,esclusi){return slots().find(s=>s.colore===c&&stato(s)==="LIBERO"&&!(esclusi||[]).includes(s.numero));}
 function telaioUsato(t,eccetto){if(!t)return null;const n=norm(t);return slots().find(s=>s.id!==eccetto&&s._has&&norm(s.telaio)===n)||null;}
@@ -680,7 +684,7 @@ function openEditor(id,assegna){
       <label class="f">Modello<input id="e_modello" value="${esc(f.modello)}" autocomplete="off"></label>
     </div>
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
-    ${base.colore==="ROSSO"&&!libero&&fotoTarga(f.targa)?citBox(f.targa):""}
+    ${base.colore==="ROSSO"&&!libero&&fotoTarga(f.targa)?citBox(f.targa,usatoTarga(f.targa)):""}
     <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI]).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
     <div class="keybox"><h4><span>Già venduta<br><span class="small">vettura nuova arrivata già venduta a un cliente</span></span> ${seg("venduta")}</h4>
@@ -745,7 +749,7 @@ function openEditor(id,assegna){
     const logs=[];
     if(!inAtt(base)&&data.attesa==="Sì"&&data.ripristino!=="Sì")logs.push({codice:codice(base),azione:"In attesa di ripristino",dettaglio:[DT,data.danni].filter(Boolean).join(" · ")});
     if(rIn)logs.push({codice:codice(base),azione:"In ripristino",dettaglio:[data.ripristinoTipo,data.ripristinoDove].filter(Boolean).join(" · ")});
-    if(rOut)logs.push({codice:codice(base),azione:"Fine ripristino",dettaglio:base.ripristinoDal?`dopo ${giorniDa(base.ripristinoDal)} giorni`:""});
+    if(rOut)logs.push({codice:codice(base),azione:"Fine ripristino",dettaglio:base.ripristinoDal?`dopo ${giorniLav(base.ripristinoDal)} giorni lavorativi`:""});
     if(rMod)logs.push({codice:codice(base),azione:"Ripristino aggiornato",dettaglio:[data.ripristinoTipo,data.ripristinoDove].filter(Boolean).join(" · ")});
     if(diffs.length||!base._has)logs.push({codice:codice(base),azione:libero?"Assegnato":"Aggiornato",dettaglio:diffs.slice(0,4).join(" · ")});
     if(!logs.length){closeSheet();return;}
@@ -1001,6 +1005,9 @@ const canUsato=()=>!!S.me&&S.me.ruolo!=="operatore";
 const canFiscale=()=>ha(...GEST);
 const canVoci=()=>ha(...GEST,"officina","ripristini");
 const canExcel=()=>ha(...GEST,"officina");
+const canPrezzo=()=>ha(...GEST);
+const vedePrezzo=()=>ha(...GEST,"venditore","productexpert","bdc");
+const IN_VENDITA=["pronta","foto","pubblicata"];
 const canLibera=()=>ha(...GEST,"venditore","productexpert");
 const soloSposta=()=>ha("venditore","productexpert","bdc");
 const statiPermessi=()=>ha(...GEST)?STATI_U.map(([k])=>k):ha("officina","ripristini")?["ripristino","pronta"]:ha("movimentatore")?["ripristino","pronta","foto"]:ha("foto")?["foto"]:ha("venditore","productexpert")?["foto","pubblicata"]:[];
@@ -1009,7 +1016,8 @@ const euro=n=>(n===""||n==null||isNaN(n))?"—":Number(n).toLocaleString("it-IT"
 const num=v=>{if(v===""||v==null)return "";const n=parseFloat(String(v).replace(/\./g,"").replace(",",".").replace(/[^\d.\-]/g,""));return isNaN(n)?"":n;};
 const idU=(targa,telaio)=>norm(targa)||norm(telaio);
 function totali(u){let s=0,e=0,hasE=false;for(const[k]of VOCI){const v=(u.voci||{})[k]||{};if(v.stimato!==""&&v.stimato!=null)s+=Number(v.stimato)||0;if(v.effettivo!==""&&v.effettivo!=null){e+=Number(v.effettivo)||0;hasE=true;}}return{s,e,hasE};}
-function giorniStato(u){const d=(u.date||{})[u.stato];return d?giorniDa(d):null;}
+function giorniStato(u){const d=(u.date||{})[u.stato];return d?(u.stato==="ripristino"?giorniLav(d):giorniDa(d)):null;}
+const giorniTxtU=u=>{const g=giorniStato(u);return g==null?"":u.stato==="ripristino"?lavTxt(g):giorniTxt(g);};
 function giorniTot(u){const a=(u.date||{}).presa,b=(u.date||{}).pubblicata;if(!a||!b)return null;return Math.max(0,Math.round((new Date(b)-new Date(a))/864e5));}
 const plur=(n,a,b)=>n===1?a:b;
 const giorniTxt=n=>n==null?"":n===0?"da oggi":n===1?"da ieri":`da ${n} giorni`;
@@ -1018,6 +1026,7 @@ function listaU(){
   const q=norm(U.q);
   return [...U.docs.entries()].map(([id,d])=>Object.assign({id},d)).filter(u=>{
     if(q)return [u.targa,u.telaio,u.modello,u.chiave,u.venditore].some(v=>norm(v).includes(q));
+    if(U.stato==="vendita")return IN_VENDITA.includes(u.stato);
     if(U.stato)return u.stato===U.stato;
     return u.stato!=="pubblicata";
   }).filter(u=>!u.deleted).sort((a,b)=>{
@@ -1031,7 +1040,7 @@ function listaU(){
 function renderUsato(){
   if(!canUsato())return;
   const all=[...U.docs.values()].filter(u=>!u.deleted);
-  chipRow($("uStato"),[[null,"Da lavorare"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`])],U.stato,v=>{U.stato=v;renderUsato();});
+  chipRow($("uStato"),[[null,"Da lavorare"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`]),["vendita",`Disponibili alla vendita · ${all.filter(u=>IN_VENDITA.includes(u.stato)).length}`]],U.stato,v=>{U.stato=v;renderUsato();});
   const pub=all.filter(u=>giorniTot(u)!=null),media=pub.length?Math.round(pub.reduce((a,u)=>a+giorniTot(u),0)/pub.length):null;
   const aperte=all.filter(u=>u.stato!=="pubblicata");let ts=0,te=0;aperte.forEach(u=>{const t=totali(u);ts+=t.s;te+=t.e;});
   $("uSummary").innerHTML=`<div class="sum"><h3>APERTE</h3><dl><dt>Vetture</dt><dd>${aperte.length}</dd><dt>Priorità alta</dt><dd>${aperte.filter(u=>u.priorita==="alta").length}</dd></dl></div>
@@ -1049,7 +1058,7 @@ function renderUsato(){
       <span style="min-width:0">
         <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?'<span class="pill p-Solo-seconda">Priorità alta</span>':u.priorita==="bassa"?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
         <span class="uinfo">${[u.chiave?`Chiave U.${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
-        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${g!=null?`<span class="kp">${esc(giorniTxt(g))}</span>`:""}</span>
+        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
       </span></button>`;
   }
   $("uList").innerHTML=html||`<div class="empty"><p>Nessuna vettura in questa vista.</p></div>`;
@@ -1103,9 +1112,14 @@ function stampaPerizia(u){
 /* --- scheda usato --- */
 const citnow=(targa,rep)=>`https://portal.autoimaging.co.uk/Vehicles/DAG_Auto_SRL#/Portal/2169/published/vehicles/3980/${rep}/${encodeURIComponent(String(targa).toUpperCase().replace(/[^A-Z0-9]/g,""))}`;
 const fotoOk=st=>STATI_U.findIndex(([k])=>k===st)>=STATI_U.findIndex(([k])=>k==="foto");
+// MB Certified: solo Mercedes (non smart), meno di 6 anni dall'immatricolazione e massimo 150.000 km; le altre DAG Used.
+const dataImm=s=>{const d=scadData(s);if(d)return new Date(d+"T12:00:00");const m=String(s||"").match(/^(\d{4})$/);return m?new Date(+m[1],0,1):null;};
+function repCitnow(u){if(!u)return["10653","10652"];const mb=/MERCEDES/i.test(u.marca||"MERCEDES")&&!/^\s*smart/i.test(u.modello||"")&&!/smart/i.test(u.marca||"");if(!mb)return["10653"];
+  const imm=dataImm(u.immatricolazione),km=num(u.km);if(!imm||km==="")return["10653","10652"];const lim=new Date(imm);lim.setFullYear(lim.getFullYear()+6);return lim>new Date()&&km<=150000?["10652"]:["10653"];}
+const usatoTarga=targa=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return null;for(const d of U.docs.values())if(!d.deleted&&String(d.targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"")===t)return d;return null;};
 const fotoTarga=targa=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return false;for(const d of U.docs.values())if(String(d.targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"")===t&&fotoOk(d.stato))return true;return false;};
-const citBox=targa=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return"";const b=(rep,l)=>`<a class="btn" role="button" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" data-cit="${esc(t)}" href="${citnow(t,rep)}">${l}</a>`;
-  return`<div class="keybox"><h4>Foto CitNOW <span class="small">si aprono nel portale CitNOW</span></h4><div class="grid2">${b("10653","Foto DAG Used")}${b("10652","Foto MB Certified")}</div>
+const citBox=(targa,u)=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0-9]/g,"");if(!t)return"";const reps=repCitnow(u);const b=(rep,l)=>`<a class="btn" role="button" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" data-cit="${esc(t)}" href="${citnow(t,rep)}">${l}</a>`;
+  return`<div class="keybox"><h4>Foto CitNOW <span class="small">si aprono nel portale CitNOW</span></h4><div class="${reps.length>1?"grid2":""}">${reps.map(r=>b(r,r==="10652"?"Foto MB Certified":"Foto DAG Used")).join("")}</div>
   <div class="small cit-msg">Premendo il pulsante la targa viene copiata: se CitNOW non apre la vettura, incollala nella sua ricerca.</div></div>`;};
 document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[data-cit]");if(!a)return;try{navigator.clipboard&&navigator.clipboard.writeText(a.dataset.cit).catch(()=>{});}catch(_){}const m=a.closest(".keybox")&&a.closest(".keybox").querySelector(".cit-msg");if(m)m.innerHTML=`Targa <b>${esc(a.dataset.cit)}</b> copiata: se CitNOW non apre la vettura, incollala nella sua ricerca.`;});
 function openUsato(id){
@@ -1117,17 +1131,17 @@ function openUsato(id){
   const edDati=canPresa();
   const inp=(k,l,o={})=>`<label class="f">${l}<input id="u_${k}" ${o.mono?'class="mono"':""} ${o.type?`type="${o.type}"`:""} ${o.im?`inputmode="${o.im}"`:""} value="${esc(f[k]??"")}" ${edDati?"":"disabled"} autocomplete="off"></label>`;
   const p=openSheet(`<form class="panel" id="uf" novalidate role="dialog" aria-modal="true" aria-label="${nuovo?"Presa in carico":"Vettura usata"}">
-    <div class="phead"><div><h2>${nuovo?"Presa in carico":esc((f.targa||"")+" · "+(f.modello||""))}</h2><p>${nuovo?"Fotografa libretto e stato d'uso: la scheda si compila da sola. Controlla e registra.":`${esc(NOME_STATO[f.stato])} ${esc(giorniTxt(giorniStato(f)))}`}</p></div></div>
+    <div class="phead"><div><h2>${nuovo?"Presa in carico":esc((f.targa||"")+" · "+(f.modello||""))}</h2><p>${nuovo?"Fotografa libretto e stato d'uso: la scheda si compila da sola. Controlla e registra.":`${esc(NOME_STATO[f.stato])} ${esc(giorniTxtU(f))}`}</p></div></div>
     ${nuovo||canVoci()?`<div class="keybox"><h4>Foto dei documenti <span class="small">${nuovo?"la scheda si compila da sola":"aggiunge ripristini e danni della perizia"}</span></h4>
       <div class="grid2">${nuovo?`<button type="button" id="u_bLib">Foto del libretto</button>`:""}<button type="button" id="u_bStato">${nuovo?"Foto dello stato d'uso":"Foto della perizia"}</button></div>
       <input type="file" id="u_fLib" accept="image/*" capture="environment" hidden><input type="file" id="u_fStato" accept="image/*" multiple hidden>
       <div id="u_fmsg" class="small" style="margin-top:6px"></div></div>`:""}
-    ${!nuovo&&fotoOk(f.stato)?citBox(f.targa):""}
+    ${!nuovo&&fotoOk(f.stato)?citBox(f.targa,f):""}
     ${!nuovo?`<div class="keybox"><h4>Stato</h4><div class="places" data-k="stato">${STATI_U.map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}" ${statiPermessi().includes(k)||f.stato===k?"":"disabled"}>${l}</button>`).join("")}</div>
       <div class="small">${STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`).join(" · ")}</div></div>`:""}
     <div class="keybox"><h4>Priorità di ripristino <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
     <div class="grid2">${inp("targa","Targa",{mono:1})}${inp("modello","Modello")}</div>
-    ${inp("telaio","Telaio",{mono:1})}
+    <div class="grid2">${inp("marca","Marca")}${inp("telaio","Telaio",{mono:1})}</div>
     <div class="grid2">${inp("km","Km",{im:"numeric"})}${inp("chiave","N° chiave rossa (U)",{im:"numeric"})}</div>
     ${nuovo?`<div id="u_chmsg" class="small"></div>
     <div class="grid2"><label class="f">Prima chiave in<select id="u_dovePrima">${LUOGHI.map(l=>`<option>${l}</option>`).join("")}<option value="">Non c'è</option></select></label>
@@ -1135,6 +1149,9 @@ function openUsato(id){
     <div class="grid2">${inp("immatricolazione","Immatricolazione")}${inp("venditore","Venditore")}</div>
     <div class="grid2">${inp("scadBollo","Scadenza bollo (MM/AAAA)")}${inp("scadRevisione","Scadenza revisione (MM/AAAA)")}</div>
     <div class="grid2">${inp("exProprietario","Ex proprietario")}${inp("ritiroPermuta","Ritiro permuta su contratto")}</div>
+    ${!nuovo&&vedePrezzo()?`<div class="keybox"><h4>Vendita <span class="small">${canPrezzo()?"prezzo e margine li vedono anche i venditori":"inseriti dal back office"}</span></h4>
+      <div class="grid2"><label class="f">Prezzo di vendita (€)<input id="u_prezzoVendita" inputmode="decimal" value="${esc(f.prezzoVendita??"")}" ${canPrezzo()?"":"disabled"} autocomplete="off"></label>
+      <label class="f">Margine di trattativa<input id="u_margine" maxlength="2" placeholder="es. A, Ae" value="${esc(f.margine||"")}" ${canPrezzo()?"":"disabled"} autocomplete="off"></label></div></div>`:""}
     ${canFiscale()?`<div class="keybox fisc"><h4>Carico fiscale <span class="small">visibile solo ad amministratori, back office e responsabile usato</span></h4>
       <div class="grid2"><label class="f">Valore da contratto (€)<input id="u_valoreContratto" inputmode="decimal" value="${esc(r.valoreContratto)}"></label>
       <label class="f">IVA esposta<select id="u_ivaEsposta"><option value=""></option><option ${r.ivaEsposta==="Sì"?"selected":""}>Sì</option><option ${r.ivaEsposta==="No"?"selected":""}>No</option></select></label></div></div>`:""}
@@ -1178,6 +1195,7 @@ function openUsato(id){
       for(let i=0;i<files.length;i++){msgF(`Leggo la foto ${i+1} di ${files.length}…`);
         try{const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken(),"X-Firebase-AppCheck":S.store.appCheckToken?await S.store.appCheckToken():""},body:JSON.stringify({modo:"usato",immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
           if(!r.ok)throw new Error(r.status);const d=await r.json();
+          if(d.marca){const im=$("u_marca");if(im&&!im.disabled&&(!im.value.trim()||(nuovo&&/^MERCEDES$/i.test(im.value.trim())&&!/MERCEDES/i.test(d.marca)))){im.value=d.marca;n++;}}
           n+=metti("targa",d.targa)+metti("telaio",d.telaio)+metti("modello",d.modello)+metti("immatricolazione",d.immatricolazione)+metti("exProprietario",d.exProprietario)+metti("km",d.km);
           n+=aggiungi("u_danni",d.danni,", ");for(const a of d.accessori||[])n+=aggiungi("u_accdoc",a,"\n");n+=aggiungi("u_note",d.note,"\n");
           for(const v of d.voci||[]){const el=p.querySelector(`[data-voce="${v.sezione}"]`);if(!el)continue;const ds=el.querySelector('[data-vf="descrizione"]'),st=el.querySelector('[data-vf="stimato"]');
@@ -1198,7 +1216,8 @@ function openUsato(id){
   const del=$("u_del");if(del)del.onclick=async()=>{if(!del.dataset.armed){del.dataset.armed="1";del.classList.add("solid");del.textContent="Conferma eliminazione";return;}
     try{await S.store.commitU([{col:"usato",id,merge:true,data:{deleted:true,deletedAt:oggi(),deletedBy:S.me.nome}}],addRefs([{codice:base.targa||id,azione:"Scheda usato eliminata",dettaglio:"recuperabile da Archivio"}],[{data:base}]));closeSheet();flash("Scheda eliminata. Si recupera da Archivio cercando la targa.","ok");}catch(x){$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}};
   p.onsubmit=async e=>{e.preventDefault();leggiVoci();
-    if(edDati)for(const k of["targa","modello","telaio","km","chiave","immatricolazione","venditore","scadBollo","scadRevisione","exProprietario","ritiroPermuta"])f[k]=$("u_"+k).value.trim();
+    if(edDati)for(const k of["targa","modello","marca","telaio","km","chiave","immatricolazione","venditore","scadBollo","scadRevisione","exProprietario","ritiroPermuta"])f[k]=$("u_"+k).value.trim();
+    if(!nuovo&&canPrezzo()&&$("u_prezzoVendita")){f.prezzoVendita=num($("u_prezzoVendita").value);f.margine=$("u_margine").value.replace(/[^A-Za-z]/g,"").slice(0,2);}
     f.note=$("u_note").value.trim();f.danni=$("u_danni").value.trim();f.accessoriDoc=$("u_accdoc").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,10);f.targa=String(f.targa||"").toUpperCase().replace(/\s/g,"");f.telaio=String(f.telaio||"").toUpperCase().replace(/\s/g,"");f.km=num(f.km);f.chiave=f.chiave?String(parseInt(f.chiave,10)||""):"";
     const nid=nuovo?idU(f.targa,f.telaio):id;
     if(!nid){$("e_err").innerHTML=`<div class="banner bad">Serve almeno la targa o il telaio.</div>`;return;}
@@ -1236,13 +1255,36 @@ function openUsato(id){
 $("uList").addEventListener("click",e=>{const b=e.target.closest("[data-u]");if(b)openUsato(b.dataset.u);});
 $("uq").addEventListener("input",e=>{U.q=e.target.value.trim();renderUsato();});
 $("btnPresa").onclick=()=>openUsato(null);
+// Stesse colonne del file «Dettaglio Usato»: l'app compila quello che sa, il resto resta vuoto per il preposto.
+const TRACCIATO=["Tipo vettura (pc / van / van comm)", " Targa", "N. Chiave", "Destinazione (vendita: Privato/Commerciante — flotta: Noleggio/Courtesy/Demo/Comodato)", "Stato Vettura", "Provenienza acquisto", "DATA ENTRATA", "Marca", "MODELLO", "VERSIONE", "Cambio", "kwatt", "CC", "Cavalli", "Aliment", "COLORE", "MESE immat", "ANNO immat.", "KM", "PROPRIETARIO", "Venditore in acquisto", "N PROPRIETARI", "PRIMA IMMATRICOLAZIONE", "IVA ESPOSTA", "PREZZO ACQ. Carico Fiscale", "PREZZO ACQ. Carico Fiscale (no Iva)", "Stato", "Data Fine ripristino", "Tempo Medio Ripristino", "Ripristimi stimati su perizia", "Meccanica IMPONIBILE SOLO INTERNI", "Carrozzeria (iva inclusa)", "Lavaggio interno/esterno (iva inclusa)", "Lavorazioni esterne (iva inclusa)", "Allestimento", "Margine Noleggio", "Note di credito  (iva inclusa)", "Pacchetto Manutenzione", "Costo Manutenzione Ivato", "Satellitare Ivato", "Tipo Garanzia", "Costo GARANZIA (12 MESI ALTRI MARCHI - 24 MESI CERTIFIED) ivati", "Costo", "Costo Imponibile totale", "Giorni Giacenza", "PREZZO VENDITA PRIVATO", "Margine di trattativa (lett minuscola= centinaia- maiuscola =migliaia)", "Note", "Cliente Vendita ", "Tipo Cliente", "Venditore VENDITA ", "DATA VENDITA ", "PREZZO REALIZZATO con iva al 22%", "IVA applicata", "Prezzo realizzato IMPONIBILE", "Costo voltura o passaggio di proprietà ", "Costo IPT no iva", "Tipo FINANZIAMENTO", "Ricavi FINANZIAMENTO", "Provvigioni venditori/terzi ulteriori servizi", "Provvigione venditore finanziamento", "Altri premi e segnalazioni", "Redditività Usato CON SERVIZI FINANZIARI", "Redditività %", "Note di credito Km0 e destock", "Premio 3%", "Pagati", "∆ Premi da riconoscere", "Redditività Usato con 3%", "% Redditività Usato con 3%", "Redditività Imponibile con 3%", "Totale Ripristini Esterni Imponibile", "Totale Satellitare Imponibile", "Totale Service care Imponibile", "3% IMPONIBILE", "Garanzia Imponibile", "Noleggio Imponibile", "Costo Imponibile Vettura incluso premi", "N° FATT", "DATA FATT", "Buono D'ordine", "Data", "Data fine noleggio / rientro in vendita", "Categoria giacenza", "N. in Lista Usato", "Chiave giacenza (calcolata)", "N. Lista per giacenza", "Chiave marca-modello", "N. Lista per marca", "Chiave modello-marca", "N. Lista per modello", "N. in Stock Noleggio (calc.)", "N. in Storico Noleggio (calc.)", "Età vettura mesi (calc.)", "Gruppo Certified (calc.)", "Targa venduta (per lista venditori)", "Data vendita (per lista venditori)"];
+const MESI=["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const STATO_TRACCIATO={ripristino:"ripristino",foto:"foto",pubblicata:"pubblicata"};
+$("btnTracciato").onclick=async()=>{
+  try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
+  const col=l=>{let n=0;for(const ch of l)n=n*26+ch.charCodeAt(0)-64;return n-1;};
+  const dt=s=>{const d=scadData(s)||(/^\d{4}-\d{2}-\d{2}/.test(String(s||""))?String(s).slice(0,10):"");return d?new Date(d+"T12:00:00"):"";};
+  const rows=[...U.docs.entries()].filter(([,u])=>!u.deleted).sort((a,b)=>String((a[1].date||{}).presa||"").localeCompare(String((b[1].date||{}).presa||""))).map(([id,u])=>{
+    const r=new Array(TRACCIATO.length).fill("");const put=(l,v)=>{if(v!==""&&v!=null)r[col(l)]=v;};const ris=U.ris.get(id)||{};const imm=dataImm(u.immatricolazione);const t=totali(u);
+    put("B",u.targa||"");put("C",u.chiave?Number(u.chiave):"");put("E","Stock");put("G",dt((u.date||{}).presa));
+    put("H",/^mercedes/i.test(u.marca||"")?"Mercedes-Benz":(u.marca||""));put("I",u.modello||"");
+    if(imm&&/\d{1,2}[\/.\-]\d/.test(String(u.immatricolazione||"")))put("Q",MESI[imm.getMonth()]);if(imm)put("R",imm.getFullYear());
+    put("S",u.km===""||u.km==null?"":Number(u.km));put("T",u.exProprietario||"");put("U",u.venditore||"");
+    put("X",ris.ivaEsposta==="Sì"?"SI":ris.ivaEsposta==="No"?"NO":"");put("Y",ris.valoreContratto===""||ris.valoreContratto==null?"":Number(ris.valoreContratto));
+    put("AA",STATO_TRACCIATO[u.stato]||"no");put("AB",dt((u.date||{}).pronta));put("AD",t.s||"");
+    put("AT",u.prezzoVendita===""||u.prezzoVendita==null?"":Number(u.prezzoVendita));put("AU",u.margine||"");put("AV",u.note||"");
+    return r;});
+  const ws=XLSX.utils.aoa_to_sheet([TRACCIATO,...rows],{cellDates:true,dateNF:"dd/mm/yyyy"});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Dettaglio Usato");
+  const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array",cellDates:true})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Tracciato_Dettaglio_Usato_${oggi()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+  flash(`Esportate ${rows.length} vetture con le colonne del Dettaglio Usato: completa le celle vuote.`,"ok");
+};
 $("btnExportU").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
   const rows=[...U.docs.entries()].map(([id,u])=>{const t=totali(u);const o={"Targa":u.targa||"","Telaio":u.telaio||"","Modello":u.modello||"","Km":u.km??"","Chiave U":u.chiave||"","Venditore":u.venditore||"","Stato":NOME_STATO[u.stato]||"","Priorità":u.priorita||""};
     for(const[k,l]of STATI_U)o["Data "+l.toLowerCase()]=(u.date||{})[k]||"";
     o["Giorni presa → pubblicata"]=giorniTot(u)??"";
     for(const[k,l]of VOCI){const v=(u.voci||{})[k]||{};o[l+" lavori"]=v.descrizione||"";o[l+" stimato"]=v.stimato??"";o[l+" effettivo"]=v.effettivo??"";}
-    o["Totale stimato"]=t.s;o["Totale effettivo"]=t.hasE?t.e:"";o["Scostamento"]=t.hasE?t.e-t.s:"";
+    o["Prezzo di vendita"]=u.prezzoVendita??"";o["Margine di trattativa"]=u.margine||"";o["Totale stimato"]=t.s;o["Totale effettivo"]=t.hasE?t.e:"";o["Scostamento"]=t.hasE?t.e-t.s:"";
     if(canFiscale()){const r=U.ris.get(id)||{};o["Valore da contratto"]=r.valoreContratto??"";o["IVA esposta"]=r.ivaEsposta||"";}
     o["Note"]=u.note||"";return o;});
   const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"Targa":""}]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Lavorazione usato");
@@ -1255,7 +1297,7 @@ function vista(v){
   $("vAgenda").hidden=v!=="agenda";$("vChiavi").hidden=v!=="chiavi";$("vUsato").hidden=v!=="usato";$("vConsegne").hidden=v!=="consegne";$("vArchivio").hidden=v!=="archivio";
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tab===v));
   $("btnBolla").hidden=v!=="chiavi";$("btnPresa").hidden=v!=="usato"||!canPresa();$("btnConsegna").hidden=v!=="consegne"||!canCreaConsegna();$("btnImpegno").hidden=v!=="agenda"||!canImpegni();
-  $("btnExport").hidden=v!=="chiavi"||!canExcel();$("btnExportU").hidden=v!=="usato"||!canExcel();$("btnExportC").hidden=v!=="consegne"||!canExcel();$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!canImport();
+  $("btnExport").hidden=v!=="chiavi"||!canExcel();$("btnExportU").hidden=v!=="usato"||!canExcel();$("btnTracciato").hidden=v!=="usato"||!canFiscale();$("btnExportC").hidden=v!=="consegne"||!canExcel();$("btnNew").hidden=v!=="chiavi";$("btnImport").hidden=v!=="chiavi"||!canImport();
   $("h1t").textContent={chiavi:"Dag Auto Vetture",usato:"Lavorazione usato",consegne:"Consegne",archivio:"Archivio",agenda:"Agenda"}[v];
   $("subt").textContent={chiavi:"Cerca per targa, telaio, modello o numero del cartellino.",usato:"Dalla presa in carico alla pubblicazione: priorità, ripristini e tempi.",consegne:"Calendario delle consegne e preparazione in officina.",archivio:"Lo storico di ogni vettura: cerca per targa o telaio.",agenda:"Consegne, appuntamenti, corsi e permessi."}[v];
   try{localStorage.setItem("vista",v);}catch(e){}
@@ -1274,6 +1316,7 @@ const canCreaConsegna=()=>ha(...GEST);
 const canAppConsegna=()=>ha(...GEST,"productexpert");
 const canPrepConsegna=()=>ha(...GEST,"officina","movimentatore","ripristini","preparatore");
 const canConsegnata=()=>ha(...GEST,"venditore","productexpert");
+const canMontato=()=>ha(...GEST,"officina","ripristini","preparatore");
 const canImpegni=()=>ha(...GEST,"productexpert","venditore");
 const canImpTutti=()=>ha(...GEST);
 const vedeImpegni=()=>ha(...GEST,"venditore","productexpert","bdc");
@@ -1407,7 +1450,7 @@ function stampaVerbale(c){
     <div class="pvf"><span>Firma officina ____________________</span><span>Firma cliente ____________________</span></div></div>`;
   window.print();
 }
-const omRow=(o,i,ro)=>`<div class="accrow omrow"><input class="ominp" data-om="testo" value="${esc(o.testo||"")}" placeholder="es. Tappetini personalizzati" ${ro}><label class="chk small"><input type="checkbox" data-om="fatto" ${o.fatto?"checked":""} ${canPrepConsegna()?"":"disabled"}> montato</label>${ro?"":`<button type="button" class="link" data-omdel="1" aria-label="Togli">Togli</button>`}</div>`;
+const omRow=(o,i,ro)=>`<div class="accrow omrow"><input class="ominp" data-om="testo" value="${esc(o.testo||"")}" placeholder="es. Tappetini personalizzati" ${ro}><label class="chk small"><input type="checkbox" data-om="fatto" ${o.fatto?"checked":""} ${canMontato()?"":"disabled"}> montato</label>${ro?"":`<button type="button" class="link" data-omdel="1" aria-label="Togli">Togli</button>`}</div>`;
 function openConsegna(id){
   const nuovo=!id;
   const base=nuovo?{stato:"richiesta",tipo:"vendita",colore:"BLU",std:{},pag:{},prep:{},date:{richiesta:oggi()}}:JSON.parse(JSON.stringify(C.docs.get(id)));
@@ -1432,7 +1475,7 @@ function openConsegna(id){
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
       <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div></div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato»</span></h4>
-      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label><label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&prepOk?"":"disabled"}> montato</label></div>`;}).join("")}
+      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label><label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&canMontato()?"":"disabled"}> montato</label></div>`;}).join("")}
       <div class="accrow" style="border-top:0"><b style="font-size:14px">Accessori in omaggio</b></div>
       <div id="c_omlist">${omaggi(f).map((o,i)=>omRow(o,i,ro)).join("")}</div>
       ${ro?"":`<button type="button" class="link" id="c_omadd">+ Aggiungi omaggio</button>`}</div>
@@ -1467,7 +1510,7 @@ function openConsegna(id){
       const altre=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.stato!=="annullata"&&norm(c.venditore)===norm(pe));
       if(altre.length)w.innerHTML+=`<div class="banner">${esc(pe)} quel giorno ha già ${altre.length} ${plur(altre.length,"consegna","consegne")}: ${altre.map(([,c])=>esc((c.ora||"--:--")+" "+etich(c))).join(", ")}.</div>`;}};
   $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);$("c_venditore").addEventListener("input",avvData);avvData();
-  p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked;if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
+  p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked||!canMontato();if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
   const leggi=()=>{
     for(const k of["targa","telaio","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");
     f.targa=f.targa.toUpperCase().replace(/\s/g,"");f.tipo=$("c_tipo").value;
