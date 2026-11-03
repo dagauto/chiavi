@@ -12,14 +12,16 @@ const SITO = "https://dagauto.github.io/chiavi/";
 
 // Stesso elenco della pagina: chi riceve ogni evento se non ha cambiato le sue preferenze.
 const EVENTI = {
-  consegna_nuova: ["officina", "movimentatore", "preparatore", "backoffice"],
-  consegna_fissata: ["officina", "movimentatore", "preparatore", "backoffice"],
-  consegna_24h: ["officina", "movimentatore", "preparatore", "backoffice", "admin"],
+  consegna_nuova: ["officina", "preparatore", "backoffice"],
+  consegna_fissata: ["officina", "preparatore", "backoffice"],
+  consegna_24h: ["officina", "preparatore", "backoffice", "admin"],
   consegna_pronta: ["productexpert", "backoffice"],
   consegna_scadenze: ["officina", "backoffice"],
+  consegna_ordine: ["magazzino", "backoffice"],
+  consegna_arrivati: ["productexpert", "backoffice"],
   usato_presa: ["usato", "admin"],
   usato_attesa: ["ripristini", "officina"],
-  usato_pronta: ["foto", "movimentatore"],
+  usato_pronta: ["foto", "preparatore"],
 };
 const ACC_STD = ["chiavi", "giubotto", "prontosoccorso", "gonfiaggio", "portachiavi", "libretto"];
 const PREP = ["targata", "lavaggio"];
