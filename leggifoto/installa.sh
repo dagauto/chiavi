@@ -5,7 +5,7 @@ set -e
 P=chiavi-dag-auto
 gcloud config set project $P >/dev/null 2>&1
 mkdir -p ~/leggifoto && cd ~/leggifoto
-for f in index.js package.json; do curl -sf -o $f "https://raw.githubusercontent.com/dagauto/chiavi/main/leggifoto/$f"; done
+for f in index.js package.json; do curl -sf -o $f "${BASE:-https://raw.githubusercontent.com/dagauto/chiavi/main}/leggifoto/$f"; done
 T=$(gcloud auth print-access-token)
 SCELTO=""; LUOGO=""
 for L in europe-west8 europe-west1 europe-west4 europe-west3 global; do
@@ -23,7 +23,7 @@ echo "MODELLO SCELTO: $SCELTO ($LUOGO)"
 # Se il luogo non e' global, la funzione usa l'host regionale.
 if [ "$LUOGO" != global ]; then sed -i "s#https://aiplatform.googleapis.com/v1/projects/\${PROGETTO}/locations/\${LUOGO}#https://\${LUOGO}-aiplatform.googleapis.com/v1/projects/\${PROGETTO}/locations/\${LUOGO}#" index.js; fi
 gcloud functions deploy leggifoto --gen2 --region=europe-west8 --runtime=nodejs22 --source=. \
-  --entry-point=leggifoto --trigger-http --allow-unauthenticated --memory=512Mi --timeout=120s \
+  --entry-point=leggifoto --trigger-http --allow-unauthenticated --memory=512Mi --timeout=180s \
   --max-instances=3 --set-env-vars=MODELLO=$SCELTO,LUOGO=$LUOGO --quiet 2>&1 | grep -E '^state|^url|ERROR|uri:' || true
 echo "URL: $(gcloud functions describe leggifoto --region=europe-west8 --format='value(serviceConfig.uri)')"
 echo FINE
