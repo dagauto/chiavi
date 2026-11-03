@@ -379,6 +379,7 @@ const SING={BLU:"Blu",ROSSO:"Rossa",VERDE:"Verde"};
 const LETT={BLU:"N",ROSSO:"U",VERDE:"V"};const LETT_OLD={BLU:"B",ROSSO:"R",VERDE:"V"};
 const LUOGHI=["Salone","Officina","Garage","Cimitero","Bel Sito"];
 const FUORI="Fuori a noleggio";
+const ALLEST="Fuori in allestimento";
 const RETRO="retro cassaforte salone";
 const TIPI_RIP=["Danni di trasporto","Meccanica","Carrozzeria","Sanificazione","Altro"];
 const DT="Danni di trasporto";
@@ -601,6 +602,7 @@ function filtered(){
       case"daverif":return st==="Non censito"||st==="Da controllare";
       case"rip":return inRip(s)||inAtt(s);
       case"noleggio":return occupato(s)&&s.dovePrima===FUORI;
+      case"allestimento":return occupato(s)&&s.dovePrima===ALLEST;
       case"vendute":return occupato(s)&&s.venduta==="Sì";
       case"esposizione":return occupato(s)&&s.esposizione==="Sì";
     }return true;
@@ -614,7 +616,7 @@ function chipRow(el,items,cur,onPick,lbl){
 }
 function renderFilters(){
   chipRow($("fColore"),[[null,"Tutti i colori"],...COLORI.map(c=>[c,CORTO[c],"c-"+c])],S.col,v=>{S.col=v;render();});
-  chipRow($("fStato"),[["incasa","In casa"],["avvisi","Con avvisi"],["una","Una sola chiave"],["rip","Ripristino / in attesa"],["noleggio","Fuori a noleggio"],["vendute","Già vendute"],["esposizione","Conto esposizione"],["liberi","Numeri liberi"],["daverif","Da censire"]],S.stato,v=>{S.stato=v||"incasa";render();});
+  chipRow($("fStato"),[["incasa","In casa"],["avvisi","Con avvisi"],["una","Una sola chiave"],["rip","Ripristino / in attesa"],["noleggio","Fuori a noleggio"],["allestimento","In allestimento"],["vendute","Già vendute"],["esposizione","Conto esposizione"],["liberi","Numeri liberi"],["daverif","Da censire"]],S.stato,v=>{S.stato=v||"incasa";render();});
   chipRow($("fLuogo"),[[null,"Ovunque"],...LUOGHI.map(l=>[l,l]),["RETRO","Seconde · retro salone"]],S.luogo,v=>{S.luogo=v;render();},"Prima chiave in:");
 }
 function renderSummary(){
@@ -625,7 +627,7 @@ function renderSummary(){
   }).join("");
 }
 function keyPills(s){
-  const p=s.prima==="Sì"?`<span class="kp"><strong>1ª</strong> ${esc(s.dovePrima===FUORI?FUORI+(s.noleggioDal?" · "+ggTesto(s.noleggioDal):""):(s.dovePrima||"dove?"))}</span>`:s.prima==="No"?`<span class="kp miss"><strong>1ª</strong> manca</span>`:`<span class="kp"><strong>1ª</strong> da controllare</span>`;
+  const p=s.prima==="Sì"?`<span class="kp"><strong>1ª</strong> ${esc(s.dovePrima===FUORI?FUORI+(s.noleggioDal?" · "+ggTesto(s.noleggioDal):""):s.dovePrima===ALLEST?ALLEST+(s.allestimentoDal?" · "+ggTesto(s.allestimentoDal):""):(s.dovePrima||"dove?"))}</span>`:s.prima==="No"?`<span class="kp miss"><strong>1ª</strong> manca</span>`:`<span class="kp"><strong>1ª</strong> da controllare</span>`;
   const q=s.seconda==="Sì"?`<span class="kp"><strong>2ª</strong> retro salone</span>`:s.seconda==="No"?`<span class="kp miss"><strong>2ª</strong> manca</span>`:`<span class="kp"><strong>2ª</strong> da controllare</span>`;
   return p+q;
 }
@@ -670,10 +672,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)
 const erroreScrittura=e=>e&&String(e.code||"").includes("permission")?"Non hai il permesso di fare questa modifica.":"Salvataggio non riuscito. Controlla la connessione e riprova.";
 
 /* =================== Scheda vettura =================== */
-const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["noleggioDal","Fuori a noleggio dal"],["venduta","Venduta"],["cliente","Cliente"],["esposizione","Conto esposizione"],["esposizioneDal","In conto esposizione dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
+const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["noleggioDal","Fuori a noleggio dal"],["allestimentoDal","In allestimento dal"],["venduta","Venduta"],["cliente","Cliente"],["esposizione","Conto esposizione"],["esposizioneDal","In conto esposizione dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
 function openEditor(id,assegna){
   const base=slots().find(s=>s.id===id);if(!base)return;
-  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",noleggioDal:"",venduta:"",cliente:"",esposizione:"",esposizioneDal:"",attesa:"",attesaDal:"",danni:"",controllatoDa:"",dataControllo:"",note:""},base);
+  const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",noleggioDal:"",allestimentoDal:"",venduta:"",cliente:"",esposizione:"",esposizioneDal:"",attesa:"",attesaDal:"",danni:"",controllatoDa:"",dataControllo:"",note:""},base);
   const libero=!occupato(base);
   if(assegna&&libero){f.prima="Sì";f.dovePrima="Salone";f.seconda=base.colore==="BLU"?"Sì":"";f.dataControllo=oggi();f.controllatoDa=S.me.nome;}
   const seg=k=>`<span class="seg" data-k="${k}">${["Sì","No"].map(v=>`<button type="button" data-v="${v}" aria-pressed="${f[k]===v}">${v}</button>`).join("")}</span>`;
@@ -685,7 +687,7 @@ function openEditor(id,assegna){
     </div>
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
     ${base.colore==="ROSSO"&&!libero&&fotoTarga(f.targa)?citBox(f.targa,usatoTarga(f.targa)):""}
-    <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI]).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
+    <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI,ALLEST]).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
     <div class="keybox"><h4><span>Già venduta<br><span class="small">vettura nuova arrivata già venduta a un cliente</span></span> ${seg("venduta")}</h4>
       <div id="e_venbox" ${f.venduta==="Sì"?"":"hidden"}><label class="f" style="margin-top:8px">Cliente (facoltativo)<input id="e_cliente" value="${esc(f.cliente||"")}" autocomplete="off"></label></div></div>
@@ -716,6 +718,7 @@ function openEditor(id,assegna){
     if(k==="prima"&&f.prima!=="Sì"){f.dovePrima="";press("dovePrima");}
     if(k==="dovePrima"&&f.dovePrima){f.prima="Sì";press("prima");}
     if(k==="dovePrima")f.noleggioDal=f.dovePrima===FUORI?(base.dovePrima===FUORI&&base.noleggioDal?base.noleggioDal:oggi()):"";
+    if(k==="dovePrima")f.allestimentoDal=f.dovePrima===ALLEST?(base.dovePrima===ALLEST&&base.allestimentoDal?base.allestimentoDal:oggi()):"";
     if(k==="venduta"){$("e_venbox").hidden=f.venduta!=="Sì";}
     if(k==="esposizione"){if(f.esposizione==="Sì"){if(!f.esposizioneDal)f.esposizioneDal=oggi();}else f.esposizioneDal="";}
     if(k==="attesa"){$("e_attbox").hidden=f.attesa!=="Sì";if(f.attesa==="Sì"){if(!f.attesaDal)f.attesaDal=oggi();}else f.attesaDal="";}
@@ -732,7 +735,7 @@ function openEditor(id,assegna){
       [{codice:codice(base),azione:"Numero liberato",dettaglio:`uscita ${base.targa||base.telaio||""}`.trim()}],`${SING[base.colore]} ${base.numero} liberato.`);
   };
   ed.onsubmit=e=>{e.preventDefault();
-    if(sp){const data={dovePrima:f.dovePrima||"",prima:f.prima||"",noleggioDal:f.noleggioDal||""};
+    if(sp){const data={dovePrima:f.dovePrima||"",prima:f.prima||"",noleggioDal:f.noleggioDal||"",allestimentoDal:f.allestimentoDal||""};
       if(data.dovePrima===(base.dovePrima||"")&&data.prima===(base.prima||"")){closeSheet();return;}
       salva([{id:base.id,merge:true,data}],[{codice:codice(base),azione:"Spostata",dettaglio:`prima chiave: ${data.dovePrima||"—"}`}],`${SING[base.colore]} ${base.numero}: spostata.`);return;}
     for(const k of["telaio","targa","modello","motivo","controllatoDa","dataControllo","note"])f[k]=$("e_"+k).value.trim();
@@ -895,7 +898,7 @@ function renderRighe(){
       <div class="numbox"><label class="f">N° chiave<input data-f="numero" type="number" inputmode="numeric" min="1" max="100" value="${esc(r.numero)}" placeholder="—"></label>
         ${lib&&!r.numero?`<button type="button" data-lib="${lib.numero}">Usa il primo libero: ${lib.numero}</button>`:""}</div>
       <div class="grid2">
-        <label class="f">Prima chiave in<select data-f="dovePrima">${LUOGHI.map(l=>`<option ${r.dovePrima===l?"selected":""}>${l}</option>`).join("")}<option value="" ${!r.dovePrima?"selected":""}>Non c'è</option></select></label>
+        <label class="f">Prima chiave in<select data-f="dovePrima">${LUOGHI.concat([ALLEST]).map(l=>`<option ${r.dovePrima===l?"selected":""}>${l}</option>`).join("")}<option value="" ${!r.dovePrima?"selected":""}>Non c'è</option></select></label>
         <label class="f">Seconda chiave (${RETRO})<select data-f="seconda"><option value="Sì" ${r.seconda==="Sì"?"selected":""}>Sì, c'è</option><option value="No" ${r.seconda==="No"?"selected":""}>Non c'è</option></select></label>
       </div>
       <label class="chk" style="margin-top:6px"><input type="checkbox" data-f="venduta" ${r.venduta?"checked":""}> Già venduta</label>
@@ -920,7 +923,7 @@ async function registraBolla(){
   if(errs.length){$("b_err").innerHTML=`<div class="banner bad">Sistema prima ${errs.length===1?"la vettura evidenziata":"le "+errs.length+" vetture evidenziate"}: ${esc(errs[0][1])}</div>`;return;}
   const writes=[],logs=[];
   for(const r of B.righe){const n=parseInt(r.numero,10);
-    writes.push({id:idOf(r.colore,n),data:Object.assign({colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"},r.danni?{attesa:"Sì",attesaDal:oggi(),danni:(r.danniDescr||"").trim()}:{},r.venduta?{venduta:"Sì",cliente:(r.cliente||"").trim()}:{},r.esposizione?{esposizione:"Sì",esposizioneDal:oggi()}:{})});
+    writes.push({id:idOf(r.colore,n),data:Object.assign({colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"},r.danni?{attesa:"Sì",attesaDal:oggi(),danni:(r.danniDescr||"").trim()}:{},r.venduta?{venduta:"Sì",cliente:(r.cliente||"").trim()}:{},r.esposizione?{esposizione:"Sì",esposizioneDal:oggi()}:{},r.dovePrima===ALLEST?{allestimentoDal:oggi()}:{})});
     if(r.danni)logs.push({codice:`${LETT[r.colore]}.${n}`,azione:"In attesa di ripristino",dettaglio:[DT,(r.danniDescr||"").trim()].filter(Boolean).join(" · ")});
     logs.push({codice:`${LETT[r.colore]}.${n}`,azione:r.foto?"Assegnato da foto":"Assegnato a mano",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
   $("b_save").disabled=true;
@@ -960,7 +963,7 @@ $("fileImport").onchange=async e=>{
 };
 $("btnExport").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
-  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Fuori a noleggio dal":s.dovePrima===FUORI?(s.noleggioDal||""):"","Seconda chiave":s.seconda||"","Stato":stato(s),"In ripristino":s.ripristino||"","Lavoro ripristino":s.ripristinoTipo||"","Dove ripristino":s.ripristinoDove||"","Venduta":s.venduta||"","Cliente":s.cliente||"","Conto esposizione":s.esposizione||"","In esposizione dal":s.esposizioneDal||"","Giorni esposizione":s.esposizione==="Sì"&&s.esposizioneDal?giorniDa(s.esposizioneDal):"","In attesa di ripristino":s.attesa||"","Danni di trasporto":s.danni||"","In ripristino dal":s.ripristinoDal||"","Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
+  const rows=slots().map(s=>({"Colore":s.colore,"N° prima":s.numero,"N° seconda":s.numero+100,"Telaio":s.telaio||"","Targa":s.targa||"","Modello":s.modello||"","Prima chiave":s.prima||"","Dove prima":s.dovePrima||"","Fuori a noleggio dal":s.dovePrima===FUORI?(s.noleggioDal||""):"","In allestimento dal":s.dovePrima===ALLEST?(s.allestimentoDal||""):"","Seconda chiave":s.seconda||"","Stato":stato(s),"In ripristino":s.ripristino||"","Lavoro ripristino":s.ripristinoTipo||"","Dove ripristino":s.ripristinoDove||"","Venduta":s.venduta||"","Cliente":s.cliente||"","Conto esposizione":s.esposizione||"","In esposizione dal":s.esposizioneDal||"","Giorni esposizione":s.esposizione==="Sì"&&s.esposizioneDal?giorniDa(s.esposizioneDal):"","In attesa di ripristino":s.attesa||"","Danni di trasporto":s.danni||"","In ripristino dal":s.ripristinoDal||"","Avvisi":avvisi(s),"Motivo chiave singola":s.motivo||"","Controllato da":s.controllatoDa||"","Data controllo":s.dataControllo||"","Note":s.note||""}));
   const ws=XLSX.utils.json_to_sheet(rows);ws["!cols"]=[9,9,10,20,11,18,11,12,12,16,11,14,20,13,30,30,14,13,30].map(w=>({wch:w}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Censimento");
   const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
@@ -1058,7 +1061,7 @@ function renderUsato(){
       <span style="min-width:0">
         <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?'<span class="pill p-Solo-seconda">Priorità alta</span>':u.priorita==="bassa"?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
         <span class="uinfo">${[u.chiave?`Chiave U.${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
-        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
+        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}${u.ivaEsposta?" · IVA esp. "+esc(u.ivaEsposta):""}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
       </span></button>`;
   }
   $("uList").innerHTML=html||`<div class="empty"><p>Nessuna vettura in questa vista.</p></div>`;
@@ -1151,7 +1154,8 @@ function openUsato(id){
     <div class="grid2">${inp("exProprietario","Ex proprietario")}${inp("ritiroPermuta","Ritiro permuta su contratto")}</div>
     ${!nuovo&&vedePrezzo()?`<div class="keybox"><h4>Vendita <span class="small">${canPrezzo()?"prezzo e margine li vedono anche i venditori":"inseriti dal back office"}</span></h4>
       <div class="grid2"><label class="f">Prezzo di vendita (€)<input id="u_prezzoVendita" inputmode="decimal" value="${esc(f.prezzoVendita??"")}" ${canPrezzo()?"":"disabled"} autocomplete="off"></label>
-      <label class="f">Margine di trattativa<input id="u_margine" maxlength="2" placeholder="es. A, Ae" value="${esc(f.margine||"")}" ${canPrezzo()?"":"disabled"} autocomplete="off"></label></div></div>`:""}
+      <label class="f">Margine di trattativa<input id="u_margine" maxlength="2" placeholder="es. A, Ae" value="${esc(f.margine||"")}" ${canPrezzo()?"":"disabled"} autocomplete="off"></label></div>
+      ${canPrezzo()?"":`<div class="small">IVA esposta: <b>${esc(f.ivaEsposta||"non indicata")}</b></div>`}</div>`:""}
     ${canFiscale()?`<div class="keybox fisc"><h4>Carico fiscale <span class="small">visibile solo ad amministratori, back office e responsabile usato</span></h4>
       <div class="grid2"><label class="f">Valore da contratto (€)<input id="u_valoreContratto" inputmode="decimal" value="${esc(r.valoreContratto)}"></label>
       <label class="f">IVA esposta<select id="u_ivaEsposta"><option value=""></option><option ${r.ivaEsposta==="Sì"?"selected":""}>Sì</option><option ${r.ivaEsposta==="No"?"selected":""}>No</option></select></label></div></div>`:""}
@@ -1231,6 +1235,7 @@ function openUsato(id){
     if(nuovo)writes.push(coda("usato_presa",`Presa in carico ${f.targa||""}`,`${desc}${f.chiave?" · chiave R "+f.chiave:""}`,"#usato"));
     else if(f.stato!==base.stato&&f.stato==="attesa")writes.push(coda("usato_attesa",`Usato da ripristinare: ${f.targa||""}`,`${desc} · priorità ${f.priorita||"normale"}`,"#usato"));
     else if(f.stato!==base.stato&&f.stato==="pronta")writes.push(coda("usato_pronta",`Foto da fare: ${f.targa||""}`,`${desc} è pronta e lavata`,"#usato"));
+    if(canFiscale()&&$("u_ivaEsposta"))f.ivaEsposta=$("u_ivaEsposta").value;
     if(canFiscale()){const rv={valoreContratto:num($("u_valoreContratto").value),ivaEsposta:$("u_ivaEsposta").value};if(nuovo||rv.valoreContratto!==(r.valoreContratto??"")||rv.ivaEsposta!==(r.ivaEsposta||""))writes.push({col:"usato_riservato",id:nid,data:rv});}
     const cod=f.targa||nid;
     if(nuovo)logs.push({codice:cod,azione:"Presa in carico",dettaglio:[f.modello,f.chiave?`chiave U.${f.chiave}`:""].filter(Boolean).join(" · ")});
@@ -1253,6 +1258,11 @@ function openUsato(id){
   };
 }
 $("uList").addEventListener("click",e=>{const b=e.target.closest("[data-u]");if(b)openUsato(b.dataset.u);});
+// Copia «IVA esposta» dal carico fiscale alla scheda usato, perché i venditori la vedano (solo il dato Sì/No, non il valore).
+let ivaFatta=false;
+async function allineaIva(){if(ivaFatta||!canFiscale()||!U.docs.size)return;ivaFatta=true;const w=[];
+  for(const[id,r]of U.ris.entries()){const u=U.docs.get(id);if(u&&r.ivaEsposta&&u.ivaEsposta!==r.ivaEsposta)w.push({col:"usato",id,merge:true,data:{ivaEsposta:r.ivaEsposta}});}
+  if(w.length)try{await S.store.commitU(w.slice(0,400),[]);}catch(e){console.warn("allineaIva",e);}}
 $("uq").addEventListener("input",e=>{U.q=e.target.value.trim();renderUsato();});
 $("btnPresa").onclick=()=>openUsato(null);
 // Stesse colonne del file «Dettaglio Usato»: l'app compila quello che sa, il resto resta vuoto per il preposto.
@@ -1697,7 +1707,7 @@ function avviaApp(store){
   store.onLog(l=>{S.log=l;renderLog();});
   if(isAdmin())store.onUtenti(u=>{S.utenti=u;renderUtenti();});
   if(canUsato()){$("tabs").hidden=false;const ta=document.querySelector('#tabs [data-tab="archivio"]');if(ta)ta.hidden=!canArchivio();store.onColl("usato",l=>{U.docs=new Map(l);renderUsato();renderConsegne();});
-    if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);});
+    if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);setTimeout(allineaIva,1500);});
     store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();renderAgenda();});
     if(vedeImpegni())store.onColl("impegni",l=>{C.imp=new Map(l);renderConsegne();renderAgenda();});
     if(!isAdmin())store.onUtenti(u=>{S.utenti=u;});}
