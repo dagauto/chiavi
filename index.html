@@ -283,7 +283,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
     </div>
     <div class="actions">
       <button class="primary" id="btnBolla">+ Aggiungi vettura</button>
-      <button class="primary" id="btnPresa" hidden>+ Presa in carico</button>
+      <button class="primary" id="btnPresa" hidden>+ Nuova usata</button>
       <button class="primary" id="btnConsegna" hidden>+ Consegna</button>
       <button id="btnImpegno" hidden>+ Impegno</button>
       <button id="btnMore" aria-expanded="false">Altro</button>
@@ -745,6 +745,7 @@ function openEditor(id,assegna){
     if($("e_danni"))f.danni=$("e_danni").value.trim();if(f.attesa!=="Sì"){f.attesa="";f.attesaDal="";}
     if(f.ripristino!=="Sì")f.ripristino="";
     f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");f.targa=f.targa.toUpperCase().replace(/\s/g,"");
+    if((f.telaio||f.targa||f.modello)&&(!f.prima||!f.seconda)){$("e_err").innerHTML=`<div class="banner bad">Indica se ci sono la prima e la seconda chiave (Sì o No): senza questa risposta la vettura finisce in «Da censire».</div>`;return;}
     const dup=telaioUsato(f.telaio,base.id);
     if(dup){$("e_err").innerHTML=`<div class="banner bad">Questo telaio è già registrato al ${esc(SING[dup.colore])} ${dup.numero}. Libera prima quel numero o correggi il telaio.</div>`;return;}
     const data={colore:base.colore,numero:base.numero};for(const[k]of FIELDS)data[k]=f[k]||"";
@@ -995,17 +996,20 @@ $("btnUsers").onclick=()=>{
 };
 
 /* =================== Lavorazione usato =================== */
-const STATI_U=[["presa","Presa in carico"],["attesa","In attesa di ripristino"],["ripristino","In ripristino"],["pronta","Pronta e lavata"],["foto","Foto fatte"],["pubblicata","Pubblicata"]];
-const NOME_STATO=Object.fromEntries(STATI_U);
+// Appena entra, la vettura va in attesa di ripristino oppure a destinazione commerciante (non si ripristina).
+const STATI_U=[["attesa","In attesa di ripristino"],["ripristino","In ripristino"],["pronta","Pronta e lavata"],["foto","Foto fatte"],["pubblicata","Pubblicata"],["commerciante","Destinazione commerciante"]];
+const STATI_ENTRATA=["attesa","commerciante"];
+const CHIUSI_U=["pubblicata","commerciante"];
+const NOME_STATO=Object.assign({presa:"In attesa di ripristino"},Object.fromEntries(STATI_U));
 const VOCI=[["carrozzeria","Carrozzeria"],["manutenzione","Manutenzione"],["freni","Freni"],["pneumatici","Pneumatici"],["meccanica","Meccanica e motore"],["cristalli","Cristalli"],["illuminazione","Impianto illuminazione"],["interni","Interni e sanificazione"],["altro","Altro"]];
 const PRIO=[["alta","Alta"],["normale","Normale"],["bassa","Bassa"]];
 const PRIO_ORD={alta:0,normale:1,bassa:2};
-const RUOLI=[["operatore","Operatore chiavi: solo registro chiavi (per i meccanici)"],["movimentatore","Movimentatore: chiavi, stati dell'usato fino a «foto fatte», preparazione consegne · niente carico fiscale"],["officina","Officina: chiavi, ripristini usato, preparazione consegne, Excel · niente carico fiscale"],["ripristini","Ripristini: chiavi, ripristini usato, preparazione consegne · niente carico fiscale"],["preparatore","Preparatore: chiavi e preparazione consegne"],["foto","Foto: chiavi, vede l'usato e segna «foto fatte»"],["venditore","Venditore: vede tutto, sposta le vetture, consegna, segna «pubblicata»"],["productexpert","Product expert: come venditore, più appuntamenti di consegna e impegni in agenda"],["backoffice","Responsabile back office: tutto, carico fiscale e import Excel compresi"],["usato","Responsabile usato: tutto, carico fiscale e import Excel compresi"],["admin","Amministratore: tutto, anche creazione utenti"]];
+const RUOLI=[["operatore","Operatore chiavi: solo registro chiavi (per i meccanici)"],["preparatore","Preparatore: chiavi, stati dell'usato fino a «foto fatte», preparazione consegne · niente carico fiscale"],["officina","Officina: chiavi, ripristini usato, preparazione consegne, Excel · niente carico fiscale"],["ripristini","Ripristini: chiavi, ripristini usato, preparazione consegne · niente carico fiscale"],["magazzino","Magazzino: vede le consegne e segna «arrivati» gli accessori da ordinare"],["foto","Foto: chiavi, vede l'usato e segna «foto fatte»"],["venditore","Venditore: vede tutto, sposta le vetture, consegna, segna «pubblicata»"],["productexpert","Product expert: come venditore, più appuntamenti di consegna e impegni in agenda"],["backoffice","Responsabile back office: tutto, carico fiscale e import Excel compresi"],["usato","Responsabile usato: tutto, carico fiscale e import Excel compresi"],["admin","Amministratore: tutto, anche creazione utenti"]];
 const NOME_RUOLO=Object.fromEntries(RUOLI.map(([k,v])=>[k,v.split(":")[0]]));
 // Permessi per ruolo: le stesse regole sono anche nel database (firestore.rules).
 const ha=(...rs)=>!!S.me&&rs.includes(S.me.ruolo);
 const GEST=["admin","backoffice","usato"];
-const canUsato=()=>!!S.me&&S.me.ruolo!=="operatore";
+const canUsato=()=>!!S.me&&!["operatore","magazzino"].includes(S.me.ruolo);
 const canFiscale=()=>ha(...GEST);
 const canVoci=()=>ha(...GEST,"officina","ripristini");
 const canExcel=()=>ha(...GEST,"officina");
@@ -1014,7 +1018,7 @@ const vedePrezzo=()=>ha(...GEST,"venditore","productexpert","bdc");
 const IN_VENDITA=["pronta","foto","pubblicata"];
 const canLibera=()=>ha(...GEST,"venditore","productexpert");
 const soloSposta=()=>ha("venditore","productexpert","bdc");
-const statiPermessi=()=>ha(...GEST)?STATI_U.map(([k])=>k):ha("officina","ripristini")?["ripristino","pronta"]:ha("movimentatore")?["ripristino","pronta","foto"]:ha("foto")?["foto"]:ha("venditore","productexpert")?["foto","pubblicata"]:[];
+const statiPermessi=()=>ha(...GEST)?STATI_U.map(([k])=>k):ha("officina","ripristini")?["ripristino","pronta"]:ha("preparatore")?["ripristino","pronta","foto"]:ha("foto")?["foto"]:ha("venditore","productexpert")?["foto","pubblicata"]:[];
 const U={docs:new Map(),ris:new Map(),q:"",stato:null};
 const euro=n=>(n===""||n==null||isNaN(n))?"—":Number(n).toLocaleString("it-IT",{style:"currency",currency:"EUR",maximumFractionDigits:0});
 const num=v=>{if(v===""||v==null)return "";const n=parseFloat(String(v).replace(/\./g,"").replace(",",".").replace(/[^\d.\-]/g,""));return isNaN(n)?"":n;};
@@ -1032,7 +1036,7 @@ function listaU(){
     if(q)return [u.targa,u.telaio,u.modello,u.chiave,u.venditore].some(v=>norm(v).includes(q));
     if(U.stato==="vendita")return inVendita(u);
     if(U.stato)return u.stato===U.stato;
-    return u.stato!=="pubblicata";
+    return !CHIUSI_U.includes(u.stato);
   }).filter(u=>!u.deleted).sort((a,b)=>{
     const sa=STATI_U.findIndex(x=>x[0]===a.stato),sb=STATI_U.findIndex(x=>x[0]===b.stato);
     if(sa!==sb)return sa-sb;
@@ -1046,10 +1050,10 @@ function renderUsato(){
   const all=[...U.docs.values()].filter(u=>!u.deleted);
   chipRow($("uStato"),[[null,"Da lavorare"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`]),["vendita",`Disponibili alla vendita · ${all.filter(inVendita).length}`]],U.stato,v=>{U.stato=v;renderUsato();});
   const pub=all.filter(u=>giorniTot(u)!=null),media=pub.length?Math.round(pub.reduce((a,u)=>a+giorniTot(u),0)/pub.length):null;
-  const aperte=all.filter(u=>u.stato!=="pubblicata");let ts=0,te=0;aperte.forEach(u=>{const t=totali(u);ts+=t.s;te+=t.e;});
+  const aperte=all.filter(u=>!CHIUSI_U.includes(u.stato));let ts=0,nr=0;aperte.forEach(u=>{const t=totali(u);ts+=t.s;if(t.s)nr++;});
   $("uSummary").innerHTML=`<div class="sum"><h3>APERTE</h3><dl><dt>Vetture</dt><dd>${aperte.length}</dd><dt>Priorità alta</dt><dd>${aperte.filter(u=>u.priorita==="alta").length}</dd></dl></div>
-    <div class="sum"><h3>RIPRISTINI</h3><dl><dt>Stimato</dt><dd>${euro(ts)}</dd><dt>Effettivo</dt><dd>${euro(te)}</dd></dl></div>
-    <div class="sum"><h3>TEMPI</h3><dl><dt>Presa → pubblicata</dt><dd>${media==null?"—":media+" gg"}</dd><dt>Su vetture</dt><dd>${pub.length}</dd></dl></div>`;
+    <div class="sum"><h3>RIPRISTINI</h3><dl><dt>Stimato</dt><dd>${euro(ts)}</dd><dt>Su vetture</dt><dd>${nr}</dd></dl></div>
+    <div class="sum"><h3>TEMPI</h3><dl><dt>Entrata → pubblicata</dt><dd>${media==null?"—":media+" gg"}</dd><dt>Su vetture</dt><dd>${pub.length}</dd></dl></div>`;
   const xs=listaU();
   $("uCount").textContent=U.q?`${xs.length} ${plur(xs.length,"risultato","risultati")} per «${U.q}»`:`${xs.length} ${plur(xs.length,"vettura","vetture")}`;
   if(!U.docs.size){$("uList").innerHTML=`<div class="empty"><h2>Nessuna vettura in lavorazione</h2><p>Qui il back office registra la presa in carico delle vetture usate. Ogni vettura poi avanza: attesa di ripristino, ripristino, pronta e lavata, foto, pubblicazione.</p><p>${canPresa()?"Tocca <b>+ Presa in carico</b> per inserire la prima.":""}</p></div>`;return;}
@@ -1062,7 +1066,7 @@ function renderUsato(){
       <span style="min-width:0">
         <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?'<span class="pill p-Solo-seconda">Priorità alta</span>':u.priorita==="bassa"?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
         <span class="uinfo">${[u.chiave?`Chiave U.${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
-        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}${u.ivaEsposta?" · IVA esp. "+esc(u.ivaEsposta):""}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
+        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}${u.ivaEsposta?" · IVA esp. "+esc(u.ivaEsposta):""}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
       </span></button>`;
   }
   $("uList").innerHTML=html||`<div class="empty"><p>Nessuna vettura in questa vista.</p></div>`;
@@ -1099,7 +1103,7 @@ function trovaTelaiTesto(t){try{const r=leggiBolla(t);return r.length?r[0].telai
 function stampaPerizia(u){
   const t=totali(u);const acc=(u.accessoriDoc||[]).slice(0,10);while(acc.length<10)acc.push("");
   const car=`<svg viewBox="0 0 200 300" width="100%" style="max-height:330px"><g fill="none" stroke="#000" stroke-width="1.5"><rect x="50" y="20" width="100" height="260" rx="40"/><rect x="62" y="70" width="76" height="44" rx="10"/><rect x="62" y="186" width="76" height="40" rx="10"/><line x1="50" y1="130" x2="150" y2="130"/><line x1="50" y1="175" x2="150" y2="175"/><rect x="34" y="58" width="16" height="36" rx="5"/><rect x="150" y="58" width="16" height="36" rx="5"/><rect x="34" y="206" width="16" height="36" rx="5"/><rect x="150" y="206" width="16" height="36" rx="5"/></g><text x="100" y="12" font-size="10" text-anchor="middle">ANTERIORE</text><text x="100" y="297" font-size="10" text-anchor="middle">POSTERIORE</text></svg>`;
-  const righe=VOCI.map(([k,l])=>{const v=(u.voci||{})[k]||{};return`<tr><td class="pl">${esc(l)}</td><td>${esc(v.descrizione||"")}${v.fatto?" ✔":""}</td><td class="pn">${v.stimato!==""&&v.stimato!=null?euro(v.stimato):""}</td><td class="pn">${v.effettivo!==""&&v.effettivo!=null?euro(v.effettivo):""}</td></tr>`;}).join("");
+  const righe=VOCI.map(([k,l])=>{const v=(u.voci||{})[k]||{};return`<tr><td class="pl">${esc(l)}</td><td>${esc(v.descrizione||"")}${v.fatto?" ✔":""}</td><td class="pn">${v.stimato!==""&&v.stimato!=null?euro(v.stimato):""}</td></tr>`;}).join("");
   $("printArea").innerHTML=`<div class="pv"><div class="pvh"><b>Stato d'uso / Perizia</b><span>DAG AUTO S.r.l.<br>Concessionaria Mercedes-Benz</span></div>
     <table class="pvt"><tr><td>Veicolo</td><td>${esc(u.modello||"")}</td><td>Targa</td><td>${esc(u.targa||"")}</td></tr>
     <tr><td>Telaio</td><td>${esc(u.telaio||"")}</td><td>Km check</td><td>${u.km!==""&&u.km!=null?Number(u.km).toLocaleString("it-IT"):""}</td></tr>
@@ -1107,15 +1111,15 @@ function stampaPerizia(u){
     <div class="pvg"><div><h2>Segnalazione danni carrozzeria</h2>${car}<div class="pvn">${esc(u.danni||"")}</div>
       <p class="pvs">Simboli: X bollatura · R rigatura · V da verniciare · C differenza colore · P raggio · F incrinatura vetro</p>
       <h2>Accessori e documenti</h2><table class="pvt">${[0,1,2,3,4].map(i=>`<tr><td style="width:8%">${i+1}.</td><td>${esc(acc[i])}</td><td style="width:8%">${i+6}.</td><td>${esc(acc[i+5])}</td></tr>`).join("")}</table></div>
-    <div><h2>Esame tecnico per valutazione costi di ripristino</h2><table class="pvt pvv"><tr><th>Voce</th><th>Perizia</th><th>Stimato</th><th>Effettivo</th></tr>${righe}
-      <tr><td class="pl">TOTALE</td><td></td><td class="pn"><b>${euro(t.s)}</b></td><td class="pn"><b>${t.hasE?euro(t.e):""}</b></td></tr></table></div></div>
+    <div><h2>Esame tecnico per valutazione costi di ripristino</h2><table class="pvt pvv"><tr><th>Voce</th><th>Perizia</th><th>Stimato</th></tr>${righe}
+      <tr><td class="pl">TOTALE</td><td></td><td class="pn"><b>${euro(t.s)}</b></td></tr></table></div></div>
     <p class="pvd">Data <b>${u.date&&u.date.presa?new Date(u.date.presa).toLocaleDateString("it-IT"):"____________"}</b></p>
     <div class="pvf"><span>Firma tecnico leggibile ____________________</span></div></div>`;
   window.print();
 }
 /* --- scheda usato --- */
 const citnow=(targa,rep)=>`https://portal.autoimaging.co.uk/Vehicles/DAG_Auto_SRL#/Portal/2169/published/vehicles/3980/${rep}/${encodeURIComponent(String(targa).toUpperCase().replace(/[^A-Z0-9]/g,""))}`;
-const fotoOk=st=>STATI_U.findIndex(([k])=>k===st)>=STATI_U.findIndex(([k])=>k==="foto");
+const fotoOk=st=>st==="foto"||st==="pubblicata";
 // MB Certified: solo Mercedes (non smart), meno di 6 anni dall'immatricolazione e massimo 150.000 km; le altre DAG Used.
 const dataImm=s=>{const d=scadData(s);if(d)return new Date(d+"T12:00:00");const m=String(s||"").match(/^(\d{4})$/);return m?new Date(+m[1],0,1):null;};
 function repCitnow(u){if(!u)return["10653","10652"];const mb=/MERCEDES/i.test(u.marca||"MERCEDES")&&!/^\s*smart/i.test(u.modello||"")&&!/smart/i.test(u.marca||"");if(!mb)return["10653"];
@@ -1128,7 +1132,7 @@ const citBox=(targa,u)=>{const t=String(targa||"").toUpperCase().replace(/[^A-Z0
 document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[data-cit]");if(!a)return;try{navigator.clipboard&&navigator.clipboard.writeText(a.dataset.cit).catch(()=>{});}catch(_){}const m=a.closest(".keybox")&&a.closest(".keybox").querySelector(".cit-msg");if(m)m.innerHTML=`Targa <b>${esc(a.dataset.cit)}</b> copiata. Se CitNOW mostra il login o la pagina generica, accedi (spunta «Salvare le credenziali?»), torna qui e premi di nuovo il pulsante.`;});
 function openUsato(id){
   const nuovo=!id;
-  const base=nuovo?{stato:"presa",priorita:"normale",marca:"MERCEDES",date:{presa:oggi()},voci:{}}:Object.assign({},U.docs.get(id));
+  const base=nuovo?{stato:"attesa",priorita:"normale",marca:"MERCEDES",date:{presa:oggi()},voci:{}}:Object.assign({},U.docs.get(id));
   const ris=nuovo?{}:Object.assign({},U.ris.get(id)||{});
   const f=JSON.parse(JSON.stringify(base));f.voci=f.voci||{};f.date=f.date||{};
   const r=Object.assign({valoreContratto:"",ivaEsposta:""},ris);
@@ -1141,8 +1145,8 @@ function openUsato(id){
       <input type="file" id="u_fLib" accept="image/*" capture="environment" hidden><input type="file" id="u_fStato" accept="image/*" multiple hidden>
       <div id="u_fmsg" class="small" style="margin-top:6px"></div></div>`:""}
     ${!nuovo&&fotoOk(f.stato)?citBox(f.targa,f):""}
-    ${!nuovo?`<div class="keybox"><h4>Stato</h4><div class="places" data-k="stato">${STATI_U.map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}" ${statiPermessi().includes(k)||f.stato===k?"":"disabled"}>${l}</button>`).join("")}</div>
-      <div class="small">${STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`).join(" · ")}</div></div>`:""}
+    <div class="keybox"><h4>Stato${nuovo?' <span class="small">dove va la vettura appena entra</span>':""}</h4><div class="places" data-k="stato">${STATI_U.filter(([k])=>!nuovo||STATI_ENTRATA.includes(k)).map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}" ${statiPermessi().includes(k)||f.stato===k?"":"disabled"}>${l}</button>`).join("")}</div>
+      ${nuovo?"":`<div class="small">${[f.date.presa?`Entrata: ${new Date(f.date.presa).toLocaleDateString("it-IT")}`:""].concat(STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`)).filter(Boolean).join(" · ")}</div>`}</div>
     <div class="keybox"><h4>Priorità di ripristino <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
     <div class="grid2">${inp("targa","Targa",{mono:1})}${inp("modello","Modello")}</div>
     <div class="grid2">${inp("marca","Marca")}${inp("telaio","Telaio",{mono:1})}</div>
@@ -1164,7 +1168,7 @@ function openUsato(id){
       <div class="voci">${VOCI.map(([k,l])=>{const v=f.voci[k]||{};return`<div class="voce" data-voce="${k}">
         <div class="vh"><b>${l}</b><label class="small"><input type="checkbox" data-vf="fatto" ${v.fatto?"checked":""}> fatto</label></div>
         <input data-vf="descrizione" placeholder="Lavori da fare" value="${esc(v.descrizione||"")}">
-        <div class="grid2 tight"><label class="f">Stimato €<input data-vf="stimato" inputmode="decimal" value="${esc(v.stimato??"")}"></label><label class="f">Effettivo €<input data-vf="effettivo" inputmode="decimal" value="${esc(v.effettivo??"")}"></label></div></div>`;}).join("")}</div></div>
+        <div class="grid2 tight"><label class="f">Stimato €<input data-vf="stimato" inputmode="decimal" value="${esc(v.stimato??"")}"></label></div></div>`;}).join("")}</div></div>
     <label class="f">Segnalazione danni carrozzeria<textarea id="u_danni" rows="2" placeholder="es. X portiera ant. sx, R paraurti post.">${esc(f.danni||"")}</textarea></label>
     <label class="f">Accessori e documenti (uno per riga, max 10)<textarea id="u_accdoc" rows="3">${esc((f.accessoriDoc||[]).join("\n"))}</textarea></label>
     <label class="f">Note<textarea id="u_note" rows="2">${esc(f.note||"")}</textarea></label>
@@ -1179,8 +1183,8 @@ function openUsato(id){
   const press=k=>p.querySelectorAll(`[data-k="${k}"] button`).forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===f[k]));
   p.addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(!b)return;const k=b.parentElement.dataset.k;f[k]=b.dataset.v;press(k);});
   const leggiVoci=()=>{p.querySelectorAll("[data-voce]").forEach(el=>{const k=el.dataset.voce;const v={};el.querySelectorAll("[data-vf]").forEach(i=>{v[i.dataset.vf]=i.type==="checkbox"?i.checked:(i.dataset.vf==="descrizione"?i.value.trim():num(i.value));});
-    if(v.descrizione||v.stimato!==""||v.effettivo!==""||v.fatto)f.voci[k]=v;else delete f.voci[k];});};
-  const aggTot=()=>{leggiVoci();const t=totali(f);$("u_tot").textContent=`stimato ${euro(t.s)}${t.hasE?` · effettivo ${euro(t.e)} · scostamento ${euro(t.e-t.s)}`:""}`;};
+    if(v.descrizione||v.stimato!==""||v.fatto)f.voci[k]=v;else delete f.voci[k];});};
+  const aggTot=()=>{leggiVoci();const t=totali(f);$("u_tot").textContent=`stimato ${euro(t.s)}`;};
   p.querySelector(".voci").addEventListener("input",aggTot);p.querySelector(".voci").addEventListener("change",aggTot);aggTot();
   $("u_close").onclick=closeSheet;
   const upr=$("u_print");if(upr)upr.onclick=()=>{leggiVoci();const g=Object.assign({},f,{danni:$("u_danni").value.trim(),accessoriDoc:$("u_accdoc").value.split("\n").map(x=>x.trim()).filter(Boolean)});stampaPerizia(g);};
@@ -1233,13 +1237,13 @@ function openUsato(id){
     const writes=[soloStato?{col:"usato",id:nid,merge:true,data:{stato:f.stato,date:f.date}}:{col:"usato",id:nid,data:f}],logs=[];
     if(soloStato&&f.stato===base.stato){closeSheet();return;}
     const desc=[f.targa,f.modello].filter(Boolean).join(" · ");
-    if(nuovo)writes.push(coda("usato_presa",`Presa in carico ${f.targa||""}`,`${desc}${f.chiave?" · chiave R "+f.chiave:""}`,"#usato"));
-    else if(f.stato!==base.stato&&f.stato==="attesa")writes.push(coda("usato_attesa",`Usato da ripristinare: ${f.targa||""}`,`${desc} · priorità ${f.priorita||"normale"}`,"#usato"));
+    if(nuovo)writes.push(coda("usato_presa",`Entrata usato ${f.targa||""}${f.stato==="commerciante"?" · destinazione commerciante":""}`,`${desc}${f.chiave?" · chiave R "+f.chiave:""}`,"#usato"));
+    if(f.stato==="attesa"&&(nuovo||f.stato!==base.stato))writes.push(coda("usato_attesa",`Usato da ripristinare: ${f.targa||""}`,`${desc} · priorità ${f.priorita||"normale"}`,"#usato"));
     else if(f.stato!==base.stato&&f.stato==="pronta")writes.push(coda("usato_pronta",`Foto da fare: ${f.targa||""}`,`${desc} è pronta e lavata`,"#usato"));
     if(canFiscale()&&$("u_ivaEsposta"))f.ivaEsposta=$("u_ivaEsposta").value;
     if(canFiscale()){const rv={valoreContratto:num($("u_valoreContratto").value),ivaEsposta:$("u_ivaEsposta").value};if(nuovo||rv.valoreContratto!==(r.valoreContratto??"")||rv.ivaEsposta!==(r.ivaEsposta||""))writes.push({col:"usato_riservato",id:nid,data:rv});}
     const cod=f.targa||nid;
-    if(nuovo)logs.push({codice:cod,azione:"Presa in carico",dettaglio:[f.modello,f.chiave?`chiave U.${f.chiave}`:""].filter(Boolean).join(" · ")});
+    if(nuovo)logs.push({codice:cod,azione:f.stato==="commerciante"?"Entrata · destinazione commerciante":"Entrata · in attesa di ripristino",dettaglio:[f.modello,f.chiave?`chiave U.${f.chiave}`:""].filter(Boolean).join(" · ")});
     else if(f.stato!==base.stato)logs.push({codice:cod,azione:NOME_STATO[f.stato],dettaglio:`da «${NOME_STATO[base.stato]}»`});
     else logs.push({codice:cod,azione:"Scheda usato aggiornata",dettaglio:f.priorita!==base.priorita?`priorità ${f.priorita}`:""});
     // collegamento con il registro chiavi
@@ -1262,6 +1266,11 @@ function openUsato(id){
 function inVendita(u){return IN_VENDITA.includes(u.stato)&&!!u.prezzoVendita&&parseFloat(String(u.prezzoVendita).replace(',','.'))>0;}
 $("uList").addEventListener("click",e=>{const b=e.target.closest("[data-u]");if(b)openUsato(b.dataset.u);});
 // Copia «IVA esposta» dal carico fiscale alla scheda usato, perché i venditori la vedano (solo il dato Sì/No, non il valore).
+// Le schede rimaste nel vecchio stato «Presa in carico» passano a «In attesa di ripristino» (lo fa la gestione, una volta).
+let migrata=false;
+async function migraPresa(){if(migrata||!ha(...GEST)||!(U.daMigrare||[]).length)return;migrata=true;
+  const w=U.daMigrare.map(id=>{const u=U.docs.get(id);return u?{col:"usato",id,merge:true,data:{stato:"attesa",date:u.date}}:null;}).filter(Boolean);
+  try{await S.store.commitU(w.slice(0,400),[]);}catch(e){console.warn("migraPresa",e);}}
 let ivaFatta=false;
 async function allineaIva(){if(ivaFatta||!canFiscale()||!U.docs.size)return;ivaFatta=true;const w=[];
   for(const[id,r]of U.ris.entries()){const u=U.docs.get(id);if(u&&r.ivaEsposta&&u.ivaEsposta!==r.ivaEsposta)w.push({col:"usato",id,merge:true,data:{ivaEsposta:r.ivaEsposta}});}
@@ -1278,7 +1287,7 @@ $("btnTracciato").onclick=async()=>{
   const dt=s=>{const d=scadData(s)||(/^\d{4}-\d{2}-\d{2}/.test(String(s||""))?String(s).slice(0,10):"");return d?new Date(d+"T12:00:00"):"";};
   const rows=[...U.docs.entries()].filter(([,u])=>!u.deleted).sort((a,b)=>String((a[1].date||{}).presa||"").localeCompare(String((b[1].date||{}).presa||""))).map(([id,u])=>{
     const r=new Array(TRACCIATO.length).fill("");const put=(l,v)=>{if(v!==""&&v!=null)r[col(l)]=v;};const ris=U.ris.get(id)||{};const imm=dataImm(u.immatricolazione);const t=totali(u);
-    put("B",u.targa||"");put("C",u.chiave?Number(u.chiave):"");put("E","Stock");put("G",dt((u.date||{}).presa));
+    put("B",u.targa||"");put("C",u.chiave?Number(u.chiave):"");put("D",u.stato==="commerciante"?"Commerciante":"");put("E","Stock");put("G",dt((u.date||{}).presa));
     put("H",/^mercedes/i.test(u.marca||"")?"Mercedes-Benz":(u.marca||""));put("I",u.modello||"");
     if(imm&&/\d{1,2}[\/.\-]\d/.test(String(u.immatricolazione||"")))put("Q",MESI[imm.getMonth()]);if(imm)put("R",imm.getFullYear());
     put("S",u.km===""||u.km==null?"":Number(u.km));put("T",u.exProprietario||"");put("U",u.venditore||"");
@@ -1294,10 +1303,10 @@ $("btnTracciato").onclick=async()=>{
 $("btnExportU").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
   const rows=[...U.docs.entries()].map(([id,u])=>{const t=totali(u);const o={"Targa":u.targa||"","Telaio":u.telaio||"","Modello":u.modello||"","Km":u.km??"","Chiave U":u.chiave||"","Venditore":u.venditore||"","Stato":NOME_STATO[u.stato]||"","Priorità":u.priorita||""};
-    for(const[k,l]of STATI_U)o["Data "+l.toLowerCase()]=(u.date||{})[k]||"";
+    o["Data entrata"]=(u.date||{}).presa||"";for(const[k,l]of STATI_U)o["Data "+l.toLowerCase()]=(u.date||{})[k]||"";
     o["Giorni presa → pubblicata"]=giorniTot(u)??"";
-    for(const[k,l]of VOCI){const v=(u.voci||{})[k]||{};o[l+" lavori"]=v.descrizione||"";o[l+" stimato"]=v.stimato??"";o[l+" effettivo"]=v.effettivo??"";}
-    o["Prezzo di vendita"]=u.prezzoVendita??"";o["Margine di trattativa"]=u.margine||"";o["Totale stimato"]=t.s;o["Totale effettivo"]=t.hasE?t.e:"";o["Scostamento"]=t.hasE?t.e-t.s:"";
+    for(const[k,l]of VOCI){const v=(u.voci||{})[k]||{};o[l+" lavori"]=v.descrizione||"";o[l+" stimato"]=v.stimato??"";}
+    o["Prezzo di vendita"]=u.prezzoVendita??"";o["Margine di trattativa"]=u.margine||"";o["Totale stimato"]=t.s;
     if(canFiscale()){const r=U.ris.get(id)||{};o["Valore da contratto"]=r.valoreContratto??"";o["IVA esposta"]=r.ivaEsposta||"";}
     o["Note"]=u.note||"";return o;});
   const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"Targa":""}]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Lavorazione usato");
@@ -1327,9 +1336,10 @@ const C={docs:new Map(),imp:new Map(),week:0,q:""};
 const canConsegne=()=>!!S.me&&S.me.ruolo!=="operatore";
 const canCreaConsegna=()=>ha(...GEST);
 const canAppConsegna=()=>ha(...GEST,"productexpert");
-const canPrepConsegna=()=>ha(...GEST,"officina","movimentatore","ripristini","preparatore");
+const canPrepConsegna=()=>ha(...GEST,"officina","ripristini","preparatore");
 const canConsegnata=()=>ha(...GEST,"venditore","productexpert");
-const canMontato=()=>ha(...GEST,"officina","ripristini","preparatore");
+const canMagazzino=()=>ha(...GEST,"magazzino");
+const canMontato=()=>ha(...GEST,"officina","ripristini");
 const canImpegni=()=>ha(...GEST,"productexpert","venditore");
 const canImpTutti=()=>ha(...GEST);
 const vedeImpegni=()=>ha(...GEST,"venditore","productexpert","bdc");
@@ -1392,6 +1402,7 @@ function quando(c){return c.data?new Date(`${c.data}T${c.ora||"09:00"}:00`):null
 function semaforo(c){
   if(c.stato==="consegnata")return["done","Consegnata"];
   if(c.stato==="annullata")return["done","Annullata"];
+  if(c.ordineDa&&!c.ordineArrivati)return["warn","Accessori da ordinare: in attesa del magazzino"];
   if(prontaC(c))return["ok",c.data?"Pronta":"Pronta · data da fissare"];
   if(!c.data)return["warn","Data da fissare"];
   const h=oreLavorative(Date.now(),quando(c).getTime());
@@ -1468,7 +1479,7 @@ function openConsegna(id){
   const nuovo=!id;
   const base=nuovo?{stato:"richiesta",tipo:"vendita",colore:"BLU",std:{},pag:{},prep:{},date:{richiesta:oggi()}}:JSON.parse(JSON.stringify(C.docs.get(id)));
   const f=Object.assign({std:{},pag:{},prep:{},date:{}},JSON.parse(JSON.stringify(base)));
-  const edAll=canCreaConsegna();const prepOk=canPrepConsegna();const appOk=canAppConsegna();const roP=prepOk?"":"disabled";const roA=appOk?"":"disabled";
+  const edAll=canCreaConsegna();const prepOk=canPrepConsegna();const appOk=canAppConsegna();const roP=prepOk?"":"disabled";const bloccoOrd=!!(base.ordineDa&&!base.ordineArrivati);const roA=appOk&&!bloccoOrd?"":"disabled";
   const ro=edAll?"":"disabled";
   const ck=(grp,k,l,dis)=>`<label class="chk"><input type="checkbox" data-g="${grp}" data-k="${k}" ${(f[grp]||{})[k]?"checked":""} ${dis?"disabled":""}> ${esc(l)}</label>`;
   const p=openSheet(`<form class="panel" id="cf" novalidate role="dialog" aria-modal="true" aria-label="Consegna">
@@ -1486,12 +1497,16 @@ function openConsegna(id){
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
     <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&soloSposta()?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
-      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div></div>
+      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}</div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato»</span></h4>
       ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label><label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&canMontato()?"":"disabled"}> montato</label></div>`;}).join("")}
       <div class="accrow" style="border-top:0"><b style="font-size:14px">Accessori in omaggio</b></div>
       <div id="c_omlist">${omaggi(f).map((o,i)=>omRow(o,i,ro)).join("")}</div>
       ${ro?"":`<button type="button" class="link" id="c_omadd">+ Aggiungi omaggio</button>`}</div>
+    <div class="keybox ${f.ordineDa&&!f.ordineArrivati?"ripbox":""}"><h4><span>Accessori omaggio da ordinare<br><span class="small">es. pneumatici, barre · finché il magazzino non li segna arrivati la consegna non si fissa</span></span><label class="chk"><input type="checkbox" id="c_ordDa" ${f.ordineDa?"checked":""} ${ro}> da ordinare</label></h4>
+      <div id="c_ordBox" ${f.ordineDa?"":"hidden"}><label class="f">Cosa ordinare<textarea id="c_ordDett" rows="2" placeholder="es. 4 pneumatici invernali, barre portatutto" ${ro}>${esc(f.ordineDettagli||"")}</textarea></label>
+      <label class="chk" style="margin-top:8px;font-weight:600"><input type="checkbox" id="c_ordArr" ${f.ordineArrivati?"checked":""} ${canMagazzino()?"":"disabled"}> Arrivati in magazzino: via libera alla consegna</label>
+      ${f.ordineArrivati&&f.ordineArrivatiDa?`<div class="small">Segnati arrivati da ${esc(f.ordineArrivatiDa)}${f.ordineArrivatiIl?" il "+new Date(f.ordineArrivatiIl).toLocaleDateString("it-IT"):""}</div>`:""}</div></div>
     <div class="keybox"><h4>Preparazione officina <span class="small">spunta solo le voci che servono a questo cliente</span></h4>
       <div class="chkgrid">${ACC_STD.map(([k,l])=>ck("std",k,l,!prepOk)).join("")}${PREP.map(([k,l])=>ck("prep",k,l,!prepOk)).join("")}</div>
       <label class="chk" style="margin-top:10px;padding:10px;border:2px solid var(--ok);border-radius:8px;font-weight:600"><input type="checkbox" id="c_pronta" ${f.pronta?"checked":""} ${roP}> Preconsegna fatta: vettura pronta per la consegna</label>
@@ -1499,10 +1514,11 @@ function openConsegna(id){
     <label class="f">Note<textarea id="c_note" rows="2" ${edAll||prepOk||appOk?"":"disabled"}>${esc(f.note||"")}</textarea></label>
     <div id="e_err"></div>
     <div class="pfoot"><div class="r" style="margin-left:0;flex-wrap:wrap">${nuovo?"":`<button type="button" id="c_print">Stampa verbale</button><button type="button" id="c_ics">Aggiungi al calendario</button>`}</div>
-      <div class="r">${!nuovo&&f.stato!=="consegnata"&&canConsegnata()?`<button type="button" class="danger" id="c_done">Consegnata</button>`:""}<button type="button" id="c_close">Chiudi</button>${edAll||prepOk||appOk?`<button type="submit" class="primary" id="e_save">${nuovo?"Crea consegna":"Salva"}</button>`:""}</div></div>
+      <div class="r">${!nuovo&&f.stato!=="consegnata"&&canConsegnata()?`<button type="button" class="danger" id="c_done">Consegnata</button>`:""}<button type="button" id="c_close">Chiudi</button>${edAll||prepOk||appOk||canMagazzino()?`<button type="submit" class="primary" id="e_save">${nuovo?"Crea consegna":"Salva"}</button>`:""}</div></div>
     ${!nuovo&&edAll&&f.stato!=="consegnata"?`<div style="text-align:right"><button type="button" class="link" id="c_annulla">Annulla questa consegna</button></div>`:""}
   </form>`);
   $("c_close").onclick=closeSheet;
+  const odc=$("c_ordDa");odc.onchange=()=>{$("c_ordBox").hidden=!odc.checked;};
   const oa=$("c_omadd");if(oa)oa.onclick=()=>{const d=document.createElement("div");d.innerHTML=omRow({testo:"",fatto:false},0,"");const r=d.firstElementChild;$("c_omlist").appendChild(r);r.querySelector("input").focus();};
   $("c_omlist").addEventListener("click",e=>{const b=e.target.closest("[data-omdel]");if(b)b.closest(".omrow").remove();});
   const mostraVett=()=>{const n=parseInt($("c_numero").value,10),col=$("c_colore").value;const el=$("c_vett");
@@ -1533,6 +1549,9 @@ function openConsegna(id){
     for(const[k,v]of Object.entries(pg)){if(v.sel)f.pag[k]={sel:true,fatto:!!v.fatto};else delete f.pag[k];}
     if(nuovo){f.colore=$("c_colore").value;f.numero=parseInt($("c_numero").value,10);}
     const pc=$("c_pronta").checked;if(pc&&!base.pronta)f.prontaDa=S.me.nome;if(!pc)delete f.prontaDa;f.pronta=pc;
+    // Accessori da ordinare: i campi si scrivono solo se usati, così le altre utenze non li «toccano» salvando.
+    const od2=$("c_ordDa").checked;if(od2||"ordineDa" in base){f.ordineDa=od2;f.ordineDettagli=od2?$("c_ordDett").value.trim():"";}
+    const oa2=od2&&$("c_ordArr").checked;if(oa2||"ordineArrivati" in base){if(oa2&&!base.ordineArrivati){f.ordineArrivatiDa=S.me.nome;f.ordineArrivatiIl=oggi();}if(!oa2){delete f.ordineArrivatiDa;delete f.ordineArrivatiIl;}f.ordineArrivati=oa2;}
   };
   const salvaC=async(extraWrites,logs,msg)=>{
     const sv=$("e_save");if(sv)sv.disabled=true;
@@ -1541,6 +1560,7 @@ function openConsegna(id){
   };
   const cid=()=>id||`${f.colore}-${String(f.numero).padStart(3,"0")}-${Date.now().toString(36)}`;
   p.onsubmit=e=>{e.preventDefault();leggi();
+    if(f.ordineDa&&!f.ordineArrivati&&f.data&&(f.data!==(base.data||"")||f.ora!==(base.ora||""))){$("e_err").innerHTML=`<div class="banner bad">Ci sono accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`;return;}
     if(nuovo){if(!(f.numero>=1&&f.numero<=100)){$("e_err").innerHTML=`<div class="banner bad">Cerca la vettura per targa o telaio e toccala nei risultati (oppure indica colore e numero chiave).</div>`;return;}
       const s=mostraVett();if(s){if(!f.telaio)f.telaio=s.telaio||"";f.modello=s.modello||"";}
       const aperta=[...C.docs.values()].find(c=>c.colore===f.colore&&c.numero===f.numero&&c.stato!=="consegnata"&&c.stato!=="annullata");
@@ -1558,6 +1578,8 @@ function openConsegna(id){
     const quandoTxt=f.data?`${new Date(f.data).toLocaleDateString("it-IT")} ore ${f.ora||"--:--"}`:"data da fissare";
     if(nuovo)qw.push(coda("consegna_nuova",`Nuova consegna ${sig}`,`${chi} · ${quandoTxt}. Prepara la vettura.`,"#consegne"));
     else if(f.data&&(f.data!==base.data||f.ora!==base.ora)){f.avviso24h=false;qw.push(coda("consegna_fissata",`Consegna ${sig}: ${quandoTxt}`,`${chi}${base.data?" · spostata dal "+new Date(base.data).toLocaleDateString("it-IT"):""}`,"#consegne"));}
+    if(f.ordineDa&&!f.ordineArrivati&&(!base.ordineDa||f.ordineDettagli!==(base.ordineDettagli||""))){qw.push(coda("consegna_ordine",`Accessori da ordinare: ${sig}`,`${chi} · ${f.ordineDettagli||"vedi la consegna"}`,"#consegne"));logs.push({codice:cod,azione:"Accessori da ordinare",dettaglio:f.ordineDettagli||""});}
+    if(f.ordineArrivati&&!base.ordineArrivati){qw.push(coda("consegna_arrivati",`Accessori arrivati: ${sig}`,`${chi} · si può fissare la consegna`,"#consegne"));logs.push({codice:cod,azione:"Accessori arrivati",dettaglio:f.ordineDettagli||""});}
     if(ora&&!prontaC(base)&&!nuovo)qw.push(coda("consegna_pronta",`Consegna ${sig} pronta`,`${chi} · ${quandoTxt}`,"#consegne"));
     salvaC([{col:"consegne",id:cid(),data:f},...qw],logs,nuovo?"Consegna creata.":"Consegna salvata.");
   };
@@ -1672,7 +1694,7 @@ $("btnExportC").onclick=async()=>{
 };
 
 /* =================== Notifiche =================== */
-const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","movimentatore","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","movimentatore","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","movimentatore","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con bollo o revisione scaduti o in scadenza",["officina","backoffice"]],["usato_presa","Nuova presa in carico usato",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","movimentatore"]]];
+const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con bollo o revisione scaduti o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_arrivati","Accessori ordinati arrivati: si può fissare la consegna",["productexpert","backoffice"]]];
 const coda=(evento,titolo,testo,link)=>({col:"notifiche_coda",id:`${evento}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,data:{evento,titolo,testo,link:link||"",inviata:false,ts:Date.now()}});
 let MIE={prefs:{},tokens:[]};
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
@@ -1724,7 +1746,7 @@ function avviaApp(store){
   store.onChiavi(list=>{S.docs=new Map(list);render();},()=>flash("Non riesco a leggere il registro. Ricarica la pagina.","bad"));
   store.onLog(l=>{S.log=l;renderLog();});
   if(isAdmin())store.onUtenti(u=>{S.utenti=u;renderUtenti();});
-  if(canUsato()){$("tabs").hidden=false;const ta=document.querySelector('#tabs [data-tab="archivio"]');if(ta)ta.hidden=!canArchivio();store.onColl("usato",l=>{U.docs=new Map(l);renderUsato();renderConsegne();});
+  if(canConsegne()){$("tabs").hidden=false;const ta=document.querySelector('#tabs [data-tab="archivio"]');if(ta)ta.hidden=!canArchivio();const tu=document.querySelector('#tabs [data-tab="usato"]');if(tu)tu.hidden=!canUsato();store.onColl("usato",l=>{U.daMigrare=l.filter(([,d])=>d.stato==="presa").map(([i])=>i);U.docs=new Map(l.map(([i,d])=>[i,d.stato==="presa"?Object.assign({},d,{stato:"attesa",date:Object.assign({attesa:(d.date||{}).presa||""},d.date||{})}):d]));renderUsato();renderConsegne();if(U.daMigrare.length)setTimeout(migraPresa,2000);});
     if(canFiscale())store.onColl("usato_riservato",l=>{U.ris=new Map(l);setTimeout(allineaIva,1500);});
     store.onColl("consegne",l=>{C.docs=new Map(l);renderConsegne();renderAgenda();});
     if(vedeImpegni())store.onColl("impegni",l=>{C.imp=new Map(l);renderConsegne();renderAgenda();});
