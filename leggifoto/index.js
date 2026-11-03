@@ -78,6 +78,9 @@ Ti mando la foto di un documento di una vettura usata: può essere la carta di c
 - Nel verbale: "km" è il campo KM in alto; "accessori" sono le Dotazioni presenti (non segnate R o S); in "note" metti
   esterno/interno pulito SI/NO, numero verbale, tipo pneumatici e le note di stato meccanica se brevi.
 - sicuro: true se targa e telaio si leggono chiaramente, false se hai dovuto indovinare.
+- Scrittura a mano: molte perizie sono compilate a penna, anche in fretta. Leggi la grafia con attenzione e riporta comunque
+  quello che riesci a leggere (pezzi, R/S, importi, km), anche se la foto è storta o in parte in ombra; lascia vuoto solo
+  il singolo dato davvero illeggibile, senza scartare il resto. Non inventare importi.
 Se un dato non c'è lascia la stringa vuota (o la lista vuota). Non inventare nulla.
 In "tipo_documento" scrivi libretto, stato d'uso o altro.`;
 const SCHEMA_USATO = {
@@ -147,7 +150,16 @@ functions.http("leggifoto", async (req, res) => {
       contents: [{ role: "user", parts: [{ text: usato ? ISTRUZIONI_USATO : ISTRUZIONI }, { inlineData: { mimeType: mime || "image/jpeg", data: immagine } }] }],
       generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: usato ? SCHEMA_USATO : SCHEMA },
     };
-    const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${await tokenGoogle()}`, "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+    // Ragionamento breve: le perizie scritte a mano con il ragionamento lungo superavano il tempo massimo.
+    // Se il modello non accetta l'opzione, si riprova senza.
+    const chiama = async (c) => {
+      const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 170000);
+      try { return await fetch(url, { method: "POST", signal: ac.signal, headers: { Authorization: `Bearer ${await tokenGoogle()}`, "Content-Type": "application/json" }, body: JSON.stringify(c) }); }
+      finally { clearTimeout(t); }
+    };
+    const veloce = JSON.parse(JSON.stringify(corpo)); veloce.generationConfig.thinkingConfig = { thinkingLevel: "LOW" };
+    let r = await chiama(veloce);
+    if (r.status === 400) { console.warn("thinkingLevel non accettato, riprovo senza"); r = await chiama(corpo); }
     const j = await r.json();
     if (!r.ok) {
       console.error("Gemini", r.status, JSON.stringify(j).slice(0, 500));
