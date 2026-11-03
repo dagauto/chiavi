@@ -297,6 +297,7 @@ details.raw pre{white-space:pre-wrap;font-family:var(--f-mono);font-size:12px;ba
     <button id="btnExportC" hidden>Esporta Excel consegne</button>
     <button id="btnImport" hidden>Importa Excel</button>
     <button id="btnUsers" hidden>Utenti</button>
+    <button id="btnCome" hidden>Vedi come un altro ruolo</button>
     <button id="btnNotif">Notifiche</button>
     <button id="btnOut">Esci</button>
   </div>
@@ -1700,8 +1701,23 @@ $("btnNotif").onclick=()=>{openSheet(`<div class="panel" role="dialog" aria-moda
 /* =================== Avvio =================== */
 $("btnMore").onclick=()=>{const m=$("moreMenu");m.hidden=!m.hidden;$("btnMore").setAttribute("aria-expanded",String(!m.hidden));};
 $("btnOut").onclick=()=>S.store.logout();
+// «Vedi come»: l'amministratore guarda l'app con le schermate di un altro ruolo, senza poter salvare nulla.
+function vediCome(store){let r=null;try{r=sessionStorage.getItem("vediCome");}catch(e){}
+  if(!r||store.demo||store.me.ruolo!=="admin"||!RUOLI.some(([k])=>k===r))return;
+  store.me.ruolo=r;store.anteprima=true;
+  for(const k of["commitU","commit","setUtente","delUtente","setMiePrefs","attivaPush"])store[k]=async()=>{throw new Error("Anteprima «vedi come»: in questa modalità non si salva nulla.");};
+  const nome=(RUOLI.find(([k])=>k===r)[1]||r).split(":")[0];
+  document.body.insertAdjacentHTML("afterbegin",`<div id="comeBanner" style="position:sticky;top:0;z-index:50;background:#7a1fa2;color:#fff;padding:8px 12px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">Stai vedendo l'app come <b>${esc(nome)}</b> · nessuna modifica viene salvata <button type="button" id="comeEsci" style="margin-left:auto;background:#fff;color:#7a1fa2;border:0;border-radius:6px;padding:4px 10px;font-weight:600">Torna amministratore</button></div>`);
+  $("comeEsci").onclick=()=>{try{sessionStorage.removeItem("vediCome");}catch(e){}location.reload();};}
+$("btnCome").onclick=()=>{const p=openSheet(`<div class="panel" role="dialog" aria-modal="true" aria-label="Vedi come"><div class="phead"><div><h2>Vedi come un altro ruolo</h2><p>L'app si ricarica con le schermate e i permessi del ruolo scelto, sui dati veri. Non si salva nulla finché non torni amministratore.</p></div></div>
+  <div style="display:grid;gap:8px">${RUOLI.filter(([k])=>k!=="admin").map(([k,l])=>`<button type="button" class="btn" data-come="${k}" style="text-align:left">${esc(l)}</button>`).join("")}</div>
+  <div style="margin-top:12px"><button type="button" class="btn" id="comeChiudi">Annulla</button></div></div>`);
+  p.onclick=e=>{const b=e.target.closest("[data-come]");if(b){try{sessionStorage.setItem("vediCome",b.dataset.come);}catch(x){}location.reload();}};
+  $("comeChiudi").onclick=closeSheet;};
 function avviaApp(store){
+  vediCome(store);
   S.store=store;S.me=store.me;show("app");
+  $("btnCome").hidden=!(isAdmin()&&!store.demo);
   $("demoBanner").hidden=!store.demo;
   $("btnImport").hidden=!canImport();$("btnUsers").hidden=!isAdmin();
   $("whoami").textContent=`Accesso: ${store.me.nome} (${store.me.email})${isAdmin()?" · amministratore":""}`;
