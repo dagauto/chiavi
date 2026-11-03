@@ -1200,7 +1200,7 @@ function openUsato(id){
     const aggiungi=(id,v,sep)=>{const i=$(id);if(!i||!v)return 0;const cur=i.value.trim();if(cur.includes(v))return 0;i.value=cur?cur+sep+v:v;return 1;};
     const leggiU=async files=>{if(!files.length)return;
       if(!window.LEGGIFOTO_URL||!S.store.idToken){msgF("Lettura delle foto non disponibile qui: compila a mano.");return;}
-      let n=0,dubbio=false;
+      let n=0,dubbio=false;const ko=[];
       for(let i=0;i<files.length;i++){msgF(`Leggo la foto ${i+1} di ${files.length}…`);
         try{const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken(),"X-Firebase-AppCheck":S.store.appCheckToken?await S.store.appCheckToken():""},body:JSON.stringify({modo:"usato",immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
           if(!r.ok)throw new Error(r.status);const d=await r.json();
@@ -1212,8 +1212,10 @@ function openUsato(id){
             if(v.stimato){st.value=String((num(st.value)||0)+v.stimato);}}
           if((d.voci||[]).length)aggTot();
           if(d.targa||d.telaio)dubbio=dubbio||!d.sicuro;
-        }catch(e){msgF(`<span style="color:var(--bad)">Non sono riuscito a leggere la foto ${i+1}. Riprova o compila a mano.</span>`);return;}}
-      msgF(n?`<span style="color:var(--ok)">Ho compilato ${n} ${n===1?"campo":"campi"}.</span> ${dubbio?'<b style="color:var(--warn)">Controlla targa e telaio: la foto non era nitida.</b>':(nuovo?"Controlla i dati prima di registrare.":"Controlla i dati e tocca Salva.")}`:"Nella foto non ho trovato dati nuovi da inserire.");};
+        }catch(e){ko.push(i+1);}}
+      const koT=ko.length?`<span style="color:var(--bad)">Non sono riuscito a leggere ${ko.length===1?"la foto "+ko[0]:"le foto "+ko.join(", ")}: riprova con più luce e il foglio dritto, oppure compila a mano.</span> `:"";
+      if(ko.length&&!n){msgF(koT);return;}
+      msgF(koT+(n?`<span style="color:var(--ok)">Ho compilato ${n} ${n===1?"campo":"campi"}.</span> ${dubbio?'<b style="color:var(--warn)">Controlla targa e telaio: la foto non era nitida.</b>':(nuovo?"Controlla i dati prima di registrare.":"Controlla i dati e tocca Salva.")}`:"Nella foto non ho trovato dati nuovi da inserire."));};
     if($("u_bLib"))$("u_bLib").onclick=()=>$("u_fLib").click();$("u_bStato").onclick=()=>$("u_fStato").click();
     $("u_fLib").onchange=e=>{leggiU([...e.target.files]);e.target.value="";};$("u_fStato").onchange=e=>{leggiU([...e.target.files]);e.target.value="";};
   }
