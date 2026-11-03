@@ -53,7 +53,8 @@ Ti mando la foto di un documento di una vettura usata: può essere la carta di c
 "stato d'uso" / perizia compilata a mano o stampata (con km, danni, accessori, note). Estrai solo quello che c'è scritto:
 - targa: targa italiana (libretto campo A), maiuscolo senza spazi.
 - telaio: VIN di 17 caratteri (libretto campo E), maiuscolo senza spazi; nei VIN non esistono I, O, Q (sono 1 o 0).
-- modello: marca e modello brevi (libretto D.1 + D.3, es. "Mercedes GLC 220 d 4MATIC"; ometti "Mercedes-Benz" se è Mercedes).
+- marca: la marca (libretto campo D.1), scritta per bene: Mercedes-Benz, smart, Fiat, Audi, Volkswagen…
+- modello: modello breve senza la marca (libretto D.3, es. "GLC 220 d 4MATIC", "Panda 1.2").
 - immatricolazione: data di prima immatricolazione (libretto campo B) nel formato GG/MM/AAAA.
 - exProprietario: intestatario (libretto campi C.2.1 / C.2.2, cognome e nome o ragione sociale).
 - km: chilometri indicati nella scheda stato d'uso, solo cifre.
@@ -82,12 +83,12 @@ In "tipo_documento" scrivi libretto, stato d'uso o altro.`;
 const SCHEMA_USATO = {
   type: "OBJECT",
   properties: {
-    tipo_documento: { type: "STRING" }, targa: { type: "STRING" }, telaio: { type: "STRING" }, modello: { type: "STRING" },
+    tipo_documento: { type: "STRING" }, targa: { type: "STRING" }, telaio: { type: "STRING" }, marca: { type: "STRING" }, modello: { type: "STRING" },
     immatricolazione: { type: "STRING" }, exProprietario: { type: "STRING" }, km: { type: "STRING" }, danni: { type: "STRING" },
     accessori: { type: "ARRAY", items: { type: "STRING" } }, note: { type: "STRING" }, sicuro: { type: "BOOLEAN" },
     voci: { type: "ARRAY", items: { type: "OBJECT", properties: { sezione: { type: "STRING", enum: ["carrozzeria", "manutenzione", "freni", "pneumatici", "meccanica", "cristalli", "illuminazione", "interni", "altro"] }, descrizione: { type: "STRING" }, stimato: { type: "NUMBER" } }, required: ["sezione", "descrizione", "stimato"] } },
   },
-  required: ["tipo_documento", "targa", "telaio", "modello", "immatricolazione", "exProprietario", "km", "danni", "accessori", "note", "sicuro", "voci"],
+  required: ["tipo_documento", "targa", "telaio", "marca", "modello", "immatricolazione", "exProprietario", "km", "danni", "accessori", "note", "sicuro", "voci"],
 };
 
 async function tokenGoogle() {
@@ -158,7 +159,7 @@ functions.http("leggifoto", async (req, res) => {
     if (usato) {
       const out = {
         tipo: dati.tipo_documento || "", targa: pulisciTarga(dati.targa), telaio: pulisciTelaio(dati.telaio),
-        modello: String(dati.modello || "").trim(), immatricolazione: String(dati.immatricolazione || "").trim(),
+        marca: String(dati.marca || "").trim(), modello: String(dati.modello || "").trim(), immatricolazione: String(dati.immatricolazione || "").trim(),
         exProprietario: String(dati.exProprietario || "").trim(), km: String(dati.km || "").replace(/\D/g, ""),
         danni: String(dati.danni || "").trim(), accessori: (dati.accessori || []).map((x) => String(x).trim()).filter(Boolean).slice(0, 10),
         note: String(dati.note || "").trim(), sicuro: dati.sicuro !== false,
