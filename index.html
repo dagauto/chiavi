@@ -676,6 +676,11 @@ const erroreScrittura=e=>e&&String(e.code||"").includes("permission")?"Non hai i
 
 /* =================== Scheda vettura =================== */
 const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["noleggioDal","Fuori a noleggio dal"],["allestimentoDal","In allestimento dal"],["venduta","Venduta"],["cliente","Cliente"],["esposizione","Conto esposizione"],["esposizioneDal","In conto esposizione dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
+// Salvataggi in contemporanea: se mentre la scheda era aperta qualcun altro l'ha salvata, non si sovrascrive.
+function cambiataDaAltri(prima,ora){if(!prima||!ora)return"";if((ora.updatedAt||0)===(prima.updatedAt||0))return"";
+  const by=ora.updatedBy||"";const nome=((S.utenti||[]).find(u=>u.email===by)||{}).nome||by||"un altro utente";
+  const h=ora.updatedAt?new Date(ora.updatedAt).toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"}):"";
+  return`<div class="banner bad">Mentre avevi aperta questa scheda l'ha salvata ${esc(nome)}${h?" alle "+h:""}. Per non cancellare le sue modifiche chiudi e riapri la scheda, poi rifai le tue.</div>`;}
 function openEditor(id,assegna){
   const base=slots().find(s=>s.id===id);if(!base)return;
   const f=Object.assign({telaio:"",targa:"",modello:"",prima:"",dovePrima:"",seconda:"",motivo:"",ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",noleggioDal:"",allestimentoDal:"",venduta:"",cliente:"",esposizione:"",esposizioneDal:"",attesa:"",attesaDal:"",danni:"",controllatoDa:"",dataControllo:"",note:""},base);
@@ -732,12 +737,14 @@ function openEditor(id,assegna){
   $("e_close").onclick=closeSheet;
   const out=$("e_out");
   if(out)out.onclick=()=>{
+    {const w=cambiataDaAltri(base,S.docs.get(base.id));if(w){$("e_err").innerHTML=w;return;}}
     if(!out.dataset.armed){out.dataset.armed="1";out.classList.add("solid");out.textContent="Conferma: la vettura è uscita";return;}
     const snap=Object.assign({},base);delete snap._has;delete snap.id;snap.uscita=oggi();snap.motivoUscita=`Auto uscita, liberata da ${S.me.nome}`;snap.refs=[norm(base.targa),norm(base.telaio)].filter(Boolean);
     salva([{id:base.id,data:{colore:base.colore,numero:base.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:`${base.id}-${Date.now().toString(36)}`,data:snap}],
       [{codice:codice(base),azione:"Numero liberato",dettaglio:`uscita ${base.targa||base.telaio||""}`.trim()}],`${SING[base.colore]} ${base.numero} liberato.`);
   };
   ed.onsubmit=e=>{e.preventDefault();
+    {const w=cambiataDaAltri(base,S.docs.get(base.id));if(w){$("e_err").innerHTML=w;return;}}
     if(sp){const data={dovePrima:f.dovePrima||"",prima:f.prima||"",noleggioDal:f.noleggioDal||"",allestimentoDal:f.allestimentoDal||""};
       if(data.dovePrima===(base.dovePrima||"")&&data.prima===(base.prima||"")){closeSheet();return;}
       salva([{id:base.id,merge:true,data}],[{codice:codice(base),azione:"Spostata",dettaglio:`prima chiave: ${data.dovePrima||"—"}`}],`${SING[base.colore]} ${base.numero}: spostata.`);return;}
@@ -1233,6 +1240,7 @@ function openUsato(id){
   const del=$("u_del");if(del)del.onclick=async()=>{if(!del.dataset.armed){del.dataset.armed="1";del.classList.add("solid");del.textContent="Conferma eliminazione";return;}
     try{await S.store.commitU([{col:"usato",id,merge:true,data:{deleted:true,deletedAt:oggi(),deletedBy:S.me.nome}}],addRefs([{codice:base.targa||id,azione:"Scheda usato eliminata",dettaglio:"recuperabile da Archivio"}],[{data:base}]));closeSheet();flash("Scheda eliminata. Si recupera da Archivio cercando la targa.","ok");}catch(x){$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}};
   p.onsubmit=async e=>{e.preventDefault();leggiVoci();
+    if(!nuovo){const w=cambiataDaAltri(base,U.docs.get(id));if(w){$("e_err").innerHTML=w;return;}}
     if(edDati)for(const k of["targa","modello","marca","telaio","km","chiave","immatricolazione","venditore","scadBollo","scadRevisione","exProprietario","ritiroPermuta"])f[k]=$("u_"+k).value.trim();
     if(!nuovo&&canPrezzo()&&$("u_prezzoVendita")){f.prezzoVendita=num($("u_prezzoVendita").value);f.margine=$("u_margine").value.replace(/[^A-Za-z]/g,"").slice(0,2);}
     f.note=$("u_note").value.trim();f.danni=$("u_danni").value.trim();f.accessoriDoc=$("u_accdoc").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,10);f.targa=String(f.targa||"").toUpperCase().replace(/\s/g,"");f.telaio=String(f.telaio||"").toUpperCase().replace(/\s/g,"");f.km=num(f.km);f.chiave=f.chiave?String(parseInt(f.chiave,10)||""):"";
@@ -1565,6 +1573,7 @@ function openConsegna(id){
     const oa2=od2&&$("c_ordArr").checked;if(oa2||"ordineArrivati" in base){if(oa2&&!base.ordineArrivati){f.ordineArrivatiDa=S.me.nome;f.ordineArrivatiIl=oggi();}if(!oa2){delete f.ordineArrivatiDa;delete f.ordineArrivatiIl;}f.ordineArrivati=oa2;}
   };
   const salvaC=async(extraWrites,logs,msg)=>{
+    if(!nuovo){const w=cambiataDaAltri(base,C.docs.get(id));if(w){$("e_err").innerHTML=w;return;}}
     const sv=$("e_save");if(sv)sv.disabled=true;
     try{await S.store.commitU(extraWrites,addRefs(logs,extraWrites));closeSheet();flash(msg,"ok");}
     catch(x){if(sv)sv.disabled=false;$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}
