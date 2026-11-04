@@ -714,7 +714,7 @@ function openEditor(id,assegna){
     <label class="f">Note<textarea id="e_note" rows="2">${esc(f.note)}</textarea></label>
     <div id="e_err"></div>
     <div class="pfoot">
-      ${!libero&&canLibera()?`<button type="button" class="danger" id="e_out">Auto uscita: libera il numero</button>`:"<span></span>"}
+      <div class="r" style="margin-left:0;flex-wrap:wrap">${!libero&&canLibera()?`<button type="button" class="danger" id="e_out">Auto uscita: libera il numero</button>`:""}${!libero&&ha(...GEST)?`<button type="button" id="e_col">Cambia colore</button>`:""}</div>
       <div class="r"><button type="button" id="e_close">Annulla</button><button type="submit" class="primary" id="e_save">Salva</button></div>
     </div>
   </form>`);
@@ -735,6 +735,30 @@ function openEditor(id,assegna){
     if(k==="ripristino"){$("e_ripbox").hidden=f.ripristino!=="Sì";if(f.ripristino==="Sì"){if(!f.ripristinoDal)f.ripristinoDal=oggi();}else{f.ripristinoTipo="";f.ripristinoDove="";f.ripristinoDal="";press("ripristinoTipo");const d=$("e_ripristinoDove");if(d)d.value="";}}
   });
   $("e_close").onclick=closeSheet;
+  // Cambio colore (es. nuova blu o usata rossa che va a noleggio e diventa verde): nuovo numero, il vecchio si libera.
+  const ecol=$("e_col");if(ecol)ecol.onclick=()=>{
+    const altri=COLORI.filter(c=>c!==base.colore);let col=null;
+    $("e_err").innerHTML=`<div class="keybox"><h4><span>Cambia colore<br><span class="small">la vettura passa a un altro colore con un nuovo numero e il ${esc(codice(base))} si libera</span></span></h4>
+      <div class="places" id="e_cc">${altri.map(c=>`<button type="button" class="chip" data-cc="${c}" aria-pressed="false">${esc(NOMI[c])}</button>`).join("")}</div>
+      <label class="f" style="margin-top:8px">Nuovo numero<input id="e_cn" inputmode="numeric" autocomplete="off"></label><div id="e_cmsg" class="small"></div>
+      <div style="margin-top:8px;text-align:right"><button type="button" class="primary" id="e_cok" disabled>Sposta al nuovo colore</button></div></div>`;
+    const cn=$("e_cn"),ok=$("e_cok"),msg=$("e_cmsg");
+    const chk=()=>{const n=parseInt(cn.value,10);ok.disabled=true;if(!col){msg.textContent="Scegli il nuovo colore.";return;}
+      if(!(n>=1&&n<=100)){msg.innerHTML='<span style="color:var(--bad)">Il numero va da 1 a 100.</span>';return;}
+      const t=slot(col,n);if(occupato(t)){msg.innerHTML=`<span style="color:var(--bad)">La ${esc(SING[col])} ${n} è occupata (${esc(t.targa||t.modello||t.telaio||"altra vettura")}).</span>`;return;}
+      msg.innerHTML=`Diventa <b>${esc(SING[col])} ${n}</b>: prima chiave al ${n}, seconda al ${n+100}.`;ok.disabled=false;};
+    $("e_cc").onclick=e=>{const b=e.target.closest("[data-cc]");if(!b)return;col=b.dataset.cc;$("e_cc").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));const l=primoLibero(col);cn.value=l?l.numero:"";chk();};
+    cn.oninput=chk;chk();
+    ok.onclick=()=>{const w0=cambiataDaAltri(base,S.docs.get(base.id));if(w0){$("e_err").innerHTML=w0;return;}
+      const n=parseInt(cn.value,10);if(!col||!(n>=1&&n<=100)||occupato(slot(col,n)))return;
+      const nuovo={colore:col,numero:n};for(const[k]of FIELDS)nuovo[k]=base[k]||"";
+      const w=[{id:idOf(col,n),data:nuovo},{id:base.id,data:{colore:base.colore,numero:base.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}}];
+      for(const[cid,c]of C.docs.entries())if(c.colore===base.colore&&c.numero===base.numero&&c.stato!=="consegnata"&&c.stato!=="annullata")w.push({col:"consegne",id:cid,merge:true,data:{colore:col,numero:n}});
+      if(base.colore==="ROSSO"&&col!=="ROSSO")for(const[uid,u]of U.docs.entries())if(!u.deleted&&String(u.chiave)===String(base.numero)&&((base.targa&&norm(u.targa)===norm(base.targa))||(base.telaio&&norm(u.telaio)===norm(base.telaio))))w.push({col:"usato",id:uid,merge:true,data:{chiave:""}});
+      const dest={colore:col,numero:n};
+      salva(w,[{codice:codice(base),azione:"Cambio colore",dettaglio:`diventa ${SING[col]} ${n} · ${[base.targa,base.modello].filter(Boolean).join(" ")}`},{codice:codice(dest),azione:"Arrivata da cambio colore",dettaglio:`era ${codice(base)}`}],
+        `${codice(base)} è diventata ${SING[col]} ${n}: sposta le chiavi, prima al ${n} e seconda al ${n+100}.`);};
+  };
   const out=$("e_out");
   if(out)out.onclick=()=>{
     {const w=cambiataDaAltri(base,S.docs.get(base.id));if(w){$("e_err").innerHTML=w;return;}}
