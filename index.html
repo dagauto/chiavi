@@ -1091,7 +1091,7 @@ function renderUsato(){
   chipRow($("uStato"),chU.filter(c=>primi.includes(c[0])).sort((a,b)=>primi.indexOf(a[0])-primi.indexOf(b[0])).concat(chU.filter(c=>!primi.includes(c[0]))),U.stato,v=>{U.stato=v;renderUsato();});
   const pub=all.filter(u=>giorniTot(u)!=null),media=pub.length?Math.round(pub.reduce((a,u)=>a+giorniTot(u),0)/pub.length):null;
   const aperte=all.filter(u=>!CHIUSI_U.includes(u.stato));let ts=0,te=0;aperte.forEach(u=>{const t=totali(u);ts+=t.s;te+=t.e;});
-  $("uSummary").innerHTML=`<div class="sum"><h3>APERTE</h3><dl><dt>Vetture</dt><dd>${aperte.length}</dd><dt>Priorità alta</dt><dd>${aperte.filter(u=>u.priorita==="alta").length}</dd></dl></div>
+  $("uSummary").innerHTML=`<div class="sum"><h3>APERTE</h3><dl><dt>Vetture</dt><dd>${aperte.length}</dd><dt>Ripristino prioritario</dt><dd>${aperte.filter(u=>u.priorita==="alta"&&!IN_VENDITA.includes(u.stato)).length}</dd></dl></div>
     <div class="sum"><h3>RIPRISTINI</h3><dl><dt>Stimato</dt><dd>${euro(ts)}</dd><dt>Effettivo</dt><dd>${euro(te)}</dd></dl></div>
     <div class="sum"><h3>TEMPI</h3><dl><dt>Entrata → pubblicata</dt><dd>${media==null?"—":media+" gg"}</dd><dt>Su vetture</dt><dd>${pub.length}</dd></dl></div>`;
   const xs=listaU();
@@ -1104,7 +1104,7 @@ function renderUsato(){
     html+=`<button class="card ucard" data-u="${esc(u.id)}">
       <span class="ustate s-${esc(u.stato)}">${esc(NOME_STATO[u.stato]||"")}</span>
       <span style="min-width:0">
-        <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?'<span class="pill p-Solo-seconda">Priorità alta</span>':u.priorita==="bassa"?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
+        <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?`<span class="pill p-Solo-seconda">${IN_VENDITA.includes(u.stato)?"Vendita prioritaria":"Priorità alta"}</span>`:u.priorita==="bassa"&&!IN_VENDITA.includes(u.stato)?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
         <span class="uinfo">${[u.chiave?`Chiave U.${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
         <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}${u.ivaEsposta?" · IVA esp. "+esc(u.ivaEsposta):""}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
       </span></button>`;
@@ -1182,12 +1182,12 @@ function openUsato(id){
     <div class="phead"><div><h2>${nuovo?"Presa in carico":esc((f.targa||"")+" · "+(f.modello||""))}</h2><p>${nuovo?"Fotografa libretto e stato d'uso: la scheda si compila da sola. Controlla e registra.":`${esc(NOME_STATO[f.stato])} ${esc(giorniTxtU(f))}`}</p></div></div>
     ${nuovo||canVoci()?`<div class="keybox"><h4>Foto dei documenti <span class="small">${nuovo?"la scheda si compila da sola":"aggiunge ripristini e danni della perizia"}</span></h4>
       <div class="grid2">${nuovo?`<button type="button" id="u_bLib">Foto del libretto</button>`:""}<button type="button" id="u_bStato">${nuovo?"Foto dello stato d'uso":"Foto della perizia"}</button></div>
-      <input type="file" id="u_fLib" accept="image/*" capture="environment" hidden><input type="file" id="u_fStato" accept="image/*" multiple hidden>
+      <input type="file" id="u_fLib" accept="image/*" hidden><input type="file" id="u_fStato" accept="image/*" multiple hidden>
       <div id="u_fmsg" class="small" style="margin-top:6px"></div></div>`:""}
     ${!nuovo&&fotoOk(f.stato)?citBox(f.targa,f):""}
     <div class="keybox"><h4>Stato${nuovo?' <span class="small">dove va la vettura appena entra</span>':""}</h4><div class="places" data-k="stato">${STATI_U.filter(([k])=>!nuovo||STATI_ENTRATA.includes(k)).map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}" ${statiPermessi().includes(k)||f.stato===k?"":"disabled"}>${l}</button>`).join("")}</div>
       ${nuovo?"":`<div class="small">${[f.date.presa?`Entrata: ${new Date(f.date.presa).toLocaleDateString("it-IT")}`:""].concat(STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`)).filter(Boolean).join(" · ")}</div>`}</div>
-    <div class="keybox"><h4>Priorità di ripristino <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
+    <div class="keybox"><h4>${IN_VENDITA.includes(f.stato)?"Priorità di vendita":"Priorità di ripristino"} <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
     <div class="grid2">${inp("targa","Targa",{mono:1})}${inp("modello","Modello")}</div>
     <div class="grid2">${inp("marca","Marca")}${inp("telaio","Telaio",{mono:1})}</div>
     <div class="grid2">${inp("km",nuovo?"Km *":"Km",{im:"numeric"})}${inp("chiave","N° chiave rossa (U)",{im:"numeric"})}</div>
@@ -1374,8 +1374,17 @@ $("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if
 
 /* =================== Consegne =================== */
 const ACC_STD=[["chiavi","Chiave e doppia chiave"],["giubotto","Giubotto catarifrangente"],["prontosoccorso","Kit pronto soccorso"],["gonfiaggio","Kit gonfiaggio"],["portachiavi","Portachiavi Mercedes-Benz"],["libretto","Libretto d'uso e manutenzione"]];
-const ACC_PAG=[["autonera","Auto nera"],["bulloni","Bulloni antifurto"],["tappeti","Tappeti in gomma"],["servicecare","Service Care 4"],["advance","Advance 4"],["defence","Defence 48 mesi"],["certified","Certified"],["mapfree","Mapfree"]];
+const ACC_PAG=[["autonera","Auto nera"],["bulloni","Bulloni antifurto"],["tappeti","Tappeti in gomma"],["servicecare","Service Care"],["advance","Advance"],["defence","Defence"],["certified","Certified"],["mapfree","Mapfree"]];
 const PREP=[["targata","Targa montata"],["lavaggio","Lavaggio"]];
+// Durate dei pacchetti (Service Care in anni, gli altri in mesi); le consegne vecchie avevano Service Care 4 e Defence 48.
+const VAR_PAG={servicecare:["2","3","4"],advance:["12","24"],defence:["12","24","36","48"],certified:["12","24","36","48"]};
+const VAR_VECCHIA={servicecare:"4",defence:"48"};
+const varPag=(k,v)=>(v&&v.var)||VAR_VECCHIA[k]||"";
+const nomeVar=(k,x)=>k==="servicecare"?`${x}`:`${x} mesi`;
+const nomePag=(k,l,v)=>{const x=VAR_PAG[k]?varPag(k,v):"";return x?`${l} ${nomeVar(k,x)}`:l;};
+// Accessori da ordinare: "attesa" blocca la data, "ordinato" la permette dall'arrivo previsto, "mancante" si consegna senza.
+function statoOrdine(c){if(!c||!c.ordineDa||c.ordineArrivati)return"";if(c.ordineMancante)return"mancante";if(c.ordineOrdinato&&c.ordinePrevisto)return"ordinato";return"attesa";}
+const dIt=d=>d?new Date(d+"T12:00:00").toLocaleDateString("it-IT"):"";
 const LETT_C={BLU:"N",ROSSO:"U",VERDE:"V"};
 const C={docs:new Map(),imp:new Map(),week:0,q:""};
 const canConsegne=()=>!!S.me&&S.me.ruolo!=="operatore";
@@ -1439,7 +1448,7 @@ function scadenzeC(c){if(c.stato==="consegnata"||c.stato==="annullata")return[];
     if(d<rif)out.push({t:`${a} il ${g}`,bad:true});else if(d<=fine)out.push({t:`${b} il ${g}`,bad:false});}return out;}
 // Pronta solo quando preparatore/officina mette il flag «Preconsegna fatta»: le singole voci sono un promemoria, non tutte servono a ogni cliente.
 function prontaC(c){return !!c.pronta;}
-function mancanti(c){let n=0,t=0;for(const[k]of ACC_STD){t++;if(!(c.std||{})[k])n++;}for(const[k,v]of Object.entries(c.pag||{}))if(v.sel){t++;if(!v.fatto)n++;}for(const o of omaggi(c)){t++;if(!o.fatto)n++;}if(c.omaggioPE){t++;if(!c.omaggioPEFatto)n++;}for(const[k]of PREP){t++;if(!(c.prep||{})[k])n++;}return{n,t};}
+function mancanti(c){let n=0,t=0;for(const[k]of ACC_STD){t++;if(!(c.std||{})[k])n++;}for(const[k,v]of Object.entries(c.pag||{}))if(v.sel){t++;if(!v.fatto)n++;}for(const o of omaggi(c)){t++;if(!o.fatto)n++;}for(const o of c.ripAgg||[]){t++;if(!o.fatto)n++;}if(c.omaggioPE){t++;if(!c.omaggioPEFatto)n++;}for(const[k]of PREP){t++;if(!(c.prep||{})[k])n++;}return{n,t};}
 function omaggi(c){if(Array.isArray(c.omaggi))return c.omaggi.filter(o=>o&&o.testo);return c.omaggio?[{testo:c.omaggio,fatto:!!c.omaggioFatto}]:[];}
 // Ore lavorative tra adesso e la consegna: sabato e domenica non contano (le vetture non si preparano).
 function oreLavorative(from,to){if(to<=from)return(to-from)/36e5;if(to-from>21*864e5)return(to-from)/36e5;let ms=0,t=from;while(t<to){const d=new Date(t);const nx=Math.min(to,new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime());const g=d.getDay();if(g!==0&&g!==6)ms+=nx-t;t=nx;}return ms/36e5;}
@@ -1447,7 +1456,7 @@ function quando(c){return c.data?new Date(`${c.data}T${c.ora||"09:00"}:00`):null
 function semaforo(c){
   if(c.stato==="consegnata")return["done","Consegnata"];
   if(c.stato==="annullata")return["done","Annullata"];
-  if(c.ordineDa&&!c.ordineArrivati)return["warn","Accessori da ordinare: in attesa del magazzino"];
+  {const so=statoOrdine(c);if(so==="attesa")return["warn","Accessori da ordinare: in attesa del magazzino"];if(so==="ordinato"&&!c.data)return["warn",`Accessori ordinati: arrivo previsto il ${dIt(c.ordinePrevisto)}`];}
   if(prontaC(c))return["ok",c.data?"Pronta":"Pronta · data da fissare"];
   if(!c.data)return["warn","Data da fissare"];
   const h=oreLavorative(Date.now(),quando(c).getTime());
@@ -1469,7 +1478,7 @@ function cardC(c){
     <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
     <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio breve</span>':c.tipo==="lungo"?'<span class="pill p-Doppia">Noleggio lungo</span>':""}</span>
       <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`PE ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
-      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${avvisoChiaveC(c)?`<span class="kp miss">${esc(avvisoChiaveC(c))}</span>`:""}${scadenzeC(c).map(x=>`<span class="kp ${x.bad?"miss":"scad"}">${esc(x.t)}</span>`).join("")}${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
+      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${avvisoChiaveC(c)?`<span class="kp miss">${esc(avvisoChiaveC(c))}</span>`:""}${c.ordineMancante&&!c.ordineArrivati?`<span class="kp miss">Accessori da portare dopo (magazzino)</span>`:""}${scadenzeC(c).map(x=>`<span class="kp ${x.bad?"miss":"scad"}">${esc(x.t)}</span>`).join("")}${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
 }
 function renderConsegne(){
   if(!canConsegne())return;
@@ -1516,19 +1525,21 @@ function stampaVerbale(c){
     <tr><td>Marca e modello</td><td colspan="3">Mercedes-Benz ${esc(c.modello||"")}</td></tr>
     <tr><td>Telaio</td><td>${esc(c.telaio||"")}</td><td>n° Chiave</td><td>${esc(etich(c))}</td></tr></table>
     <h2>Accessori standard di preconsegna</h2>${ACC_STD.map(([k,l])=>`<div>${box((c.std||{})[k])} ${esc(l)}</div>`).join("")}
-    <h2>Ulteriori accessori a pagamento</h2>${sel.length?sel.map(([k,l])=>`<div>${box(c.pag[k].fatto)} ${esc(l)}</div>`).join(""):"<div>Nessuno</div>"}
+    <h2>Ulteriori accessori a pagamento</h2>${sel.length?sel.map(([k,l])=>`<div>${box(c.pag[k].fatto)} ${esc(nomePag(k,l,c.pag[k]))}</div>`).join(""):"<div>Nessuno</div>"}
     <h2>Ulteriori accessori in omaggio</h2>${(()=>{const l=omaggi(c).concat(c.omaggioPE?[{testo:c.omaggioPE,fatto:!!c.omaggioPEFatto}]:[]);return l.length?l.map(o=>`<div>${box(o.fatto)} ${esc(o.testo)}</div>`).join(""):"<div>Nessuno</div>";})()}
+    ${(c.ripAgg||[]).length?`<h2>Ripristini aggiuntivi</h2>${c.ripAgg.map(o=>`<div>${box(o.fatto)} ${esc(o.testo)}</div>`).join("")}`:""}
     ${c.note?`<h2>Note</h2><div>${esc(c.note)}</div>`:""}
     <p class="pvd">L'autovettura viene presa in consegna in data: <b>${c.data?new Date(c.data).toLocaleDateString("it-IT"):"____________"}</b> &nbsp; Ore <b>${esc(c.ora||"______")}</b></p>
     <div class="pvf"><span>Firma officina ____________________</span><span>Firma cliente ____________________</span></div></div>`;
   window.print();
 }
+const rpRow=(o,ro)=>`<div class="accrow rprow"><input class="ominp" data-rp="testo" value="${esc(o.testo||"")}" placeholder="es. vetri oscurati, graffio portiera ant. sx" ${ro}><label class="chk small"><input type="checkbox" data-rp="fatto" ${o.fatto?"checked":""} ${canMontato()?"":"disabled"}> fatto</label>${ro?"":`<button type="button" class="link" data-rpdel="1" aria-label="Togli">Togli</button>`}</div>`;
 const omRow=(o,i,ro)=>`<div class="accrow omrow"><input class="ominp" data-om="testo" value="${esc(o.testo||"")}" placeholder="es. Tappetini personalizzati" ${ro}><label class="chk small"><input type="checkbox" data-om="fatto" ${o.fatto?"checked":""} ${canMontato()?"":"disabled"}> montato</label>${ro?"":`<button type="button" class="link" data-omdel="1" aria-label="Togli">Togli</button>`}</div>`;
 function openConsegna(id){
   const nuovo=!id;
   const base=nuovo?{stato:"richiesta",tipo:"vendita",colore:"BLU",std:{},pag:{},prep:{},date:{richiesta:oggi()}}:JSON.parse(JSON.stringify(C.docs.get(id)));
   const f=Object.assign({std:{},pag:{},prep:{},date:{}},JSON.parse(JSON.stringify(base)));
-  const edAll=canCreaConsegna();const prepOk=canPrepConsegna();const appOk=canAppConsegna();const roP=prepOk?"":"disabled";const bloccoOrd=!!(base.ordineDa&&!base.ordineArrivati);const roA=appOk&&!bloccoOrd?"":"disabled";
+  const edAll=canCreaConsegna();const prepOk=canPrepConsegna();const appOk=canAppConsegna();const roP=prepOk?"":"disabled";const bloccoOrd=statoOrdine(base)==="attesa";const roA=appOk&&!bloccoOrd?"":"disabled";
   const ro=edAll?"":"disabled";
   const ck=(grp,k,l,dis)=>`<label class="chk"><input type="checkbox" data-g="${grp}" data-k="${k}" ${(f[grp]||{})[k]?"checked":""} ${dis?"disabled":""}> ${esc(l)}</label>`;
   const p=openSheet(`<form class="panel" id="cf" novalidate role="dialog" aria-modal="true" aria-label="Consegna">
@@ -1547,17 +1558,22 @@ function openConsegna(id){
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
     <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&soloSposta()?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
-      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}
+      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${statoOrdine(base)==="ordinato"?`min="${esc(base.ordinePrevisto)}"`:""} ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}${statoOrdine(base)==="ordinato"?`<div class="banner">Accessori ordinati: arrivo previsto il ${esc(dIt(base.ordinePrevisto))}, la consegna si fissa da quel giorno.</div>`:""}${statoOrdine(base)==="mancante"?`<div class="banner">Accessori non arrivati: si consegna senza, li porta il magazzino appena arrivano.</div>`:""}
       <label class="f" style="margin-top:8px">Omaggio da preparare <span class="small">(se il product expert lo sa già: arriva a officina, ripristini, preparatori e magazzino)</span><input id="c_omPE" value="${esc(f.omaggioPE||"")}" placeholder="es. fiori, portachiavi personalizzato, borsa Mercedes" autocomplete="off" ${appOk?"":"disabled"}></label>
       ${f.omaggioPE?`<label class="chk small"><input type="checkbox" id="c_omPEfatto" ${f.omaggioPEFatto?"checked":""} ${prepOk?"":"disabled"}> omaggio preparato</label>`:""}</div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato»</span></h4>
-      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label><label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&canMontato()?"":"disabled"}> montato</label></div>`;}).join("")}
+      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label>${VAR_PAG[k]?`<select data-pag="${k}" data-pf="var" ${ro} style="width:auto;min-width:0;padding:4px 6px">${[""].concat(VAR_PAG[k]).map(x=>`<option value="${x}" ${varPag(k,v)===x?"selected":""}>${x?esc(nomeVar(k,x)):"durata?"}</option>`).join("")}</select>`:""}<label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&canMontato()?"":"disabled"}> montato</label></div>`;}).join("")}
       <div class="accrow" style="border-top:0"><b style="font-size:14px">Accessori in omaggio</b></div>
       <div id="c_omlist">${omaggi(f).map((o,i)=>omRow(o,i,ro)).join("")}</div>
-      ${ro?"":`<button type="button" class="link" id="c_omadd">+ Aggiungi omaggio</button>`}</div>
-    <div class="keybox ${f.ordineDa&&!f.ordineArrivati?"ripbox":""}"><h4><span>Accessori omaggio da ordinare<br><span class="small">es. pneumatici, barre · finché il magazzino non li segna arrivati la consegna non si fissa</span></span><label class="chk"><input type="checkbox" id="c_ordDa" ${f.ordineDa?"checked":""} ${ro}> da ordinare</label></h4>
+      ${ro?"":`<button type="button" class="link" id="c_omadd">+ Aggiungi omaggio</button>`}
+      <div class="accrow" style="border-top:0;margin-top:8px"><b style="font-size:14px">Ripristini aggiuntivi</b> <span class="small">es. vetri oscurati, graffi da sistemare sull'usato</span></div>
+      <div id="c_rplist">${(f.ripAgg||[]).map(o=>rpRow(o,ro)).join("")}</div>
+      ${ro?"":`<button type="button" class="link" id="c_rpadd">+ Aggiungi ripristino</button>`}</div>
+    <div class="keybox ${f.ordineDa&&!f.ordineArrivati?"ripbox":""}"><h4><span>Accessori omaggio da ordinare<br><span class="small">es. pneumatici, barre · la consegna si fissa dall'arrivo previsto indicato dal magazzino</span></span><label class="chk"><input type="checkbox" id="c_ordDa" ${f.ordineDa?"checked":""} ${ro}> da ordinare</label></h4>
       <div id="c_ordBox" ${f.ordineDa?"":"hidden"}><label class="f">Cosa ordinare<textarea id="c_ordDett" rows="2" placeholder="es. 4 pneumatici invernali, barre portatutto" ${ro}>${esc(f.ordineDettagli||"")}</textarea></label>
+      <div class="grid2" style="margin-top:8px"><label class="chk" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="c_ordOrd" ${f.ordineOrdinato?"checked":""} ${canMagazzino()?"":"disabled"}> Ordinati</label><label class="f">Arrivo previsto<input type="date" id="c_ordPrev" value="${esc(f.ordinePrevisto||"")}" ${canMagazzino()?"":"disabled"}></label></div>
       <label class="chk" style="margin-top:8px;font-weight:600"><input type="checkbox" id="c_ordArr" ${f.ordineArrivati?"checked":""} ${canMagazzino()?"":"disabled"}> Arrivati in magazzino: via libera alla consegna</label>
+      <label class="chk" style="margin-top:8px"><input type="checkbox" id="c_ordMan" ${f.ordineMancante?"checked":""} ${canMagazzino()?"":"disabled"}> Non arrivati in tempo: si consegna senza, li porta il magazzino dopo</label>
       ${f.ordineArrivati&&f.ordineArrivatiDa?`<div class="small">Segnati arrivati da ${esc(f.ordineArrivatiDa)}${f.ordineArrivatiIl?" il "+new Date(f.ordineArrivatiIl).toLocaleDateString("it-IT"):""}</div>`:""}</div></div>
     <div class="keybox"><h4>Preparazione officina <span class="small">spunta solo le voci che servono a questo cliente</span></h4>
       <div class="chkgrid">${ACC_STD.map(([k,l])=>ck("std",k,l,!prepOk)).join("")}${PREP.map(([k,l])=>ck("prep",k,l,!prepOk)).join("")}</div>
@@ -1573,6 +1589,8 @@ function openConsegna(id){
   const odc=$("c_ordDa");odc.onchange=()=>{$("c_ordBox").hidden=!odc.checked;};
   const oa=$("c_omadd");if(oa)oa.onclick=()=>{const d=document.createElement("div");d.innerHTML=omRow({testo:"",fatto:false},0,"");const r=d.firstElementChild;$("c_omlist").appendChild(r);r.querySelector("input").focus();};
   $("c_omlist").addEventListener("click",e=>{const b=e.target.closest("[data-omdel]");if(b)b.closest(".omrow").remove();});
+  const ra=$("c_rpadd");if(ra)ra.onclick=()=>{const d=document.createElement("div");d.innerHTML=rpRow({testo:"",fatto:false},"");const x=d.firstElementChild;$("c_rplist").appendChild(x);x.querySelector("input").focus();};
+  $("c_rplist").addEventListener("click",e=>{const b=e.target.closest("[data-rpdel]");if(b)b.closest(".rprow").remove();});
   const mostraVett=()=>{const n=parseInt($("c_numero").value,10),col=$("c_colore").value;const el=$("c_vett");
     if(!(n>=1&&n<=100)){el.textContent="";return null;}const s=slot(col,n);
     if(occupato(s)){el.innerHTML=`Dal registro chiavi: <b>${esc(s.modello||"modello non indicato")}</b> · ${esc(s.telaio||"telaio non indicato")}${s.targa?" · "+esc(s.targa):""}`;if(nuovo&&!$("c_targa").value&&s.targa)$("c_targa").value=s.targa;if(nuovo&&!$("c_telaio").value&&s.telaio)$("c_telaio").value=s.telaio;return s;}
@@ -1596,15 +1614,18 @@ function openConsegna(id){
     for(const k of["targa","telaio","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");
     f.targa=f.targa.toUpperCase().replace(/\s/g,"");f.tipo=$("c_tipo").value;
     f.omaggi=[...p.querySelectorAll(".omrow")].map(r=>({testo:r.querySelector('[data-om="testo"]').value.trim(),fatto:r.querySelector('[data-om="fatto"]').checked})).filter(o=>o.testo);delete f.omaggio;delete f.omaggioFatto;
+    {const rp=[...p.querySelectorAll(".rprow")].map(x=>({testo:x.querySelector('[data-rp="testo"]').value.trim(),fatto:x.querySelector('[data-rp="fatto"]').checked})).filter(o=>o.testo);if(rp.length||"ripAgg" in base)f.ripAgg=rp;}
     p.querySelectorAll("[data-g]").forEach(i=>{f[i.dataset.g][i.dataset.k]=i.checked;});
-    const pg={};p.querySelectorAll("[data-pag]").forEach(i=>{pg[i.dataset.pag]=pg[i.dataset.pag]||{};pg[i.dataset.pag][i.dataset.pf]=i.checked;});
-    for(const[k,v]of Object.entries(pg)){if(v.sel)f.pag[k]={sel:true,fatto:!!v.fatto};else delete f.pag[k];}
+    const pg={};p.querySelectorAll("[data-pag]").forEach(i=>{pg[i.dataset.pag]=pg[i.dataset.pag]||{};pg[i.dataset.pag][i.dataset.pf]=i.tagName==="SELECT"?i.value:i.checked;});
+    for(const[k,v]of Object.entries(pg)){if(v.sel)f.pag[k]=Object.assign({sel:true,fatto:!!v.fatto},v.var?{var:v.var}:{});else delete f.pag[k];}
     if(nuovo){f.colore=$("c_colore").value;f.numero=parseInt($("c_numero").value,10);}
     {const om=$("c_omPE").value.trim();if(om||"omaggioPE" in base)f.omaggioPE=om;const of=$("c_omPEfatto");if(of&&(of.checked||"omaggioPEFatto" in base))f.omaggioPEFatto=of.checked;}
     const pc=$("c_pronta").checked;if(pc&&!base.pronta)f.prontaDa=S.me.nome;if(!pc)delete f.prontaDa;f.pronta=pc;
     // Accessori da ordinare: i campi si scrivono solo se usati, così le altre utenze non li «toccano» salvando.
     const od2=$("c_ordDa").checked;if(od2||"ordineDa" in base){f.ordineDa=od2;f.ordineDettagli=od2?$("c_ordDett").value.trim():"";}
     const oa2=od2&&$("c_ordArr").checked;if(oa2||"ordineArrivati" in base){if(oa2&&!base.ordineArrivati){f.ordineArrivatiDa=S.me.nome;f.ordineArrivatiIl=oggi();}if(!oa2){delete f.ordineArrivatiDa;delete f.ordineArrivatiIl;}f.ordineArrivati=oa2;}
+    const oo=od2&&$("c_ordOrd").checked;if(oo||"ordineOrdinato" in base){f.ordineOrdinato=oo;f.ordinePrevisto=oo?$("c_ordPrev").value:"";}
+    const om2=od2&&$("c_ordMan").checked;if(om2||"ordineMancante" in base){if(om2&&!base.ordineMancante){f.ordineMancanteDa=S.me.nome;f.ordineMancanteIl=oggi();}if(!om2){delete f.ordineMancanteDa;delete f.ordineMancanteIl;}f.ordineMancante=om2;}
   };
   const salvaC=async(extraWrites,logs,msg)=>{
     if(!nuovo){const w=cambiataDaAltri(base,C.docs.get(id));if(w){$("e_err").innerHTML=w;return;}}
@@ -1614,7 +1635,10 @@ function openConsegna(id){
   };
   const cid=()=>id||`${f.colore}-${String(f.numero).padStart(3,"0")}-${Date.now().toString(36)}`;
   p.onsubmit=e=>{e.preventDefault();leggi();
-    if(f.ordineDa&&!f.ordineArrivati&&f.data&&(f.data!==(base.data||"")||f.ora!==(base.ora||""))){$("e_err").innerHTML=`<div class="banner bad">Ci sono accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`;return;}
+    if(f.ordineOrdinato&&!f.ordinePrevisto){$("e_err").innerHTML=`<div class="banner bad">Indica la data di arrivo prevista degli accessori ordinati.</div>`;return;}
+    {const so=statoOrdine(f),cambiata=f.data&&(f.data!==(base.data||"")||f.ora!==(base.ora||""));
+      if(cambiata&&so==="attesa"){$("e_err").innerHTML=`<div class="banner bad">Ci sono accessori da ordinare non ancora ordinati: la data si fissa quando il magazzino indica l'arrivo previsto.</div>`;return;}
+      if(cambiata&&so==="ordinato"&&f.data<f.ordinePrevisto){$("e_err").innerHTML=`<div class="banner bad">Gli accessori arrivano il ${esc(dIt(f.ordinePrevisto))}: la consegna si può fissare da quel giorno.</div>`;return;}}
     if(nuovo){if(!(f.numero>=1&&f.numero<=100)){$("e_err").innerHTML=`<div class="banner bad">Cerca la vettura per targa o telaio e toccala nei risultati (oppure indica colore e numero chiave).</div>`;return;}
       const s=mostraVett();if(s){if(!f.telaio)f.telaio=s.telaio||"";f.modello=s.modello||"";}
       const aperta=[...C.docs.values()].find(c=>c.colore===f.colore&&c.numero===f.numero&&c.stato!=="consegnata"&&c.stato!=="annullata");
@@ -1634,6 +1658,9 @@ function openConsegna(id){
     else if(f.data&&(f.data!==base.data||f.ora!==base.ora)){f.avviso24h=false;qw.push(coda("consegna_fissata",`Consegna ${sig}${f.cliente?" · "+f.cliente:""}: ${quandoTxt}`,`${chi}${base.data?" · spostata dal "+new Date(base.data).toLocaleDateString("it-IT"):""}`,"#consegne"));}
     if(f.ordineDa&&!f.ordineArrivati&&(!base.ordineDa||f.ordineDettagli!==(base.ordineDettagli||""))){qw.push(coda("consegna_ordine",`Accessori da ordinare: ${sig}`,`${chi} · ${f.ordineDettagli||"vedi la consegna"}`,"#consegne"));logs.push({codice:cod,azione:"Accessori da ordinare",dettaglio:f.ordineDettagli||""});}
     if(f.omaggioPE&&f.omaggioPE!==(base.omaggioPE||""))qw.push(coda("consegna_omaggio",`Omaggio da preparare: ${sig}${f.cliente?" · "+f.cliente:""}`,`${f.omaggioPE} · ${[f.modello,quandoTxt].filter(Boolean).join(" · ")}`,"#consegne"));
+    if(f.ordineOrdinato&&f.ordinePrevisto&&!f.ordineArrivati&&(!base.ordineOrdinato||f.ordinePrevisto!==base.ordinePrevisto))qw.push(coda("consegna_ordinati",`Accessori ordinati: ${sig}${f.cliente?" · "+f.cliente:""}`,`Arrivo previsto il ${dIt(f.ordinePrevisto)}: la consegna si può fissare da quel giorno. ${f.ordineDettagli||""}`,"#consegne"));
+    if(f.ordineMancante&&!base.ordineMancante)qw.push(coda("consegna_senza",`Consegna ${sig} senza accessori${f.cliente?" · "+f.cliente:""}`,`${f.ordineDettagli||"Accessori"} non arrivati: si consegna senza, li porta il magazzino dopo.`,"#consegne"));
+    {const nr=(f.ripAgg||[]).filter(o=>!(base.ripAgg||[]).some(b=>b.testo===o.testo));if(nr.length)qw.push(coda("consegna_ripristini",`Ripristini da fare: ${sig}${f.cliente?" · "+f.cliente:""}`,`${nr.map(o=>o.testo).join(", ")} · ${quandoTxt}`,"#consegne"));}
     if(f.ordineArrivati&&!base.ordineArrivati){qw.push(coda("consegna_arrivati",`Accessori arrivati: ${sig}`,`${chi} · si può fissare la consegna`,"#consegne"));logs.push({codice:cod,azione:"Accessori arrivati",dettaglio:f.ordineDettagli||""});}
     if(ora&&!prontaC(base)&&!nuovo)qw.push(coda("consegna_pronta",`Consegna ${sig}${f.cliente?" · "+f.cliente:""} pronta`,`${chi} · ${quandoTxt}`,"#consegne"));
     salvaC([{col:"consegne",id:cid(),data:f},...qw],logs,nuovo?"Consegna creata.":"Consegna salvata.");
@@ -1665,7 +1692,7 @@ const A={mese:0,chi:""};
 const AGENDA_PERSONE=["Domenico Sperandeo","Nicola Bussolotto","Dino Di Bello","Girolamo De Blasiis","Marco Belisario"];
 function voceAgenda(iso){
   const cs=[...C.docs.entries()].map(([id,c])=>Object.assign({id},c)).filter(c=>c.data===iso&&c.stato!=="annullata"&&(!A.chi||(c.venditore&&(norm(A.chi).includes(norm(c.venditore))||norm(c.venditore).includes(norm(A.chi))))))
-    .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${esc(etich(c))} ${esc(c.cliente||"")}</span>`}));
+    .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${c.ora?`<b>${esc(c.ora)}</b> `:""}${esc(etich(c))} ${esc(c.cliente||"")}${c.venditore?` · ${esc(c.venditore)}`:""}</span>`}));
   const is=(vedeImpegni()?impegniDel(iso,A.chi):[]).map(i=>({ord:i.tutto?"00":i.dalle||"98",html:`<span class="ach t-${esc(i.tipo||"altro")}" data-imp="${esc(i.id)}">${esc((i.nome||"").split(" ")[0])} ${esc(titoloImp(i)||"impegno")}</span>`}));
   return cs.concat(is).sort((a,b)=>a.ord.localeCompare(b.ord));
 }
@@ -1742,14 +1769,14 @@ $("aList").addEventListener("click",async e=>{const b=e.target.closest("button")
 $("btnExportC").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
   const rows=[...C.docs.values()].sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(c=>{const m=mancanti(c);return{"Chiave":etich(c),"Tipo":c.tipo,"Cliente":c.cliente||"","Si consegna a":c.consegnatario||"","Product expert":c.venditore||"","Modello":c.modello||"","Targa":c.targa||"","Telaio":c.telaio||"","Data":c.data||"","Ora":c.ora||"","Stato":c.stato,"Semaforo":semaforo(c)[1],"Preparazione":`${m.t-m.n}/${m.t}`,
-    "Accessori a pagamento":ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel).map(([k,l])=>l+(c.pag[k].fatto?" (montato)":"")).join(", "),"Omaggi":omaggi(c).map(o=>o.testo+(o.fatto?" (montato)":"")).join(", "),"Consegnata il":(c.date||{}).consegnata||"","Note":c.note||""};});
+    "Accessori a pagamento":ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel).map(([k,l])=>nomePag(k,l,c.pag[k])+(c.pag[k].fatto?" (montato)":"")).join(", "),"Omaggi":omaggi(c).map(o=>o.testo+(o.fatto?" (montato)":"")).join(", "),"Consegnata il":(c.date||{}).consegnata||"","Note":c.note||""};});
   const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"Chiave":""}]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Consegne");
   const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Consegne_${oggi()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
 };
 
 /* =================== Notifiche =================== */
-const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con bollo o revisione scaduti o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_arrivati","Accessori ordinati arrivati: si può fissare la consegna",["productexpert","backoffice"]],["consegna_omaggio","Omaggio da preparare indicato dal product expert",["officina","ripristini","preparatore","magazzino"]]];
+const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con bollo o revisione scaduti o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_arrivati","Accessori ordinati arrivati: si può fissare la consegna",["productexpert","backoffice"]],["consegna_omaggio","Omaggio da preparare indicato dal product expert",["officina","ripristini","preparatore","magazzino"]],["consegna_ordinati","Accessori ordinati con data di arrivo prevista",["productexpert","backoffice"]],["consegna_senza","Accessori non arrivati: consegna senza",["productexpert","backoffice","officina"]],["consegna_ripristini","Ripristini aggiuntivi da fare prima della consegna",["officina","ripristini","preparatore"]]];
 const coda=(evento,titolo,testo,link)=>({col:"notifiche_coda",id:`${evento}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,data:{evento,titolo,testo,link:link||"",ruoli:((EVENTI.find(e=>e[0]===evento)||[])[2])||[],inviata:false,ts:Date.now()}});
 let MIE={prefs:{},tokens:[]};
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
