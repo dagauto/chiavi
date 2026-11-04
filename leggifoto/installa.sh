@@ -24,6 +24,6 @@ echo "MODELLO SCELTO: $SCELTO ($LUOGO)"
 if [ "$LUOGO" != global ]; then sed -i "s#https://aiplatform.googleapis.com/v1/projects/\${PROGETTO}/locations/\${LUOGO}#https://\${LUOGO}-aiplatform.googleapis.com/v1/projects/\${PROGETTO}/locations/\${LUOGO}#" index.js; fi
 gcloud functions deploy leggifoto --gen2 --region=europe-west8 --runtime=nodejs22 --source=. \
   --entry-point=leggifoto --trigger-http --allow-unauthenticated --memory=512Mi --timeout=180s \
-  --max-instances=3 --set-env-vars=MODELLO=$SCELTO,LUOGO=$LUOGO --quiet 2>&1 | grep -E '^state|^url|ERROR|uri:' || true
+  --max-instances=10 --set-env-vars=MODELLO=$SCELTO,LUOGO=$LUOGO --quiet 2>&1 | grep -E '^state|^url|ERROR|uri:' || true
 echo "URL: $(gcloud functions describe leggifoto --region=europe-west8 --format='value(serviceConfig.uri)')"
 echo FINE
