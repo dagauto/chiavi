@@ -1374,11 +1374,15 @@ $("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if
 
 /* =================== Consegne =================== */
 const ACC_STD=[["chiavi","Chiave e doppia chiave"],["giubotto","Giubotto catarifrangente"],["prontosoccorso","Kit pronto soccorso"],["gonfiaggio","Kit gonfiaggio"],["portachiavi","Portachiavi Mercedes-Benz"],["libretto","Libretto d'uso e manutenzione"]];
-const ACC_PAG=[["autonera","Auto nera"],["bulloni","Bulloni antifurto"],["tappeti","Tappeti in gomma"],["servicecare","Service Care"],["advance","Advance"],["defence","Defence"],["certified","Certified"],["mapfree","Mapfree"]];
+const ACC_PAG=[["autonera","Auto nera"],["bulloni","Bulloni antifurto"],["tappeti","Tappeti in gomma"],["servicecare","Service Care"],["advance","Advance"],["defence","Defence"],["certified","Certified"],["mapfree","Wandy"]];
 const PREP=[["targata","Targa montata"],["lavaggio","Lavaggio"]];
 // Durate dei pacchetti (Service Care in anni, gli altri in mesi); le consegne vecchie avevano Service Care 4 e Defence 48.
-const VAR_PAG={servicecare:["2","3","4"],advance:["12","24"],defence:["12","24","36","48"],certified:["12","24","36","48"]};
-const VAR_VECCHIA={servicecare:"4",defence:"48"};
+const VAR_PAG={servicecare:["2","3","4"],advance:["12","24"],defence:["12","24","36","48"],certified:["12","24","36","48"],mapfree:["12","24","36"]};
+const VAR_VECCHIA={servicecare:"4",defence:"48",mapfree:"12"};
+// Servizi (non si montano, si attivano): li spuntano back office e officina.
+const SERVIZI=["servicecare","advance","defence","certified","mapfree"];
+const canAttiva=()=>ha(...GEST,"officina");
+const puoFatto=k=>SERVIZI.includes(k)?canAttiva():canMontato();
 const varPag=(k,v)=>(v&&v.var)||VAR_VECCHIA[k]||"";
 const nomeVar=(k,x)=>k==="servicecare"?`${x}`:`${x} mesi`;
 const nomePag=(k,l,v)=>{const x=VAR_PAG[k]?varPag(k,v):"";return x?`${l} ${nomeVar(k,x)}`:l;};
@@ -1561,8 +1565,8 @@ function openConsegna(id){
       <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${statoOrdine(base)==="ordinato"?`min="${esc(base.ordinePrevisto)}"`:""} ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}${statoOrdine(base)==="ordinato"?`<div class="banner">Accessori ordinati: arrivo previsto il ${esc(dIt(base.ordinePrevisto))}, la consegna si fissa da quel giorno.</div>`:""}${statoOrdine(base)==="mancante"?`<div class="banner">Accessori non arrivati: si consegna senza, li porta il magazzino appena arrivano.</div>`:""}
       <label class="f" style="margin-top:8px">Omaggio da preparare <span class="small">(se il product expert lo sa già: arriva a officina, ripristini, preparatori e magazzino)</span><input id="c_omPE" value="${esc(f.omaggioPE||"")}" placeholder="es. fiori, portachiavi personalizzato, borsa Mercedes" autocomplete="off" ${appOk?"":"disabled"}></label>
       ${f.omaggioPE?`<label class="chk small"><input type="checkbox" id="c_omPEfatto" ${f.omaggioPEFatto?"checked":""} ${prepOk?"":"disabled"}> omaggio preparato</label>`:""}</div>
-    <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato»</span></h4>
-      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label>${VAR_PAG[k]?`<select data-pag="${k}" data-pf="var" ${ro} style="width:auto;min-width:0;padding:4px 6px">${[""].concat(VAR_PAG[k]).map(x=>`<option value="${x}" ${varPag(k,v)===x?"selected":""}>${x?esc(nomeVar(k,x)):"durata?"}</option>`).join("")}</select>`:""}<label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&canMontato()?"":"disabled"}> montato</label></div>`;}).join("")}
+    <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato», i servizi «attivato»</span></h4>
+      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label>${VAR_PAG[k]?`<select data-pag="${k}" data-pf="var" ${ro} style="width:auto;min-width:0;padding:4px 6px">${[""].concat(VAR_PAG[k]).map(x=>`<option value="${x}" ${varPag(k,v)===x?"selected":""}>${x?esc(nomeVar(k,x)):"durata?"}</option>`).join("")}</select>`:""}<label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&puoFatto(k)?"":"disabled"}> ${SERVIZI.includes(k)?"attivato":"montato"}</label></div>`;}).join("")}
       <div class="accrow" style="border-top:0"><b style="font-size:14px">Accessori in omaggio</b></div>
       <div id="c_omlist">${omaggi(f).map((o,i)=>omRow(o,i,ro)).join("")}</div>
       ${ro?"":`<button type="button" class="link" id="c_omadd">+ Aggiungi omaggio</button>`}
@@ -1575,7 +1579,7 @@ function openConsegna(id){
       <label class="chk" style="margin-top:8px;font-weight:600"><input type="checkbox" id="c_ordArr" ${f.ordineArrivati?"checked":""} ${canMagazzino()?"":"disabled"}> Arrivati in magazzino: via libera alla consegna</label>
       <label class="chk" style="margin-top:8px"><input type="checkbox" id="c_ordMan" ${f.ordineMancante?"checked":""} ${canMagazzino()?"":"disabled"}> Non arrivati in tempo: si consegna senza, li porta il magazzino dopo</label>
       ${f.ordineArrivati&&f.ordineArrivatiDa?`<div class="small">Segnati arrivati da ${esc(f.ordineArrivatiDa)}${f.ordineArrivatiIl?" il "+new Date(f.ordineArrivatiIl).toLocaleDateString("it-IT"):""}</div>`:""}</div></div>
-    <div class="keybox"><h4>Preparazione officina <span class="small">spunta solo le voci che servono a questo cliente</span></h4>
+    <div class="keybox"><h4>Preparazione officina <span class="small">tutte le voci sono obbligatorie per segnare la vettura pronta</span></h4>
       <div class="chkgrid">${ACC_STD.map(([k,l])=>ck("std",k,l,!prepOk)).join("")}${PREP.map(([k,l])=>ck("prep",k,l,!prepOk)).join("")}</div>
       <label class="chk" style="margin-top:10px;padding:10px;border:2px solid var(--ok);border-radius:8px;font-weight:600"><input type="checkbox" id="c_pronta" ${f.pronta?"checked":""} ${roP}> Preconsegna fatta: vettura pronta per la consegna</label>
       ${f.pronta&&f.prontaDa?`<div class="small">Segnata pronta da ${esc(f.prontaDa)}${f.date&&f.date.pronta?" il "+new Date(f.date.pronta).toLocaleDateString("it-IT"):""}</div>`:""}</div>
@@ -1609,7 +1613,7 @@ function openConsegna(id){
       const altre=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.stato!=="annullata"&&norm(c.venditore)===norm(pe));
       if(altre.length)w.innerHTML+=`<div class="banner">${esc(pe)} quel giorno ha già ${altre.length} ${plur(altre.length,"consegna","consegne")}: ${altre.map(([,c])=>esc((c.ora||"--:--")+" "+etich(c))).join(", ")}.</div>`;}};
   $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);$("c_venditore").addEventListener("input",avvData);avvData();
-  p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked||!canMontato();if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
+  p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked||!puoFatto(t.dataset.pag);if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
   const leggi=()=>{
     for(const k of["targa","telaio","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");
     f.targa=f.targa.toUpperCase().replace(/\s/g,"");f.tipo=$("c_tipo").value;
@@ -1646,6 +1650,8 @@ function openConsegna(id){
     if(f.data&&!base.data)f.date.fissata=oggi();
     if(f.stato==="richiesta"&&f.data)f.stato="fissata";
     if(!f.data&&f.stato==="fissata")f.stato="richiesta";
+    if(f.pronta&&!base.pronta){const manca=ACC_STD.filter(([k])=>!(f.std||{})[k]).concat(PREP.filter(([k])=>!(f.prep||{})[k])).map(([,l])=>l);
+      if(manca.length){$("e_err").innerHTML=`<div class="banner bad">Per segnare la vettura pronta servono tutte le voci della preparazione. Mancano: ${esc(manca.join(", "))}.</div>`;return;}}
     const ora=prontaC(f);if(ora&&!f.date.pronta)f.date.pronta=oggi();if(!ora)delete f.date.pronta;
     const logs=[];const cod=etich(f);
     if(nuovo)logs.push({codice:cod,azione:"Consegna creata",dettaglio:[f.cliente,f.modello].filter(Boolean).join(" · ")});
@@ -1769,7 +1775,7 @@ $("aList").addEventListener("click",async e=>{const b=e.target.closest("button")
 $("btnExportC").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
   const rows=[...C.docs.values()].sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(c=>{const m=mancanti(c);return{"Chiave":etich(c),"Tipo":c.tipo,"Cliente":c.cliente||"","Si consegna a":c.consegnatario||"","Product expert":c.venditore||"","Modello":c.modello||"","Targa":c.targa||"","Telaio":c.telaio||"","Data":c.data||"","Ora":c.ora||"","Stato":c.stato,"Semaforo":semaforo(c)[1],"Preparazione":`${m.t-m.n}/${m.t}`,
-    "Accessori a pagamento":ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel).map(([k,l])=>nomePag(k,l,c.pag[k])+(c.pag[k].fatto?" (montato)":"")).join(", "),"Omaggi":omaggi(c).map(o=>o.testo+(o.fatto?" (montato)":"")).join(", "),"Consegnata il":(c.date||{}).consegnata||"","Note":c.note||""};});
+    "Accessori a pagamento":ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel).map(([k,l])=>nomePag(k,l,c.pag[k])+(c.pag[k].fatto?(SERVIZI.includes(k)?" (attivato)":" (montato)"):"")).join(", "),"Omaggi":omaggi(c).map(o=>o.testo+(o.fatto?" (montato)":"")).join(", "),"Consegnata il":(c.date||{}).consegnata||"","Note":c.note||""};});
   const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"Chiave":""}]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Consegne");
   const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Consegne_${oggi()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
