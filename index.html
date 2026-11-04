@@ -757,6 +757,8 @@ function openEditor(id,assegna){
     if((f.telaio||f.targa||f.modello)&&(!f.prima||!f.seconda)){$("e_err").innerHTML=`<div class="banner bad">Indica se ci sono la prima e la seconda chiave (Sì o No): senza questa risposta la vettura finisce in «Da censire».</div>`;return;}
     const dup=telaioUsato(f.telaio,base.id);
     if(dup){$("e_err").innerHTML=`<div class="banner bad">Questo telaio è già registrato al ${esc(SING[dup.colore])} ${dup.numero}. Libera prima quel numero o correggi il telaio.</div>`;return;}
+    const dupT=f.targa&&norm(f.targa)!==norm(base.targa)?slots().find(x=>x.id!==base.id&&x._has&&norm(x.targa)===norm(f.targa)):null;
+    if(dupT){$("e_err").innerHTML=`<div class="banner bad">Questa targa è già registrata al ${esc(SING[dupT.colore])} ${dupT.numero}. Libera prima quel numero o correggi la targa.</div>`;return;}
     const data={colore:base.colore,numero:base.numero};for(const[k]of FIELDS)data[k]=f[k]||"";
     const diffs=[];for(const[k,l]of FIELDS){if(k==="controllatoDa"||k==="dataControllo"||k.startsWith("ripristino"))continue;const a=base[k]||"",b=data[k];if(a!==b)diffs.push(a?`${l}: ${a} → ${b||"—"}`:`${l}: ${b}`);}
     const rIn=!inRip(base)&&data.ripristino==="Sì",rOut=inRip(base)&&data.ripristino!=="Sì",rMod=inRip(base)&&data.ripristino==="Sì"&&(base.ripristinoTipo||"")+(base.ripristinoDove||"")!==data.ripristinoTipo+data.ripristinoDove;
@@ -1430,13 +1432,17 @@ const lunedi=off=>{const d=new Date();d.setHours(0,0,0,0);const g=(d.getDay()+6)
 const isoD=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
 const GIORNI=["Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica"];
 function settimanaN(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-n+3);const f=new Date(Date.UTC(t.getUTCFullYear(),0,4));return 1+Math.round(((t-f)/864e5-3+((f.getUTCDay()+6)%7))/7);}
+// La consegna punta a un numero chiave: avvisa se nel registro quel numero è libero o ha un'altra vettura.
+function avvisoChiaveC(c){if(!c||c.stato==="consegnata"||c.stato==="annullata"||!c.colore||!c.numero)return"";const s=slot(c.colore,c.numero);
+  if(!occupato(s))return`Il ${etich(c)} risulta libero nel registro chiavi`;
+  if(c.telaio&&s.telaio&&norm(c.telaio)!==norm(s.telaio))return`Al ${etich(c)} nel registro c'è un'altra vettura (${s.targa||s.modello||s.telaio})`;return"";}
 function cardC(c){
   const[k,l]=semaforo(c);const m=mancanti(c);
   return`<button class="card ccard" data-c="${esc(c.id)}">
     <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
     <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio breve</span>':c.tipo==="lungo"?'<span class="pill p-Doppia">Noleggio lungo</span>':""}</span>
       <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`PE ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
-      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${scadenzeC(c).map(x=>`<span class="kp ${x.bad?"miss":"scad"}">${esc(x.t)}</span>`).join("")}${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
+      <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${avvisoChiaveC(c)?`<span class="kp miss">${esc(avvisoChiaveC(c))}</span>`:""}${scadenzeC(c).map(x=>`<span class="kp ${x.bad?"miss":"scad"}">${esc(x.t)}</span>`).join("")}${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
 }
 function renderConsegne(){
   if(!canConsegne())return;
@@ -1500,6 +1506,7 @@ function openConsegna(id){
   const ck=(grp,k,l,dis)=>`<label class="chk"><input type="checkbox" data-g="${grp}" data-k="${k}" ${(f[grp]||{})[k]?"checked":""} ${dis?"disabled":""}> ${esc(l)}</label>`;
   const p=openSheet(`<form class="panel" id="cf" novalidate role="dialog" aria-modal="true" aria-label="Consegna">
     <div class="phead"><div><h2>${nuovo?"Nuova consegna":esc(etich(f)+" · "+(f.cliente||""))}</h2><p>${nuovo?"Il back office la crea una settimana prima: l'officina la vede subito nel calendario.":esc(semaforo(f)[1])}</p></div></div>
+    ${!nuovo&&avvisoChiaveC(f)?`<div class="banner bad">${esc(avvisoChiaveC(f))}: controlla prima di consegnare.</div>`:""}
     ${(()=>{const sc=scadenzeC(f);return sc.length?`<div class="banner ${sc.some(x=>x.bad)?"bad":"scad"}">${esc(sc.map(x=>x.t).join(" · "))}: ${sc.some(x=>x.bad)?"da rinnovare prima della consegna":"scade entro 30 giorni dalla consegna, avvisa il cliente o rinnova"}.</div>`:"";})()}
     <div class="keybox"><h4>Vettura</h4>
       ${nuovo?`<label class="f">Cerca la vettura per targa o telaio<input class="mono" id="c_cerca" placeholder="es. GH123AB oppure ultime cifre del telaio" autocomplete="off"></label><div id="c_ris" class="keys" style="flex-wrap:wrap;gap:6px;margin:4px 0 8px"></div>`:""}
