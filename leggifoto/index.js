@@ -55,7 +55,8 @@ Ti mando la foto di un documento di una vettura usata: può essere la carta di c
 - telaio: VIN di 17 caratteri (libretto campo E), maiuscolo senza spazi; nei VIN non esistono I, O, Q (sono 1 o 0).
 - marca: la marca (libretto campo D.1), scritta per bene: Mercedes-Benz, smart, Fiat, Audi, Volkswagen…
 - modello: modello breve senza la marca (libretto D.3, es. "GLC 220 d 4MATIC", "Panda 1.2").
-- immatricolazione: data di prima immatricolazione (libretto campo B) nel formato GG/MM/AAAA.
+- immatricolazione: data di PRIMA immatricolazione = campo B del libretto (in alto, sulla riga della targa A), nel formato GG/MM/AAAA.
+  NON usare il campo I (data di immatricolazione attuale, cambia con i passaggi di proprietà) né altre date del libretto.
 - exProprietario: intestatario (libretto campi C.2.1 / C.2.2, cognome e nome o ragione sociale).
 - km: chilometri indicati nella scheda stato d'uso, solo cifre.
 - danni: elenco breve dei danni di carrozzeria/interni segnati nella scheda stato d'uso, separati da virgola.
@@ -115,6 +116,13 @@ function raggruppa(voci) {
     g.set(v.sezione, x);
   }
   return [...g.values()].map((x) => ({ sezione: x.sezione, descrizione: x.parti.join(", ").slice(0, 300), stimato: Math.round(x.stimato) }));
+}
+const ANNI_VIN = "ABCDEFGHJKLMNPRSTVWXY";
+function dataDubbia(imm, telaio, marca) {
+  const m = String(imm || "").match(/(\d{4})\s*$/); if (!m || String(telaio).length !== 17 || /mercedes|smart/i.test(marca || "")) return false;
+  const i = ANNI_VIN.indexOf(telaio[9]); if (i < 0) return false;
+  const anno = 2010 + i; // A=2010 … Y=2030
+  return Math.abs(Number(m[1]) - anno) > 1;
 }
 const pulisciTarga = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -177,7 +185,10 @@ functions.http("leggifoto", async (req, res) => {
         note: String(dati.note || "").trim(), sicuro: dati.sicuro !== false,
         voci: raggruppa(dati.voci),
       };
-      console.log("letta foto usato", email, out.tipo);
+      // Il modello non deve ripetere la marca; la data si confronta con l'anno del telaio (10° carattere, non vale per Mercedes).
+      if (out.marca && out.modello.toUpperCase().startsWith(out.marca.toUpperCase() + " ")) out.modello = out.modello.slice(out.marca.length + 1).trim();
+      out.dataDubbia = dataDubbia(out.immatricolazione, out.telaio, out.marca);
+      console.log("letta foto usato", email, out.tipo, out.dataDubbia ? "data dubbia" : "");
       return res.json(out);
     }
     const vetture = (dati.vetture || [])
