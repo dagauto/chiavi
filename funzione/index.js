@@ -22,6 +22,7 @@ const EVENTI = {
   usato_presa: ["usato", "admin"],
   usato_attesa: ["ripristini", "officina"],
   usato_pronta: ["foto", "preparatore"],
+  consegna_omaggio: ["officina", "preparatore", "backoffice"],
 };
 const ACC_STD = ["chiavi", "giubotto", "prontosoccorso", "gonfiaggio", "portachiavi", "libretto"];
 const PREP = ["targata", "lavaggio"];
@@ -67,8 +68,9 @@ function mailer() {
   return transport;
 }
 
-async function destinatari(evento) {
-  const ruoli = EVENTI[evento] || [];
+// Per un evento nuovo che la funzione non conosce ancora valgono i ruoli scritti dalla pagina.
+async function destinatari(evento, ruoliPagina) {
+  const ruoli = EVENTI[evento] || (Array.isArray(ruoliPagina) ? ruoliPagina : []);
   const [us, pr] = await Promise.all([db.collection("utenti").get(), db.collection("notifiche_utenti").get()]);
   const pm = new Map(pr.docs.map((d) => [d.id, d.data()]));
   const out = [];
@@ -89,7 +91,7 @@ async function invia(n) {
   if (n.evento === "test") {
     const p = (await db.doc(`notifiche_utenti/${n.updatedBy}`).get()).data() || {};
     ds = [{ email: n.updatedBy, push: true, mail: true, tokens: p.tokens || [] }];
-  } else ds = await destinatari(n.evento);
+  } else ds = await destinatari(n.evento, n.ruoli);
   let push = 0, mail = 0;
   for (const d of ds) {
     if (d.push && d.tokens.length) {
