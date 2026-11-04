@@ -22,7 +22,7 @@ const EVENTI = {
   usato_presa: ["usato", "admin"],
   usato_attesa: ["ripristini", "officina"],
   usato_pronta: ["foto", "preparatore"],
-  consegna_omaggio: ["officina", "ripristini", "preparatore", "magazzino", "backoffice"],
+  consegna_omaggio: ["officina", "ripristini", "preparatore", "magazzino"],
 };
 const ACC_STD = ["chiavi", "giubotto", "prontosoccorso", "gonfiaggio", "portachiavi", "libretto"];
 const PREP = ["targata", "lavaggio"];
