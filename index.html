@@ -987,6 +987,8 @@ $("fileImport").onchange=async e=>{
       prima:siNo(r["Prima chiave"]),dovePrima:luogo(r["Dove prima"]),seconda:siNo(r["Seconda chiave"]),
       motivo:String(r["Motivo chiave singola"]||"").trim(),controllatoDa:String(r["Controllato da"]||"").trim(),dataControllo:toIso(r["Data controllo"]),note:String(r["Note"]||"").trim()};
     if(siNo(r["In ripristino"])==="Sì"){d.ripristino="Sì";d.ripristinoTipo=String(r["Lavoro ripristino"]||"").trim();d.ripristinoDove=String(r["Dove ripristino"]||"").trim();d.ripristinoDal=oggi();}
+    // Fuori a noleggio / in allestimento: i giorni si contano dalla data di controllo del censimento.
+    if(d.dovePrima===FUORI)d.noleggioDal=d.dataControllo||oggi();if(d.dovePrima===ALLEST)d.allestimentoDal=d.dataControllo||oggi();
     if(!(d.telaio||d.targa||d.prima||d.seconda))continue;
     writes.push({id:idOf(c,n),data:d});
   }
