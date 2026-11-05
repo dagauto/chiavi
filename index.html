@@ -389,7 +389,10 @@ const ALLEST="Fuori in allestimento";
 const RETRO="retro cassaforte salone";
 const TIPI_RIP=["Danni di trasporto","Meccanica","Carrozzeria","Sanificazione","Altro"];
 const DT="Danni di trasporto";
-const MOTIVI=["Seconda mai arrivata da Mercedes","Seconda rimasta al cliente","Chiave persa","Altro (vedi note)"];
+const MOTIVI=["Seconda mai arrivata da Mercedes","Seconda la deve consegnare il cliente","Chiave assente","Altro (vedi note)"];
+// Nomi vecchi dei motivi → nomi nuovi (per le vetture già registrate e per l'import del censimento).
+const MOTIVI_VECCHI={"Seconda rimasta al cliente":"Seconda la deve consegnare il cliente","Chiave persa":"Chiave assente"};
+const motivoNuovo=m=>MOTIVI_VECCHI[m]||m||"";
 const FB="https://www.gstatic.com/firebasejs/10.12.2/";
 const S={docs:new Map(),log:[],utenti:[],q:"",col:null,stato:"incasa",luogo:null,store:null,me:null};
 const $=id=>document.getElementById(id);
@@ -700,7 +703,7 @@ function openEditor(id,assegna){
     ${base.colore==="ROSSO"&&!libero&&fotoTarga(f.targa)?citBox(f.targa,usatoTarga(f.targa)):""}
     <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI,ALLEST],LUOGHI_RIP).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4>
-      <label class="f" style="margin-top:8px">Motivo se manca una chiave<select id="e_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${f.motivo===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label></div>
+      <label class="f" style="margin-top:8px">Motivo se manca una chiave<select id="e_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${motivoNuovo(f.motivo)===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label></div>
     <div class="keybox"><h4><span>Già venduta<br><span class="small">vettura nuova arrivata già venduta a un cliente</span></span> ${seg("venduta")}</h4>
       <div id="e_venbox" ${f.venduta==="Sì"?"":"hidden"}><label class="f" style="margin-top:8px">Cliente (facoltativo)<input id="e_cliente" value="${esc(f.cliente||"")}" autocomplete="off"></label></div></div>
     <div class="keybox"><h4><span>Conto esposizione<br><span class="small">${f.esposizione==="Sì"?esc(espTesto(f)):"numero impegnato, si contano i giorni"}</span></span> ${seg("esposizione")}</h4></div>
@@ -786,7 +789,6 @@ function openEditor(id,assegna){
     if(f.ripristino!=="Sì")f.ripristino="";
     f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");f.targa=f.targa.toUpperCase().replace(/\s/g,"");
     if((f.telaio||f.targa||f.modello)&&(!f.prima||!f.seconda)){$("e_err").innerHTML=`<div class="banner bad">Indica se ci sono la prima e la seconda chiave (Sì o No): senza questa risposta la vettura finisce in «Da censire».</div>`;return;}
-    if((f.telaio||f.targa||f.modello)&&(f.prima==="Sì")!==(f.seconda==="Sì")&&!f.motivo){$("e_err").innerHTML=`<div class="banner bad">C'è una sola chiave: indica il motivo (sotto la seconda chiave).</div>`;return;}
     const dup=telaioUsato(f.telaio,base.id);
     if(dup){$("e_err").innerHTML=`<div class="banner bad">Questo telaio è già registrato al ${esc(SING[dup.colore])} ${dup.numero}. Libera prima quel numero o correggi il telaio.</div>`;return;}
     const dupT=f.targa&&norm(f.targa)!==norm(base.targa)?slots().find(x=>x.id!==base.id&&x._has&&norm(x.targa)===norm(f.targa)):null;
@@ -967,7 +969,6 @@ function renderRighe(){
 }
 async function registraBolla(){
   const errs=B.righe.map((r,i)=>controllaRiga(r,i)).map(([k,m],i)=>[k,m,i]).filter(([k,m])=>k==="bad"||m.startsWith("Metti"));
-  {const im=B.righe.findIndex(r=>(r.seconda==="No")!==(!r.dovePrima)&&!r.motivo);if(im>=0){$("b_err").innerHTML=`<div class="banner bad">Vettura ${im+1}: c'è una sola chiave, indica il motivo.</div>`;return;}}
   if(errs.length){$("b_err").innerHTML=`<div class="banner bad">Sistema prima ${errs.length===1?"la vettura evidenziata":"le "+errs.length+" vetture evidenziate"}: ${esc(errs[0][1])}</div>`;return;}
   const writes=[],logs=[];
   for(const r of B.righe){const n=parseInt(r.numero,10);
@@ -996,7 +997,7 @@ $("fileImport").onchange=async e=>{
     if(!COLORI.includes(c)||!(n>=1&&n<=100))continue;
     const d={colore:c,numero:n,telaio:String(r["Telaio"]||"").trim().toUpperCase().replace(/\s/g,""),targa:String(r["Targa"]||"").trim().toUpperCase().replace(/\s/g,""),modello:String(r["Modello"]||"").trim(),
       prima:siNo(r["Prima chiave"]),dovePrima:luogo(r["Dove prima"]),seconda:siNo(r["Seconda chiave"]),
-      motivo:String(r["Motivo chiave singola"]||"").trim(),controllatoDa:String(r["Controllato da"]||"").trim(),dataControllo:toIso(r["Data controllo"]),note:String(r["Note"]||"").trim()};
+      motivo:motivoNuovo(String(r["Motivo chiave singola"]||"").trim()),controllatoDa:String(r["Controllato da"]||"").trim(),dataControllo:toIso(r["Data controllo"]),note:String(r["Note"]||"").trim()};
     if(siNo(r["In ripristino"])==="Sì"){d.ripristino="Sì";d.ripristinoTipo=String(r["Lavoro ripristino"]||"").trim();d.ripristinoDove=String(r["Dove ripristino"]||"").trim();d.ripristinoDal=oggi();}
     // Fuori a noleggio / in allestimento: i giorni si contano dalla data di controllo del censimento.
     if(d.dovePrima===FUORI)d.noleggioDal=d.dataControllo||oggi();if(d.dovePrima===ALLEST)d.allestimentoDal=d.dataControllo||oggi();
@@ -1290,7 +1291,6 @@ function openUsato(id){
     const nid=nuovo?idU(f.targa,f.telaio):id;
     if(!nid){$("e_err").innerHTML=`<div class="banner bad">Serve almeno la targa o il telaio.</div>`;return;}
     if(nuovo&&U.docs.has(nid)){$("e_err").innerHTML=`<div class="banner bad">Questa vettura è già in lavorazione. Cercala nell'elenco.</div>`;return;}
-    if(nuovo&&f.chiave&&$("u_seconda")&&(($("u_dovePrima").value?"Sì":"No")==="Sì")!==($("u_seconda").value==="Sì")&&!$("u_motivo").value){$("e_err").innerHTML=`<div class="banner bad">C'è una sola chiave: indica il motivo.</div>`;return;}
     if(nuovo&&!(Number(f.km)>0)){$("e_err").innerHTML=`<div class="banner bad">Indica i km: sono obbligatori nella presa in carico.</div>`;return;}
     if(f.chiave&&!(+f.chiave>=1&&+f.chiave<=100)){$("e_err").innerHTML=`<div class="banner bad">Il numero chiave va da 1 a 100.</div>`;return;}
     if(f.stato!==base.stato||nuovo)f.date[f.stato]=f.date[f.stato]||oggi();
