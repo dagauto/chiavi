@@ -146,7 +146,7 @@ async function controllo24h() {
   }
 }
 
-// Bollo / revisione scaduti alla data di consegna o in scadenza entro 30 giorni (dalla scheda usato con la stessa targa o telaio).
+// Revisione scaduta alla data di consegna o in scadenza entro 30 giorni (dalla scheda usato con la stessa targa o telaio).
 const norm = (s) => String(s ?? "").toUpperCase().replace(/[\s\-.]/g, "");
 function scadData(s) {
   s = String(s || "").trim(); let m;
@@ -169,7 +169,7 @@ async function controlloScadenze() {
     const rif = c.data || oggi;
     const lim = new Date(rif + "T12:00:00Z"); lim.setUTCDate(lim.getUTCDate() + 30);
     const fine = lim.toISOString().slice(0, 10);
-    const sc = [["scadBollo", "bollo"], ["scadRevisione", "revisione"]]
+    const sc = [["scadRevisione", "revisione"]]
       .map(([k, l]) => [l, scadData(u[k])]).filter(([, d]) => d && d <= fine)
       .map(([l, d]) => `${l} ${d < rif ? (l === "bollo" ? "scaduto" : "scaduta") : "in scadenza"} il ${d.split("-").reverse().join("/")}`);
     if (!sc.length) continue;
