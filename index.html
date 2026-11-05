@@ -381,6 +381,8 @@ const CORTO={BLU:"Blu",ROSSO:"Rosse",VERDE:"Verdi"};
 const SING={BLU:"Blu",ROSSO:"Rossa",VERDE:"Verde"};
 const LETT={BLU:"N",ROSSO:"U",VERDE:"V"};const LETT_OLD={BLU:"B",ROSSO:"R",VERDE:"V"};
 const LUOGHI=["Salone","Officina","Garage","Cimitero","Bel Sito"];
+// Quando la vettura va in carrozzeria o in sanificazione, la prima chiave si sposta lì da sola (e torna al posto di prima alla fine).
+const LUOGHI_RIP=["Carrozzeria","Sanificazione"];
 const FUORI="Fuori a noleggio";
 const ALLEST="Fuori in allestimento";
 const RETRO="retro cassaforte salone";
@@ -620,7 +622,7 @@ function chipRow(el,items,cur,onPick,lbl){
 function renderFilters(){
   chipRow($("fColore"),[[null,"Tutti i colori"],...COLORI.map(c=>[c,CORTO[c],"c-"+c])],S.col,v=>{S.col=v;render();});
   chipRow($("fStato"),[["incasa","In casa"],["avvisi","Con avvisi"],["una","Una sola chiave"],["rip","Ripristino / in attesa"],["noleggio","Fuori a noleggio"],["allestimento","In allestimento"],["vendute","Già vendute"],["esposizione","Conto esposizione"],["liberi","Numeri liberi"],["daverif","Da censire"]],S.stato,v=>{S.stato=v||"incasa";render();});
-  chipRow($("fLuogo"),[[null,"Ovunque"],...LUOGHI.map(l=>[l,l]),["RETRO","Seconde · retro salone"]],S.luogo,v=>{S.luogo=v;render();},"Prima chiave in:");
+  chipRow($("fLuogo"),[[null,"Ovunque"],...LUOGHI.concat(LUOGHI_RIP).map(l=>[l,l]),["RETRO","Seconde · retro salone"]],S.luogo,v=>{S.luogo=v;render();},"Prima chiave in:");
 }
 function renderSummary(){
   const all=slots();
@@ -675,7 +677,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)
 const erroreScrittura=e=>e&&String(e.code||"").includes("permission")?"Non hai il permesso di fare questa modifica.":"Salvataggio non riuscito. Controlla la connessione e riprova.";
 
 /* =================== Scheda vettura =================== */
-const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["noleggioDal","Fuori a noleggio dal"],["allestimentoDal","In allestimento dal"],["venduta","Venduta"],["cliente","Cliente"],["esposizione","Conto esposizione"],["esposizioneDal","In conto esposizione dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"]];
+const FIELDS=[["telaio","Telaio"],["targa","Targa"],["modello","Modello"],["prima","Prima chiave"],["dovePrima","Dove prima"],["seconda","Seconda chiave"],["motivo","Motivo"],["ripristino","In ripristino"],["ripristinoTipo","Lavoro"],["ripristinoDove","Dove"],["ripristinoDal","In ripristino dal"],["noleggioDal","Fuori a noleggio dal"],["allestimentoDal","In allestimento dal"],["venduta","Venduta"],["cliente","Cliente"],["esposizione","Conto esposizione"],["esposizioneDal","In conto esposizione dal"],["attesa","In attesa di ripristino"],["attesaDal","In attesa dal"],["danni","Danni di trasporto"],["controllatoDa","Controllato da"],["dataControllo","Data controllo"],["note","Note"],["dovePrimaPrima","Posto prima del ripristino"]];
 // Salvataggi in contemporanea: se mentre la scheda era aperta qualcun altro l'ha salvata, non si sovrascrive.
 function cambiataDaAltri(prima,ora){if(!prima||!ora)return"";if((ora.updatedAt||0)===(prima.updatedAt||0))return"";
   const by=ora.updatedBy||"";const nome=((S.utenti||[]).find(u=>u.email===by)||{}).nome||by||"un altro utente";
@@ -695,7 +697,7 @@ function openEditor(id,assegna){
     </div>
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
     ${base.colore==="ROSSO"&&!libero&&fotoTarga(f.targa)?citBox(f.targa,usatoTarga(f.targa)):""}
-    <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI,ALLEST]).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
+    <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI,ALLEST],LUOGHI_RIP).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
     <div class="keybox"><h4><span>Già venduta<br><span class="small">vettura nuova arrivata già venduta a un cliente</span></span> ${seg("venduta")}</h4>
       <div id="e_venbox" ${f.venduta==="Sì"?"":"hidden"}><label class="f" style="margin-top:8px">Cliente (facoltativo)<input id="e_cliente" value="${esc(f.cliente||"")}" autocomplete="off"></label></div></div>
@@ -733,6 +735,9 @@ function openEditor(id,assegna){
     if(k==="ripristinoTipo"&&f.ripristinoTipo&&f.ripristino!=="Sì"){f.ripristino="Sì";press("ripristino");$("e_ripbox").hidden=false;if(!f.ripristinoDal)f.ripristinoDal=oggi();}
     if((k==="ripristino"||k==="ripristinoTipo")&&f.ripristino==="Sì"&&f.attesa==="Sì"){f.attesa="";f.attesaDal="";press("attesa");$("e_attbox").hidden=true;if(!f.ripristinoTipo){f.ripristinoTipo=DT;press("ripristinoTipo");}}
     if(k==="ripristino"){$("e_ripbox").hidden=f.ripristino!=="Sì";if(f.ripristino==="Sì"){if(!f.ripristinoDal)f.ripristinoDal=oggi();}else{f.ripristinoTipo="";f.ripristinoDove="";f.ripristinoDal="";press("ripristinoTipo");const d=$("e_ripristinoDove");if(d)d.value="";}}
+    if(k==="ripristino"||k==="ripristinoTipo"){const t=f.ripristino==="Sì"?f.ripristinoTipo:"";
+      if(LUOGHI_RIP.includes(t)){if(!LUOGHI_RIP.includes(f.dovePrima))f.dovePrimaPrima=f.dovePrima||"";f.dovePrima=t;f.prima="Sì";press("dovePrima");press("prima");}
+      else if(LUOGHI_RIP.includes(f.dovePrima)){f.dovePrima=f.dovePrimaPrima||"";f.dovePrimaPrima="";press("dovePrima");}}
   });
   $("e_close").onclick=closeSheet;
   // Cambio colore (es. nuova blu o usata rossa che va a noleggio e diventa verde): nuovo numero, il vecchio si libera.
@@ -784,7 +789,7 @@ function openEditor(id,assegna){
     const dupT=f.targa&&norm(f.targa)!==norm(base.targa)?slots().find(x=>x.id!==base.id&&x._has&&norm(x.targa)===norm(f.targa)):null;
     if(dupT){$("e_err").innerHTML=`<div class="banner bad">Questa targa è già registrata al ${esc(SING[dupT.colore])} ${dupT.numero}. Libera prima quel numero o correggi la targa.</div>`;return;}
     const data={colore:base.colore,numero:base.numero};for(const[k]of FIELDS)data[k]=f[k]||"";
-    const diffs=[];for(const[k,l]of FIELDS){if(k==="controllatoDa"||k==="dataControllo"||k.startsWith("ripristino"))continue;const a=base[k]||"",b=data[k];if(a!==b)diffs.push(a?`${l}: ${a} → ${b||"—"}`:`${l}: ${b}`);}
+    const diffs=[];for(const[k,l]of FIELDS){if(k==="controllatoDa"||k==="dataControllo"||k==="dovePrimaPrima"||k.startsWith("ripristino"))continue;const a=base[k]||"",b=data[k];if(a!==b)diffs.push(a?`${l}: ${a} → ${b||"—"}`:`${l}: ${b}`);}
     const rIn=!inRip(base)&&data.ripristino==="Sì",rOut=inRip(base)&&data.ripristino!=="Sì",rMod=inRip(base)&&data.ripristino==="Sì"&&(base.ripristinoTipo||"")+(base.ripristinoDove||"")!==data.ripristinoTipo+data.ripristinoDove;
     const logs=[];
     if(!inAtt(base)&&data.attesa==="Sì"&&data.ripristino!=="Sì")logs.push({codice:codice(base),azione:"In attesa di ripristino",dettaglio:[DT,data.danni].filter(Boolean).join(" · ")});
@@ -1108,7 +1113,7 @@ function renderUsato(){
       <span style="min-width:0">
         <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?`<span class="pill p-Solo-seconda">${IN_VENDITA.includes(u.stato)?"Vendita prioritaria":"Priorità alta"}</span>`:u.priorita==="bassa"&&!IN_VENDITA.includes(u.stato)?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
         <span class="uinfo">${[u.chiave?`Chiave U.${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
-        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}${u.ivaEsposta?" · IVA esp. "+esc(u.ivaEsposta):""}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
+        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}${u.ivaEsposta?" · IVA esp. "+esc(u.ivaEsposta):""}</span>`:""}${u.stato==="ripristino"&&u.ripTipo?`<span class="kp">${esc(u.ripTipo)}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
       </span></button>`;
   }
   $("uList").innerHTML=html||`<div class="empty"><p>Nessuna vettura in questa vista.</p></div>`;
@@ -1188,6 +1193,7 @@ function openUsato(id){
       <div id="u_fmsg" class="small" style="margin-top:6px"></div></div>`:""}
     ${!nuovo&&fotoOk(f.stato)?citBox(f.targa,f):""}
     <div class="keybox"><h4>Stato${nuovo?' <span class="small">dove va la vettura appena entra</span>':""}</h4><div class="places" data-k="stato">${STATI_U.filter(([k])=>!nuovo||STATI_ENTRATA.includes(k)).map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}" ${statiPermessi().includes(k)||f.stato===k?"":"disabled"}>${l}</button>`).join("")}</div>
+      ${!nuovo&&canVoci()?`<div class="small" style="margin-top:8px">In ripristino da <span class="small">(scegli quando la vettura va in ripristino)</span></div><div class="places" data-k="ripTipo">${TIPI_RIP.filter(t=>t!==DT).map(t=>`<button type="button" class="chip" data-v="${t}" aria-pressed="${f.ripTipo===t}">${t}</button>`).join("")}</div>`:""}
       ${nuovo?"":`<div class="small">${[f.date.presa?`Entrata: ${new Date(f.date.presa).toLocaleDateString("it-IT")}`:""].concat(STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`)).filter(Boolean).join(" · ")}</div>`}</div>
     <div class="keybox"><h4>${IN_VENDITA.includes(f.stato)?"Priorità di vendita":"Priorità di ripristino"} <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
     <div class="grid2">${inp("targa","Targa",{mono:1})}${inp("modello","Modello")}</div>
@@ -1299,9 +1305,14 @@ function openUsato(id){
       if(!occupato(s)&&nuovo){writes.push({col:"chiavi",id:s.id,data:{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio,targa:f.targa,modello:f.modello,prima:$("u_dovePrima")&&$("u_dovePrima").value?"Sì":"No",dovePrima:$("u_dovePrima")?$("u_dovePrima").value:"",seconda:$("u_seconda")?$("u_seconda").value:"",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Da presa in carico usato"}});logs.push({codice:`U.${f.chiave}`,azione:"Assegnato da presa in carico",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")});}
       else if(occupato(s)&&!stessa&&nuovo)avviso=` Attenzione: la chiave Rossa ${f.chiave} risulta già occupata (${s.targa||s.modello||s.telaio||"altra vettura"}); il registro chiavi non è stato modificato.`;
       const ok=occupato(s)?stessa:nuovo;
-      if(ok&&f.stato!==base.stato){
-        if(f.stato==="ripristino"){const tipi=VOCI.filter(([k])=>f.voci[k]&&!f.voci[k].fatto&&(f.voci[k].descrizione||f.voci[k].stimato)).map(([,l])=>l).join(", ");writes.push({col:"chiavi",id:s.id,merge:true,data:{ripristino:"Sì",ripristinoTipo:"",ripristinoDove:tipi?("Lavorazione usato: "+tipi):"Lavorazione usato",ripristinoDal:oggi()}});}
-        else if(base.stato==="ripristino")writes.push({col:"chiavi",id:s.id,merge:true,data:{ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:""}});
+      if(ok&&(f.stato!==base.stato||(f.stato==="ripristino"&&(f.ripTipo||"")!==(base.ripTipo||"")))){
+        const sk=occupato(s)?s:{};
+        if(f.stato==="ripristino"){const tipi=VOCI.filter(([k])=>f.voci[k]&&!f.voci[k].fatto&&(f.voci[k].descrizione||f.voci[k].stimato)).map(([,l])=>l).join(", ");
+          const d={ripristino:"Sì",ripristinoTipo:f.ripTipo||"",ripristinoDove:tipi?("Lavorazione usato: "+tipi):"Lavorazione usato",ripristinoDal:sk.ripristinoDal&&base.stato==="ripristino"?sk.ripristinoDal:oggi()};
+          if(LUOGHI_RIP.includes(f.ripTipo)){if(!LUOGHI_RIP.includes(sk.dovePrima))d.dovePrimaPrima=sk.dovePrima||"";d.dovePrima=f.ripTipo;d.prima="Sì";}
+          else if(LUOGHI_RIP.includes(sk.dovePrima)){d.dovePrima=sk.dovePrimaPrima||"";d.dovePrimaPrima="";}
+          writes.push({col:"chiavi",id:s.id,merge:true,data:d});}
+        else if(base.stato==="ripristino"){const d={ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:""};if(LUOGHI_RIP.includes(sk.dovePrima)){d.dovePrima=sk.dovePrimaPrima||"";d.dovePrimaPrima="";}writes.push({col:"chiavi",id:s.id,merge:true,data:d});}
       }
     }
     $("e_save").disabled=true;
@@ -1383,6 +1394,8 @@ const VAR_PAG={servicecare:["2","3","4"],advance:["12","24","36"],defence:["12",
 const VAR_VECCHIA={servicecare:"4",defence:"48",mapfree:"12"};
 // Servizi (non si montano, si attivano): li spuntano back office e officina.
 const SERVIZI=["servicecare","advance","defence","certified","mapfree"];
+// Voci solo informative: niente «montato».
+const SOLO_INFO=["autonera"];
 const canAttiva=()=>ha(...GEST,"officina");
 const puoFatto=k=>SERVIZI.includes(k)?canAttiva():canMontato();
 const varPag=(k,v)=>(v&&v.var)||VAR_VECCHIA[k]||"";
@@ -1402,7 +1415,7 @@ const canAppConsegna=()=>ha(...GEST,"productexpert");
 const canPrepConsegna=()=>ha(...GEST,"officina","ripristini","preparatore");
 const canConsegnata=()=>ha(...GEST,"venditore","productexpert");
 const canMagazzino=()=>ha(...GEST,"magazzino");
-const canMontato=()=>ha(...GEST,"officina","ripristini");
+const canMontato=()=>ha(...GEST,"officina","ripristini","preparatore");
 const canImpegni=()=>ha(...GEST,"productexpert","venditore");
 const canImpTutti=()=>ha(...GEST);
 const vedeImpegni=()=>ha(...GEST,"venditore","productexpert","bdc");
@@ -1457,7 +1470,7 @@ function scadenzeC(c){if(c.stato==="consegnata"||c.stato==="annullata")return[];
     if(d<rif)out.push({t:`${a} il ${g}`,bad:true});else if(d<=fine)out.push({t:`${b} il ${g}`,bad:false});}return out;}
 // Pronta solo quando preparatore/officina mette il flag «Preconsegna fatta»: le singole voci sono un promemoria, non tutte servono a ogni cliente.
 function prontaC(c){return !!c.pronta;}
-function mancanti(c){let n=0,t=0;for(const[k]of ACC_STD){t++;if(!(c.std||{})[k])n++;}for(const[k,v]of Object.entries(c.pag||{}))if(v.sel){t++;if(!v.fatto)n++;}for(const o of omaggi(c)){t++;if(!o.fatto)n++;}for(const o of c.ripAgg||[]){t++;if(!o.fatto)n++;}if(c.omaggioPE){t++;if(!c.omaggioPEFatto)n++;}for(const[k]of PREP){t++;if(!(c.prep||{})[k])n++;}return{n,t};}
+function mancanti(c){let n=0,t=0;for(const[k]of ACC_STD){t++;if(!(c.std||{})[k])n++;}for(const[k,v]of Object.entries(c.pag||{}))if(v.sel&&!SOLO_INFO.includes(k)){t++;if(!v.fatto)n++;}for(const o of omaggi(c)){t++;if(!o.fatto)n++;}for(const o of c.ripAgg||[]){t++;if(!o.fatto)n++;}if(c.omaggioPE){t++;if(!c.omaggioPEFatto)n++;}for(const[k]of PREP){t++;if(!(c.prep||{})[k])n++;}return{n,t};}
 function omaggi(c){if(Array.isArray(c.omaggi))return c.omaggi.filter(o=>o&&o.testo);return c.omaggio?[{testo:c.omaggio,fatto:!!c.omaggioFatto}]:[];}
 // Ore lavorative tra adesso e la consegna: sabato e domenica non contano (le vetture non si preparano).
 function oreLavorative(from,to){if(to<=from)return(to-from)/36e5;if(to-from>21*864e5)return(to-from)/36e5;let ms=0,t=from;while(t<to){const d=new Date(t);const nx=Math.min(to,new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime());const g=d.getDay();if(g!==0&&g!==6)ms+=nx-t;t=nx;}return ms/36e5;}
@@ -1534,7 +1547,7 @@ function stampaVerbale(c){
     <tr><td>Marca e modello</td><td colspan="3">Mercedes-Benz ${esc(c.modello||"")}</td></tr>
     <tr><td>Telaio</td><td>${esc(c.telaio||"")}</td><td>n° Chiave</td><td>${esc(etich(c))}</td></tr></table>
     <h2>Accessori standard di preconsegna</h2>${ACC_STD.map(([k,l])=>`<div>${box((c.std||{})[k])} ${esc(l)}</div>`).join("")}
-    <h2>Ulteriori accessori a pagamento</h2>${sel.length?sel.map(([k,l])=>`<div>${box(c.pag[k].fatto)} ${esc(nomePag(k,l,c.pag[k]))}</div>`).join(""):"<div>Nessuno</div>"}
+    <h2>Ulteriori accessori a pagamento</h2>${sel.length?sel.map(([k,l])=>`<div>${SOLO_INFO.includes(k)?"• ":box(c.pag[k].fatto)+" "}${esc(nomePag(k,l,c.pag[k]))}</div>`).join(""):"<div>Nessuno</div>"}
     <h2>Ulteriori accessori in omaggio</h2>${(()=>{const l=omaggi(c).concat(c.omaggioPE?[{testo:c.omaggioPE,fatto:!!c.omaggioPEFatto}]:[]);return l.length?l.map(o=>`<div>${box(o.fatto)} ${esc(o.testo)}</div>`).join(""):"<div>Nessuno</div>";})()}
     ${(c.ripAgg||[]).length?`<h2>Ripristini aggiuntivi</h2>${c.ripAgg.map(o=>`<div>${box(o.fatto)} ${esc(o.testo)}</div>`).join("")}`:""}
     ${c.note?`<h2>Note</h2><div>${esc(c.note)}</div>`:""}
@@ -1571,7 +1584,7 @@ function openConsegna(id){
       <label class="f" style="margin-top:8px">Omaggio da preparare <span class="small">(se il product expert lo sa già: arriva a officina, ripristini, preparatori e magazzino)</span><input id="c_omPE" value="${esc(f.omaggioPE||"")}" placeholder="es. fiori, portachiavi personalizzato, borsa Mercedes" autocomplete="off" ${appOk?"":"disabled"}></label>
       ${f.omaggioPE?`<label class="chk small"><input type="checkbox" id="c_omPEfatto" ${f.omaggioPEFatto?"checked":""} ${prepOk?"":"disabled"}> omaggio preparato</label>`:""}</div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato», i servizi «attivato»</span></h4>
-      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label>${VAR_PAG[k]?`<select data-pag="${k}" data-pf="var" ${ro} style="width:auto;min-width:0;padding:4px 6px">${[""].concat(VAR_PAG[k]).map(x=>`<option value="${x}" ${varPag(k,v)===x?"selected":""}>${x?esc(nomeVar(k,x)):"durata?"}</option>`).join("")}</select>`:""}<label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&puoFatto(k)?"":"disabled"}> ${SERVIZI.includes(k)?"attivato":"montato"}</label></div>`;}).join("")}
+      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label>${VAR_PAG[k]?`<select data-pag="${k}" data-pf="var" ${ro} style="width:auto;min-width:0;padding:4px 6px">${[""].concat(VAR_PAG[k]).map(x=>`<option value="${x}" ${varPag(k,v)===x?"selected":""}>${x?esc(nomeVar(k,x)):"durata?"}</option>`).join("")}</select>`:""}${SOLO_INFO.includes(k)?"":`<label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&puoFatto(k)?"":"disabled"}> ${SERVIZI.includes(k)?"attivato":"montato"}</label>`}</div>`;}).join("")}
       <div class="accrow" style="border-top:0"><b style="font-size:14px">Accessori in omaggio</b></div>
       <div id="c_omlist">${omaggi(f).map((o,i)=>omRow(o,i,ro)).join("")}</div>
       ${ro?"":`<button type="button" class="link" id="c_omadd">+ Aggiungi omaggio</button>`}
@@ -1619,7 +1632,7 @@ function openConsegna(id){
       const altre=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.stato!=="annullata"&&norm(c.venditore)===norm(pe));
       if(altre.length)w.innerHTML+=`<div class="banner">${esc(pe)} quel giorno ha già ${altre.length} ${plur(altre.length,"consegna","consegne")}: ${altre.map(([,c])=>esc((c.ora||"--:--")+" "+etich(c))).join(", ")}.</div>`;}};
   $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);$("c_venditore").addEventListener("input",avvData);avvData();
-  p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');r.disabled=!t.checked||!puoFatto(t.dataset.pag);if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
+  p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');if(!r)return;r.disabled=!t.checked||!puoFatto(t.dataset.pag);if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
   const leggi=()=>{
     for(const k of["targa","telaio","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");
     f.targa=f.targa.toUpperCase().replace(/\s/g,"");f.tipo=$("c_tipo").value;
@@ -1781,7 +1794,7 @@ $("aList").addEventListener("click",async e=>{const b=e.target.closest("button")
 $("btnExportC").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
   const rows=[...C.docs.values()].sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(c=>{const m=mancanti(c);return{"Chiave":etich(c),"Tipo":c.tipo,"Cliente":c.cliente||"","Si consegna a":c.consegnatario||"","Product expert":c.venditore||"","Modello":c.modello||"","Targa":c.targa||"","Telaio":c.telaio||"","Data":c.data||"","Ora":c.ora||"","Stato":c.stato,"Semaforo":semaforo(c)[1],"Preparazione":`${m.t-m.n}/${m.t}`,
-    "Accessori a pagamento":ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel).map(([k,l])=>nomePag(k,l,c.pag[k])+(c.pag[k].fatto?(SERVIZI.includes(k)?" (attivato)":" (montato)"):"")).join(", "),"Omaggi":omaggi(c).map(o=>o.testo+(o.fatto?" (montato)":"")).join(", "),"Consegnata il":(c.date||{}).consegnata||"","Note":c.note||""};});
+    "Accessori a pagamento":ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel).map(([k,l])=>nomePag(k,l,c.pag[k])+(c.pag[k].fatto&&!SOLO_INFO.includes(k)?(SERVIZI.includes(k)?" (attivato)":" (montato)"):"")).join(", "),"Omaggi":omaggi(c).map(o=>o.testo+(o.fatto?" (montato)":"")).join(", "),"Consegnata il":(c.date||{}).consegnata||"","Note":c.note||""};});
   const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"Chiave":""}]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Consegne");
   const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Consegne_${oggi()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
