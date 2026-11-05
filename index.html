@@ -701,7 +701,6 @@ function openEditor(id,assegna){
     </div>
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
     ${base.colore==="ROSSO"&&!libero&&fotoTarga(f.targa)?citBox(f.targa,usatoTarga(f.targa)):""}
-    ${base.colore==="ROSSO"&&!usatoDi(f)?(canFiscale()?`<div class="keybox"><h4><span>Tab Usato<br><span class="small">non c'è la presa in carico: scegli come farla vedere nella tab Usato</span></span></h4><div class="places" data-k="usatoStato">${[["attesa","In attesa di ripristino"],["commerciante","Destinazione commerciante"]].map(([v,l])=>`<button type="button" class="chip" data-v="${v}" aria-pressed="false">${l}</button>`).join("")}</div><div class="small" style="margin-top:6px">Se la metti «In ripristino» qui sotto, entra nella tab Usato come in ripristino.</div></div>`:(libero?"":`<div class="small" style="margin:6px 0">Non è nella tab Usato (manca la presa in carico): la aggiungono il responsabile usato o il back office.</div>`)):""}
     <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI,ALLEST],LUOGHI_RIP).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4>
       <label class="f" style="margin-top:8px">Motivo se manca una chiave<select id="e_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${motivoNuovo(f.motivo)===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label></div>
@@ -803,29 +802,30 @@ function openEditor(id,assegna){
     if(rOut)logs.push({codice:codice(base),azione:"Fine ripristino",dettaglio:base.ripristinoDal?`dopo ${giorniLav(base.ripristinoDal)} giorni lavorativi`:""});
     if(rMod)logs.push({codice:codice(base),azione:"Ripristino aggiornato",dettaglio:[data.ripristinoTipo,data.ripristinoDove].filter(Boolean).join(" · ")});
     if(diffs.length||!base._has)logs.push({codice:codice(base),azione:libero?"Assegnato":"Aggiornato",dettaglio:diffs.slice(0,4).join(" · ")});
-    // Usata entrata da chiavi (senza presa in carico): scheda nella tab Usato se va in ripristino o al commerciante, e notifica a usato e back office.
-    const extra=[];
+    // Usata rossa messa «In ripristino» dalle chiavi senza scheda usato: entra da sola nella tab Usato «In attesa di ripristino».
+    // Nuova rossa registrata dalle chiavi: notifica a responsabile usato e back office.
+    const extra=[];let uScheda=null;
     if(data.colore==="ROSSO"&&(data.targa||data.telaio)&&!usatoDi(data)){
       const nuovaR=!base._has||libero;
-      const st=f.usatoStato?(data.ripristino==="Sì"?"ripristino":f.usatoStato):(rIn&&canFiscale()?"ripristino":"");
       const uid=idU(data.targa,data.telaio),ex=U.docs.get(uid);
       const desc=[data.targa,data.modello].filter(Boolean).join(" · ");
-      if(st&&canFiscale()&&(!ex||ex.deleted)){
-        extra.push({col:"usato",id:uid,data:{stato:st,priorita:"normale",marca:"",modello:data.modello,targa:data.targa,telaio:data.telaio,chiave:String(data.numero),km:"",date:{presa:oggi(),[st]:oggi()},voci:{},note:"Entrata da chiavi",ripTipo:st==="ripristino"&&LUOGHI_RIP.includes(data.ripristinoTipo)?data.ripristinoTipo:"",deleted:false}});
-        logs.push({codice:data.targa||uid,azione:"Entrata in Usato da chiavi · "+NOME_STATO[st],dettaglio:[data.modello,`chiave R ${data.numero}`].filter(Boolean).join(" · ")});
-        if(st==="attesa")extra.push(coda("usato_attesa",`Usato da ripristinare: ${data.targa||""}`,`${desc} · priorità normale`,"#usato"));
-        extra.push(coda("usato_chiavi",`Usata entrata da chiavi: ${data.targa||data.telaio}`,`${desc} · chiave R ${data.numero} · nella tab Usato come «${NOME_STATO[st]}» (registrata da ${S.me.nome})`,"#usato"));
-      }else if(nuovaR||rIn)extra.push(coda("usato_chiavi",`Usata entrata da chiavi: ${data.targa||data.telaio}`,`${desc} · chiave R ${data.numero}${rIn?" · messa in ripristino":""} · registrata da ${S.me.nome}. Non c'è la presa in carico: se va in ripristino o al commerciante aggiungila nella tab Usato (apri la chiave R ${data.numero}).`,"#usato"));
+      if(rIn&&(!ex||ex.deleted)){
+        uScheda=[{col:"usato",id:uid,data:{stato:"attesa",priorita:"normale",marca:"",modello:data.modello,targa:data.targa,telaio:data.telaio,chiave:String(data.numero),km:"",date:{presa:oggi(),attesa:oggi()},voci:{},note:"Entrata da chiavi",deleted:false}},
+          coda("usato_attesa",`Usato da ripristinare: ${data.targa||""}`,`${desc} · priorità normale`,"#usato"),
+          coda("usato_chiavi",`Usata in ripristino dalle chiavi: ${data.targa||data.telaio}`,`${desc} · chiave R ${data.numero} · messa in ripristino da ${S.me.nome}: è entrata nella tab Usato «In attesa di ripristino» (senza presa in carico, km e carico fiscale da completare).`,"#usato")];
+        logs.push({codice:data.targa||uid,azione:"Entrata in Usato da chiavi · In attesa di ripristino",dettaglio:[data.modello,`chiave R ${data.numero}`].filter(Boolean).join(" · ")});
+      }else if(nuovaR)extra.push(coda("usato_chiavi",`Usata entrata da chiavi: ${data.targa||data.telaio}`,`${desc} · chiave R ${data.numero} · registrata da ${S.me.nome}. Non c'è la presa in carico: se va in ripristino basta mettere «In ripristino» sulla chiave R ${data.numero} e passa nella tab Usato.`,"#usato"));
     }
     if(!logs.length){closeSheet();return;}
-    salva([{id:base.id,data},...extra],logs,rIn?`${SING[base.colore]} ${base.numero}: in ripristino.`:rOut?`${SING[base.colore]} ${base.numero}: ripristino finito.`:`${SING[base.colore]} ${base.numero}: salvato.`);
+    salva([{id:base.id,data},...extra],logs,rIn?`${SING[base.colore]} ${base.numero}: in ripristino${uScheda?", è passata nella tab Usato":""}.`:rOut?`${SING[base.colore]} ${base.numero}: ripristino finito.`:`${SING[base.colore]} ${base.numero}: salvato.`)
+      .then(ok=>{if(ok&&uScheda)S.store.commitU(uScheda,[]).catch(x=>console.warn("scheda usato da chiavi",x));});
   };
   setTimeout(()=>{const t=$(assegna?"e_targa":"e_close");t&&t.focus();},30);
 }
 async function salva(writes,logs,okMsg){
   const btn=$("e_save");if(btn)btn.disabled=true;
-  try{await S.store.commitU(writes.map(w=>Object.assign({col:"chiavi"},w)),addRefs(logs,writes));closeSheet();flash(okMsg,"ok");}
-  catch(e){const el=$("e_err");if(el)el.innerHTML=`<div class="banner bad">${esc(erroreScrittura(e))}</div>`;if(btn)btn.disabled=false;}
+  try{await S.store.commitU(writes.map(w=>Object.assign({col:"chiavi"},w)),addRefs(logs,writes));closeSheet();flash(okMsg,"ok");return true;}
+  catch(e){const el=$("e_err");if(el)el.innerHTML=`<div class="banner bad">${esc(erroreScrittura(e))}</div>`;if(btn)btn.disabled=false;return false;}
 }
 $("results").addEventListener("click",e=>{const b=e.target.closest("[data-id]");if(b)openEditor(b.dataset.id,S.stato==="liberi"&&!S.q);});
 $("q").addEventListener("input",e=>{S.q=e.target.value.trim();render();});
@@ -992,7 +992,7 @@ async function registraBolla(){
     logs.push({codice:`${LETT[r.colore]}.${n}`,azione:r.foto?"Assegnato da foto":"Assegnato a mano",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
   $("b_save").disabled=true;
   try{await S.store.commit(writes,logs);
-    {const nq=writes.filter(w=>w.data.colore==="ROSSO"&&!usatoDi(w.data)).map(w=>coda("usato_chiavi",`Usata entrata da chiavi: ${w.data.targa||w.data.telaio}`,`${[w.data.targa,w.data.modello].filter(Boolean).join(" · ")} · chiave R ${w.data.numero} · registrata da ${S.me.nome}. Non c'è la presa in carico: se va in ripristino o al commerciante aggiungila nella tab Usato (apri la chiave R ${w.data.numero}).`,"#usato"));
+    {const nq=writes.filter(w=>w.data.colore==="ROSSO"&&!usatoDi(w.data)).map(w=>coda("usato_chiavi",`Usata entrata da chiavi: ${w.data.targa||w.data.telaio}`,`${[w.data.targa,w.data.modello].filter(Boolean).join(" · ")} · chiave R ${w.data.numero} · registrata da ${S.me.nome}. Non c'è la presa in carico: se va in ripristino basta mettere «In ripristino» sulla chiave R ${w.data.numero} e passa nella tab Usato.`,"#usato"));
       if(nq.length)try{await S.store.commitU(nq,[]);}catch(x){console.warn("notifica usato_chiavi",x);}}
     closeSheet();flash(writes.length===1?"Vettura registrata.":`${writes.length} vetture registrate.`,"ok");}
   catch(e){$("b_save").disabled=false;$("b_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(e))}</div>`;}
