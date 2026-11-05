@@ -381,7 +381,8 @@ const CORTO={BLU:"Blu",ROSSO:"Rosse",VERDE:"Verdi"};
 const SING={BLU:"Blu",ROSSO:"Rossa",VERDE:"Verde"};
 const LETT={BLU:"N",ROSSO:"U",VERDE:"V"};const LETT_OLD={BLU:"B",ROSSO:"R",VERDE:"V"};
 const LUOGHI=["Salone","Officina","Garage","Cimitero","Bel Sito"];
-// Quando la vettura va in carrozzeria o in sanificazione, la prima chiave si sposta lì da sola (e torna al posto di prima alla fine).
+// Quando la vettura va in carrozzeria o in sanificazione la prima chiave si sposta lì da sola; quando esce dal ripristino va in Officina.
+const FINE_RIP="Officina";
 const LUOGHI_RIP=["Carrozzeria","Sanificazione"];
 const FUORI="Fuori a noleggio";
 const ALLEST="Fuori in allestimento";
@@ -737,7 +738,8 @@ function openEditor(id,assegna){
     if(k==="ripristino"){$("e_ripbox").hidden=f.ripristino!=="Sì";if(f.ripristino==="Sì"){if(!f.ripristinoDal)f.ripristinoDal=oggi();}else{f.ripristinoTipo="";f.ripristinoDove="";f.ripristinoDal="";press("ripristinoTipo");const d=$("e_ripristinoDove");if(d)d.value="";}}
     if(k==="ripristino"||k==="ripristinoTipo"){const t=f.ripristino==="Sì"?f.ripristinoTipo:"";
       if(LUOGHI_RIP.includes(t)){if(!LUOGHI_RIP.includes(f.dovePrima))f.dovePrimaPrima=f.dovePrima||"";f.dovePrima=t;f.prima="Sì";press("dovePrima");press("prima");}
-      else if(LUOGHI_RIP.includes(f.dovePrima)){f.dovePrima=f.dovePrimaPrima||"";f.dovePrimaPrima="";press("dovePrima");}}
+      else if(LUOGHI_RIP.includes(f.dovePrima)){f.dovePrima=FINE_RIP;press("dovePrima");}
+      if(k==="ripristino"&&f.ripristino!=="Sì"&&inRip(base)){f.dovePrima=FINE_RIP;f.prima="Sì";press("dovePrima");press("prima");}}
   });
   $("e_close").onclick=closeSheet;
   // Cambio colore (es. nuova blu o usata rossa che va a noleggio e diventa verde): nuovo numero, il vecchio si libera.
@@ -1193,7 +1195,7 @@ function openUsato(id){
       <div id="u_fmsg" class="small" style="margin-top:6px"></div></div>`:""}
     ${!nuovo&&fotoOk(f.stato)?citBox(f.targa,f):""}
     <div class="keybox"><h4>Stato${nuovo?' <span class="small">dove va la vettura appena entra</span>':""}</h4><div class="places" data-k="stato">${STATI_U.filter(([k])=>!nuovo||STATI_ENTRATA.includes(k)).map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}" ${statiPermessi().includes(k)||f.stato===k?"":"disabled"}>${l}</button>`).join("")}</div>
-      ${!nuovo&&canVoci()?`<div class="small" style="margin-top:8px">In ripristino da <span class="small">(scegli quando la vettura va in ripristino)</span></div><div class="places" data-k="ripTipo">${TIPI_RIP.filter(t=>t!==DT).map(t=>`<button type="button" class="chip" data-v="${t}" aria-pressed="${f.ripTipo===t}">${t}</button>`).join("")}</div>`:""}
+      ${!nuovo&&canVoci()?`<div class="small" style="margin-top:8px">In ripristino in <span class="small">(la prima chiave si sposta lì; a fine ripristino va in Officina)</span></div><div class="places" data-k="ripTipo">${LUOGHI_RIP.map(t=>`<button type="button" class="chip" data-v="${t}" aria-pressed="${f.ripTipo===t}">${t}</button>`).join("")}</div>`:""}
       ${nuovo?"":`<div class="small">${[f.date.presa?`Entrata: ${new Date(f.date.presa).toLocaleDateString("it-IT")}`:""].concat(STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`)).filter(Boolean).join(" · ")}</div>`}</div>
     <div class="keybox"><h4>${IN_VENDITA.includes(f.stato)?"Priorità di vendita":"Priorità di ripristino"} <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
     <div class="grid2">${inp("targa","Targa",{mono:1})}${inp("modello","Modello")}</div>
@@ -1310,9 +1312,9 @@ function openUsato(id){
         if(f.stato==="ripristino"){const tipi=VOCI.filter(([k])=>f.voci[k]&&!f.voci[k].fatto&&(f.voci[k].descrizione||f.voci[k].stimato)).map(([,l])=>l).join(", ");
           const d={ripristino:"Sì",ripristinoTipo:f.ripTipo||"",ripristinoDove:tipi?("Lavorazione usato: "+tipi):"Lavorazione usato",ripristinoDal:sk.ripristinoDal&&base.stato==="ripristino"?sk.ripristinoDal:oggi()};
           if(LUOGHI_RIP.includes(f.ripTipo)){if(!LUOGHI_RIP.includes(sk.dovePrima))d.dovePrimaPrima=sk.dovePrima||"";d.dovePrima=f.ripTipo;d.prima="Sì";}
-          else if(LUOGHI_RIP.includes(sk.dovePrima)){d.dovePrima=sk.dovePrimaPrima||"";d.dovePrimaPrima="";}
+          else if(LUOGHI_RIP.includes(sk.dovePrima)){d.dovePrima=FINE_RIP;d.prima="Sì";}
           writes.push({col:"chiavi",id:s.id,merge:true,data:d});}
-        else if(base.stato==="ripristino"){const d={ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:""};if(LUOGHI_RIP.includes(sk.dovePrima)){d.dovePrima=sk.dovePrimaPrima||"";d.dovePrimaPrima="";}writes.push({col:"chiavi",id:s.id,merge:true,data:d});}
+        else if(base.stato==="ripristino"){const d={ripristino:"",ripristinoTipo:"",ripristinoDove:"",ripristinoDal:"",dovePrima:FINE_RIP,prima:"Sì"};writes.push({col:"chiavi",id:s.id,merge:true,data:d});}
       }
     }
     $("e_save").disabled=true;
@@ -1466,7 +1468,7 @@ function usatoDi(c){const t=norm(c.targa),v=norm(c.telaio);if(!t&&!v)return null
 // Scaduto alla data di consegna = rosso; in scadenza entro 30 giorni dalla consegna = giallo.
 function scadenzeC(c){if(c.stato==="consegnata"||c.stato==="annullata")return[];const u=usatoDi(c);if(!u)return[];const rif=c.data||oggi();
   const lim=new Date(rif+"T12:00:00");lim.setDate(lim.getDate()+30);const fine=lim.toISOString().slice(0,10);const out=[];
-  for(const[k,a,b]of[["scadBollo","Bollo scaduto","Bollo in scadenza"],["scadRevisione","Revisione scaduta","Revisione in scadenza"]]){const d=scadData(u[k]);if(!d)continue;const g=d.split("-").reverse().join("/");
+  for(const[k,a,b]of[["scadRevisione","Revisione scaduta","Revisione in scadenza"]]){const d=scadData(u[k]);if(!d)continue;const g=d.split("-").reverse().join("/");
     if(d<rif)out.push({t:`${a} il ${g}`,bad:true});else if(d<=fine)out.push({t:`${b} il ${g}`,bad:false});}return out;}
 // Pronta solo quando preparatore/officina mette il flag «Preconsegna fatta»: le singole voci sono un promemoria, non tutte servono a ogni cliente.
 function prontaC(c){return !!c.pronta;}
@@ -1801,7 +1803,7 @@ $("btnExportC").onclick=async()=>{
 };
 
 /* =================== Notifiche =================== */
-const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con bollo o revisione scaduti o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_omaggio","Omaggio da preparare indicato dal product expert",["officina","ripristini","preparatore","magazzino"]],["consegna_ordinati","Ricambi ordinati con data di arrivo prevista",["productexpert","backoffice"]],["consegna_senza","Ricambi non disponibili o in arretrato: si consegna dopo",["magazzino","productexpert","backoffice"]],["consegna_ripristini","Ripristini aggiuntivi da fare prima della consegna",["officina","ripristini","preparatore"]]];
+const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con revisione scaduta o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_omaggio","Omaggio da preparare indicato dal product expert",["officina","ripristini","preparatore","magazzino"]],["consegna_ordinati","Ricambi ordinati con data di arrivo prevista",["productexpert","backoffice"]],["consegna_senza","Ricambi non disponibili o in arretrato: si consegna dopo",["magazzino","productexpert","backoffice"]],["consegna_ripristini","Ripristini aggiuntivi da fare prima della consegna",["officina","ripristini","preparatore"]]];
 const coda=(evento,titolo,testo,link)=>({col:"notifiche_coda",id:`${evento}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,data:{evento,titolo,testo,link:link||"",ruoli:((EVENTI.find(e=>e[0]===evento)||[])[2])||[],inviata:false,ts:Date.now()}});
 let MIE={prefs:{},tokens:[]};
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
