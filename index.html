@@ -1001,6 +1001,8 @@ $("fileImport").onchange=async e=>{
     if(siNo(r["In ripristino"])==="Sì"){d.ripristino="Sì";d.ripristinoTipo=String(r["Lavoro ripristino"]||"").trim();d.ripristinoDove=String(r["Dove ripristino"]||"").trim();d.ripristinoDal=oggi();}
     // Fuori a noleggio / in allestimento: i giorni si contano dalla data di controllo del censimento.
     if(d.dovePrima===FUORI)d.noleggioDal=d.dataControllo||oggi();if(d.dovePrima===ALLEST)d.allestimentoDal=d.dataControllo||oggi();
+    // Già venduta (colonne «Venduta» e «Cliente» del censimento).
+    if(siNo(r["Venduta"])==="Sì"){d.venduta="Sì";d.cliente=String(r["Cliente"]||"").trim();}
     if(!(d.telaio||d.targa||d.prima||d.seconda))continue;
     writes.push({id:idOf(c,n),data:d});
   }
