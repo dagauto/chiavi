@@ -1427,7 +1427,7 @@ $("tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if
 
 /* =================== Consegne =================== */
 const ACC_STD=[["chiavi","Chiave e doppia chiave"],["giubotto","Giubotto catarifrangente"],["prontosoccorso","Kit pronto soccorso"],["gonfiaggio","Kit gonfiaggio"],["portachiavi","Portachiavi Mercedes-Benz"],["libretto","Libretto d'uso e manutenzione"]];
-const ACC_PAG=[["autonera","Auto nera"],["bulloni","Bulloni antifurto"],["tappeti","Tappeti in gomma"],["servicecare","Service Care"],["advance","Advance"],["defence","Defence"],["certified","Certified"],["mapfree","Mawdy"]];
+const ACC_PAG=[["autonera","Auto nera"],["bulloni","Bulloni antifurto"],["tappeti","Tappeti in gomma"],["servicecare","Service Care"],["advance","Advance"],["defence","Defence"],["certified","Certified"],["mapfree","Mawdy"],["pieno","Pieno carburante"],["altro","Altro"]];
 const PREP=[["targata","Targa montata"],["lavaggio","Lavaggio"]];
 // Durate dei pacchetti (Service Care in anni, gli altri in mesi); le consegne vecchie avevano Service Care 4 e Defence 48.
 const VAR_PAG={servicecare:["2","3","4"],advance:["12","24","36","48"],defence:["12","24","36","48"],certified:["12","24","36","48"],mapfree:["12","24","36"]};
@@ -1440,7 +1440,7 @@ const canAttiva=()=>ha(...GEST,"officina");
 const puoFatto=k=>SERVIZI.includes(k)?canAttiva():canMontato();
 const varPag=(k,v)=>(v&&v.var)||VAR_VECCHIA[k]||"";
 const nomeVar=(k,x)=>k==="servicecare"?`${x}`:`${x} mesi`;
-const nomePag=(k,l,v)=>{const x=VAR_PAG[k]?varPag(k,v):"";return x?`${l} ${nomeVar(k,x)}`:l;};
+const nomePag=(k,l,v)=>{if(k==="altro")return v&&v.testo?v.testo:l;const x=VAR_PAG[k]?varPag(k,v):"";return x?`${l} ${nomeVar(k,x)}`:l;};
 // Accessori da ordinare: "attesa" blocca la data, "ordinato" la permette dall'arrivo previsto, "mancante" si consegna senza.
 function statoOrdine(c){if(!c||!c.ordineDa||c.ordineArrivati)return"";if(c.ordineMancante)return"mancante";if(c.ordineNonDisp)return"nondisp";if(c.ordineOrdinato&&c.ordinePrevisto)return"ordinato";return"attesa";}
 const dIt=d=>d?new Date(d+"T12:00:00").toLocaleDateString("it-IT"):"";
@@ -1627,7 +1627,7 @@ function openConsegna(id){
       ${f.omaggioPE?`<label class="chk small"><input type="checkbox" id="c_omPEfatto" ${f.omaggioPEFatto?"checked":""} ${prepOk?"":"disabled"}> omaggio preparato</label>`:""}
       <label class="chk" style="margin-top:8px"><input type="checkbox" id="c_permuta" ${f.permuta?"checked":""} ${appOk?"":"disabled"}> Permuta presente <span class="small">(avvisa il back office: quel giorno ritira la permuta e fa firmare l'atto di proprietà)</span></label></div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato», i servizi «attivato»</span></h4>
-      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label>${VAR_PAG[k]?`<select data-pag="${k}" data-pf="var" ${ro} style="width:auto;min-width:0;padding:4px 6px">${[""].concat(VAR_PAG[k]).map(x=>`<option value="${x}" ${varPag(k,v)===x?"selected":""}>${x?esc(nomeVar(k,x)):"durata?"}</option>`).join("")}</select>`:""}${SOLO_INFO.includes(k)?"":`<label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&puoFatto(k)?"":"disabled"}> ${SERVIZI.includes(k)?"attivato":"montato"}</label>`}</div>`;}).join("")}
+      ${ACC_PAG.map(([k,l])=>{const v=f.pag[k]||{};return`<div class="accrow"><label class="chk"><input type="checkbox" data-pag="${k}" data-pf="sel" ${v.sel?"checked":""} ${ro}> ${esc(l)}</label>${VAR_PAG[k]?`<select data-pag="${k}" data-pf="var" ${ro} style="width:auto;min-width:0;padding:4px 6px">${[""].concat(VAR_PAG[k]).map(x=>`<option value="${x}" ${varPag(k,v)===x?"selected":""}>${x?esc(nomeVar(k,x)):"durata?"}</option>`).join("")}</select>`:""}${k==="altro"?`<input data-pag="altro" data-pf="testo" value="${esc(v.testo||"")}" placeholder="scrivi l'accessorio" autocomplete="off" ${ro} style="flex:1;min-width:120px;padding:4px 6px">`:""}${SOLO_INFO.includes(k)?"":`<label class="chk small ${v.sel?"":"dim"}"><input type="checkbox" data-pag="${k}" data-pf="fatto" ${v.fatto?"checked":""} ${v.sel&&puoFatto(k)?"":"disabled"}> ${SERVIZI.includes(k)?"attivato":k==="pieno"?"fatto":"montato"}</label>`}</div>`;}).join("")}
       <div class="accrow" style="border-top:0"><b style="font-size:14px">Accessori in omaggio</b></div>
       <div id="c_omlist">${omaggi(f).map((o,i)=>omRow(o,i,ro)).join("")}</div>
       ${ro?"":`<button type="button" class="link" id="c_omadd">+ Aggiungi omaggio</button>`}
@@ -1684,8 +1684,8 @@ function openConsegna(id){
     f.omaggi=[...p.querySelectorAll(".omrow")].map(r=>({testo:r.querySelector('[data-om="testo"]').value.trim(),fatto:r.querySelector('[data-om="fatto"]').checked})).filter(o=>o.testo);delete f.omaggio;delete f.omaggioFatto;
     {const rp=[...p.querySelectorAll(".rprow")].map(x=>({testo:x.querySelector('[data-rp="testo"]').value.trim(),fatto:x.querySelector('[data-rp="fatto"]').checked})).filter(o=>o.testo);if(rp.length||"ripAgg" in base)f.ripAgg=rp;}
     p.querySelectorAll("[data-g]").forEach(i=>{f[i.dataset.g][i.dataset.k]=i.checked;});
-    const pg={};p.querySelectorAll("[data-pag]").forEach(i=>{pg[i.dataset.pag]=pg[i.dataset.pag]||{};pg[i.dataset.pag][i.dataset.pf]=i.tagName==="SELECT"?i.value:i.checked;});
-    for(const[k,v]of Object.entries(pg)){if(v.sel)f.pag[k]=Object.assign({sel:true,fatto:!!v.fatto},v.var?{var:v.var}:{});else delete f.pag[k];}
+    const pg={};p.querySelectorAll("[data-pag]").forEach(i=>{pg[i.dataset.pag]=pg[i.dataset.pag]||{};pg[i.dataset.pag][i.dataset.pf]=i.tagName==="SELECT"||i.type==="text"?i.value.trim():i.checked;});
+    for(const[k,v]of Object.entries(pg)){if(v.sel)f.pag[k]=Object.assign({sel:true,fatto:!!v.fatto},v.var?{var:v.var}:{},v.testo?{testo:v.testo}:{});else delete f.pag[k];}
     if(nuovo){f.colore=$("c_colore").value;f.numero=parseInt($("c_numero").value,10);}
     {const pm=$("c_permuta");if(pm&&(pm.checked||"permuta" in base))f.permuta=pm.checked;}
     {const om=$("c_omPE").value.trim();if(om||"omaggioPE" in base)f.omaggioPE=om;const of=$("c_omPEfatto");if(of&&(of.checked||"omaggioPEFatto" in base))f.omaggioPEFatto=of.checked;}
