@@ -701,6 +701,7 @@ function openEditor(id,assegna){
     </div>
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
     ${base.colore==="ROSSO"&&!libero&&fotoTarga(f.targa)?citBox(f.targa,usatoTarga(f.targa)):""}
+    ${base.colore==="ROSSO"&&!usatoDi(f)?(canFiscale()?`<div class="keybox"><h4><span>Tab Usato<br><span class="small">non c'è la presa in carico: scegli come farla vedere nella tab Usato</span></span></h4><div class="places" data-k="usatoStato">${[["attesa","In attesa di ripristino"],["commerciante","Destinazione commerciante"]].map(([v,l])=>`<button type="button" class="chip" data-v="${v}" aria-pressed="false">${l}</button>`).join("")}</div><div class="small" style="margin-top:6px">Se la metti «In ripristino» qui sotto, entra nella tab Usato come in ripristino.</div></div>`:(libero?"":`<div class="small" style="margin:6px 0">Non è nella tab Usato (manca la presa in carico): la aggiungono il responsabile usato o il back office.</div>`)):""}
     <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI,ALLEST],LUOGHI_RIP).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
     <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4>
       <label class="f" style="margin-top:8px">Motivo se manca una chiave<select id="e_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${motivoNuovo(f.motivo)===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label></div>
@@ -802,8 +803,22 @@ function openEditor(id,assegna){
     if(rOut)logs.push({codice:codice(base),azione:"Fine ripristino",dettaglio:base.ripristinoDal?`dopo ${giorniLav(base.ripristinoDal)} giorni lavorativi`:""});
     if(rMod)logs.push({codice:codice(base),azione:"Ripristino aggiornato",dettaglio:[data.ripristinoTipo,data.ripristinoDove].filter(Boolean).join(" · ")});
     if(diffs.length||!base._has)logs.push({codice:codice(base),azione:libero?"Assegnato":"Aggiornato",dettaglio:diffs.slice(0,4).join(" · ")});
+    // Usata entrata da chiavi (senza presa in carico): scheda nella tab Usato se va in ripristino o al commerciante, e notifica a usato e back office.
+    const extra=[];
+    if(data.colore==="ROSSO"&&(data.targa||data.telaio)&&!usatoDi(data)){
+      const nuovaR=!base._has||libero;
+      const st=f.usatoStato?(data.ripristino==="Sì"?"ripristino":f.usatoStato):(rIn&&canFiscale()?"ripristino":"");
+      const uid=idU(data.targa,data.telaio),ex=U.docs.get(uid);
+      const desc=[data.targa,data.modello].filter(Boolean).join(" · ");
+      if(st&&canFiscale()&&(!ex||ex.deleted)){
+        extra.push({col:"usato",id:uid,data:{stato:st,priorita:"normale",marca:"",modello:data.modello,targa:data.targa,telaio:data.telaio,chiave:String(data.numero),km:"",date:{presa:oggi(),[st]:oggi()},voci:{},note:"Entrata da chiavi",ripTipo:st==="ripristino"&&LUOGHI_RIP.includes(data.ripristinoTipo)?data.ripristinoTipo:"",deleted:false}});
+        logs.push({codice:data.targa||uid,azione:"Entrata in Usato da chiavi · "+NOME_STATO[st],dettaglio:[data.modello,`chiave R ${data.numero}`].filter(Boolean).join(" · ")});
+        if(st==="attesa")extra.push(coda("usato_attesa",`Usato da ripristinare: ${data.targa||""}`,`${desc} · priorità normale`,"#usato"));
+        extra.push(coda("usato_chiavi",`Usata entrata da chiavi: ${data.targa||data.telaio}`,`${desc} · chiave R ${data.numero} · nella tab Usato come «${NOME_STATO[st]}» (registrata da ${S.me.nome})`,"#usato"));
+      }else if(nuovaR||rIn)extra.push(coda("usato_chiavi",`Usata entrata da chiavi: ${data.targa||data.telaio}`,`${desc} · chiave R ${data.numero}${rIn?" · messa in ripristino":""} · registrata da ${S.me.nome}. Non c'è la presa in carico: se va in ripristino o al commerciante aggiungila nella tab Usato (apri la chiave R ${data.numero}).`,"#usato"));
+    }
     if(!logs.length){closeSheet();return;}
-    salva([{id:base.id,data}],logs,rIn?`${SING[base.colore]} ${base.numero}: in ripristino.`:rOut?`${SING[base.colore]} ${base.numero}: ripristino finito.`:`${SING[base.colore]} ${base.numero}: salvato.`);
+    salva([{id:base.id,data},...extra],logs,rIn?`${SING[base.colore]} ${base.numero}: in ripristino.`:rOut?`${SING[base.colore]} ${base.numero}: ripristino finito.`:`${SING[base.colore]} ${base.numero}: salvato.`);
   };
   setTimeout(()=>{const t=$(assegna?"e_targa":"e_close");t&&t.focus();},30);
 }
@@ -976,7 +991,10 @@ async function registraBolla(){
     if(r.danni)logs.push({codice:`${LETT[r.colore]}.${n}`,azione:"In attesa di ripristino",dettaglio:[DT,(r.danniDescr||"").trim()].filter(Boolean).join(" · ")});
     logs.push({codice:`${LETT[r.colore]}.${n}`,azione:r.foto?"Assegnato da foto":"Assegnato a mano",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
   $("b_save").disabled=true;
-  try{await S.store.commit(writes,logs);closeSheet();flash(writes.length===1?"Vettura registrata.":`${writes.length} vetture registrate.`,"ok");}
+  try{await S.store.commit(writes,logs);
+    {const nq=writes.filter(w=>w.data.colore==="ROSSO"&&!usatoDi(w.data)).map(w=>coda("usato_chiavi",`Usata entrata da chiavi: ${w.data.targa||w.data.telaio}`,`${[w.data.targa,w.data.modello].filter(Boolean).join(" · ")} · chiave R ${w.data.numero} · registrata da ${S.me.nome}. Non c'è la presa in carico: se va in ripristino o al commerciante aggiungila nella tab Usato (apri la chiave R ${w.data.numero}).`,"#usato"));
+      if(nq.length)try{await S.store.commitU(nq,[]);}catch(x){console.warn("notifica usato_chiavi",x);}}
+    closeSheet();flash(writes.length===1?"Vettura registrata.":`${writes.length} vetture registrate.`,"ok");}
   catch(e){$("b_save").disabled=false;$("b_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(e))}</div>`;}
 }
 
@@ -1816,7 +1834,7 @@ $("btnExportC").onclick=async()=>{
 };
 
 /* =================== Notifiche =================== */
-const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con revisione scaduta o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_omaggio","Omaggio da preparare indicato dal product expert",["officina","ripristini","preparatore","magazzino"]],["consegna_nondisp","Ricambi non disponibili, senza previsione di arrivo",["productexpert","backoffice"]],["consegna_ordinati","Ricambi ordinati con data di arrivo prevista",["productexpert","backoffice"]],["consegna_senza","Ricambi non disponibili o in arretrato: si consegna dopo",["magazzino","productexpert","backoffice"]],["consegna_ripristini","Ripristini aggiuntivi da fare prima della consegna",["officina","ripristini","preparatore"]]];
+const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con revisione scaduta o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_chiavi","Usata registrata dalle chiavi (senza presa in carico)",["usato","backoffice"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_omaggio","Omaggio da preparare indicato dal product expert",["officina","ripristini","preparatore","magazzino"]],["consegna_nondisp","Ricambi non disponibili, senza previsione di arrivo",["productexpert","backoffice"]],["consegna_ordinati","Ricambi ordinati con data di arrivo prevista",["productexpert","backoffice"]],["consegna_senza","Ricambi non disponibili o in arretrato: si consegna dopo",["magazzino","productexpert","backoffice"]],["consegna_ripristini","Ripristini aggiuntivi da fare prima della consegna",["officina","ripristini","preparatore"]]];
 const coda=(evento,titolo,testo,link)=>({col:"notifiche_coda",id:`${evento}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,data:{evento,titolo,testo,link:link||"",ruoli:((EVENTI.find(e=>e[0]===evento)||[])[2])||[],inviata:false,ts:Date.now()}});
 let MIE={prefs:{},tokens:[]};
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
