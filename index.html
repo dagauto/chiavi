@@ -1108,9 +1108,13 @@ function giorniTot(u){const a=(u.date||{}).presa,b=(u.date||{}).pubblicata;if(!a
 const plur=(n,a,b)=>n===1?a:b;
 const giorniTxt=n=>n==null?"":n===0?"da oggi":n===1?"da ieri":`da ${n} giorni`;
 
+// Le vetture messe in «Conto esposizione» sulla chiave non compaiono nella tab Usato; quando escono dal conto esposizione tornano.
+function espoSet(){const e=new Set();for(const k of slots())if(occupato(k)&&k.esposizione==="Sì")[k.targa,k.telaio].map(norm).filter(Boolean).forEach(x=>e.add(x));return e;}
+const inEspo=(u,e)=>e.has(norm(u.targa))||e.has(norm(u.telaio));
 function listaU(){
-  const q=norm(U.q);
+  const q=norm(U.q),es=espoSet();
   return [...U.docs.entries()].map(([id,d])=>Object.assign({id},d)).filter(u=>{
+    if(inEspo(u,es))return false;
     if(q)return [u.targa,u.telaio,u.modello,u.chiave,u.venditore].some(v=>norm(v).includes(q));
     if(U.stato==="vendita")return inVendita(u);
     if(U.stato)return u.stato===U.stato;
@@ -1125,7 +1129,7 @@ function listaU(){
 }
 function renderUsato(){
   if(!canUsato())return;
-  const all=[...U.docs.values()].filter(u=>!u.deleted);
+  const es=espoSet(),all=[...U.docs.values()].filter(u=>!u.deleted&&!inEspo(u,es));
   // Venditori e product expert vedono per primi i filtri che servono a loro (e partono da «Disponibili alla vendita»).
   const vend=ha("venditore","productexpert");if(vend&&!U.partito){U.partito=true;U.stato="vendita";}
   const chU=[[null,"Da lavorare"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`]),["vendita",`Disponibili alla vendita · ${all.filter(inVendita).length}`]];
@@ -1616,7 +1620,7 @@ function openConsegna(id){
       <div class="grid2"><label class="f">Tipo<select id="c_tipo" ${ro}><option value="vendita" ${f.tipo==="vendita"?"selected":""}>Vendita</option><option value="noleggio" ${f.tipo==="noleggio"?"selected":""}>Noleggio breve</option><option value="lungo" ${f.tipo==="lungo"?"selected":""}>Noleggio lungo termine</option></select></label></div></div>
     <div class="grid2"><label class="f">Cliente<input id="c_cliente" value="${esc(f.cliente||"")}" ${ro}></label>
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
-    <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&soloSposta()?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
+    <label class="f">Venditore<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&soloSposta()?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
       <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${statoOrdine(base)==="ordinato"?`min="${esc(giornoLavDopo(base.ordinePrevisto))}"`:""} ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}${statoOrdine(base)==="ordinato"?`<div class="banner">Ricambi ordinati: arrivo previsto il ${esc(dIt(base.ordinePrevisto))}, la consegna si può fissare dal ${esc(dIt(giornoLavDopo(base.ordinePrevisto)))}.</div>`:""}${statoOrdine(base)==="nondisp"?`<div class="banner bad">Ricambi non disponibili, senza previsione di arrivo: la consegna non si può ancora fissare.</div>`:""}${statoOrdine(base)==="mancante"?`<div class="banner">Ricambi non disponibili o in arretrato: i ricambi verranno consegnati dopo.</div>`:""}
       <label class="f" style="margin-top:8px">Omaggio da preparare <span class="small">(se il product expert lo sa già: arriva a officina, ripristini, preparatori e magazzino)</span><input id="c_omPE" value="${esc(f.omaggioPE||"")}" placeholder="es. fiori, portachiavi personalizzato, borsa Mercedes" autocomplete="off" ${appOk?"":"disabled"}></label>
