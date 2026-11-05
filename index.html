@@ -699,7 +699,8 @@ function openEditor(id,assegna){
     <label class="f">Telaio<input class="mono" id="e_telaio" value="${esc(f.telaio)}" autocomplete="off" maxlength="17"></label>
     ${base.colore==="ROSSO"&&!libero&&fotoTarga(f.targa)?citBox(f.targa,usatoTarga(f.targa)):""}
     <div class="keybox"><h4>Prima chiave · n° ${base.numero} ${seg("prima")}</h4><div class="places" data-k="dovePrima">${LUOGHI.concat([FUORI,ALLEST],LUOGHI_RIP).map(l=>`<button type="button" class="chip" data-v="${l}" aria-pressed="${f.dovePrima===l}">${l}</button>`).join("")}</div></div>
-    <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4></div>
+    <div class="keybox"><h4><span>Seconda chiave · n° ${base.numero+100}<br><span class="small">sempre nel ${RETRO}</span></span> ${seg("seconda")}</h4>
+      <label class="f" style="margin-top:8px">Motivo se manca una chiave<select id="e_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${f.motivo===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label></div>
     <div class="keybox"><h4><span>Già venduta<br><span class="small">vettura nuova arrivata già venduta a un cliente</span></span> ${seg("venduta")}</h4>
       <div id="e_venbox" ${f.venduta==="Sì"?"":"hidden"}><label class="f" style="margin-top:8px">Cliente (facoltativo)<input id="e_cliente" value="${esc(f.cliente||"")}" autocomplete="off"></label></div></div>
     <div class="keybox"><h4><span>Conto esposizione<br><span class="small">${f.esposizione==="Sì"?esc(espTesto(f)):"numero impegnato, si contano i giorni"}</span></span> ${seg("esposizione")}</h4></div>
@@ -709,7 +710,6 @@ function openEditor(id,assegna){
       <div id="e_ripbox" ${f.ripristino==="Sì"?"":"hidden"}><div class="places" data-k="ripristinoTipo">${TIPI_RIP.map(t=>`<button type="button" class="chip" data-v="${t}" aria-pressed="${f.ripristinoTipo===t}">${t}</button>`).join("")}</div>
       <label class="f" style="margin-top:8px">Dove o da chi (facoltativo)<input id="e_ripristinoDove" value="${esc(f.ripristinoDove)}" placeholder="es. Carrozzeria esterna, box officina 2"></label>
 </div></div>`}
-    <label class="f">Motivo se c'è una sola chiave<select id="e_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${f.motivo===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label>
     <div class="grid2">
       <label class="f">Controllato da<input id="e_controllatoDa" value="${esc(f.controllatoDa)}"></label>
       <label class="f">Data controllo<input type="date" id="e_dataControllo" value="${esc(f.dataControllo)}"></label>
@@ -786,6 +786,7 @@ function openEditor(id,assegna){
     if(f.ripristino!=="Sì")f.ripristino="";
     f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");f.targa=f.targa.toUpperCase().replace(/\s/g,"");
     if((f.telaio||f.targa||f.modello)&&(!f.prima||!f.seconda)){$("e_err").innerHTML=`<div class="banner bad">Indica se ci sono la prima e la seconda chiave (Sì o No): senza questa risposta la vettura finisce in «Da censire».</div>`;return;}
+    if((f.telaio||f.targa||f.modello)&&(f.prima==="Sì")!==(f.seconda==="Sì")&&!f.motivo){$("e_err").innerHTML=`<div class="banner bad">C'è una sola chiave: indica il motivo (sotto la seconda chiave).</div>`;return;}
     const dup=telaioUsato(f.telaio,base.id);
     if(dup){$("e_err").innerHTML=`<div class="banner bad">Questo telaio è già registrato al ${esc(SING[dup.colore])} ${dup.numero}. Libera prima quel numero o correggi il telaio.</div>`;return;}
     const dupT=f.targa&&norm(f.targa)!==norm(base.targa)?slots().find(x=>x.id!==base.id&&x._has&&norm(x.targa)===norm(f.targa)):null;
@@ -945,6 +946,7 @@ function renderRighe(){
         <label class="f">Prima chiave in<select data-f="dovePrima">${LUOGHI.concat([ALLEST]).map(l=>`<option ${r.dovePrima===l?"selected":""}>${l}</option>`).join("")}<option value="" ${!r.dovePrima?"selected":""}>Non c'è</option></select></label>
         <label class="f">Seconda chiave (${RETRO})<select data-f="seconda"><option value="Sì" ${r.seconda==="Sì"?"selected":""}>Sì, c'è</option><option value="No" ${r.seconda==="No"?"selected":""}>Non c'è</option></select></label>
       </div>
+      ${(r.seconda==="No")!==(!r.dovePrima)?`<label class="f">Motivo della chiave mancante<select data-f="motivo"><option value="">—</option>${MOTIVI.map(m=>`<option ${r.motivo===m?"selected":""}>${esc(m)}</option>`).join("")}</select></label>`:""}
       <label class="chk" style="margin-top:6px"><input type="checkbox" data-f="venduta" ${r.venduta?"checked":""}> Già venduta</label>
       ${r.venduta?`<label class="f">Cliente (facoltativo)<input data-f="cliente" value="${esc(r.cliente||"")}" autocomplete="off"></label>`:""}
       <label class="chk" style="margin-top:6px"><input type="checkbox" data-f="danni" ${r.danni?"checked":""}> Danni di trasporto: in attesa di ripristino</label>
@@ -955,6 +957,7 @@ function renderRighe(){
     if(["danni","venduta","esposizione"].includes(t.dataset.f)){r[t.dataset.f]=t.checked;renderRighe();return;}
     let v=t.value;if(t.dataset.f==="telaio"||t.dataset.f==="targa")v=v.toUpperCase().replace(/\s/g,"");if(t.dataset.f==="telaio")r.dubbio=false;r[t.dataset.f]=v;
     if(t.dataset.f==="dovePrima")r.prima=v?"Sì":"No";
+    if(t.dataset.f==="dovePrima"||t.dataset.f==="seconda"){renderRighe();return;}
     const[k,m]=controllaRiga(r,+row.dataset.i);const mm=row.querySelector("[data-msg]");mm.className="rowmsg "+k;mm.textContent=m;};
   box.onchange=e=>{if(e.target.dataset.f==="numero")renderRighe();};
   box.onclick=e=>{const b=e.target.closest("button");if(!b)return;const row=b.closest(".vrow");const i=+row.dataset.i;
@@ -964,10 +967,11 @@ function renderRighe(){
 }
 async function registraBolla(){
   const errs=B.righe.map((r,i)=>controllaRiga(r,i)).map(([k,m],i)=>[k,m,i]).filter(([k,m])=>k==="bad"||m.startsWith("Metti"));
+  {const im=B.righe.findIndex(r=>(r.seconda==="No")!==(!r.dovePrima)&&!r.motivo);if(im>=0){$("b_err").innerHTML=`<div class="banner bad">Vettura ${im+1}: c'è una sola chiave, indica il motivo.</div>`;return;}}
   if(errs.length){$("b_err").innerHTML=`<div class="banner bad">Sistema prima ${errs.length===1?"la vettura evidenziata":"le "+errs.length+" vetture evidenziate"}: ${esc(errs[0][1])}</div>`;return;}
   const writes=[],logs=[];
   for(const r of B.righe){const n=parseInt(r.numero,10);
-    writes.push({id:idOf(r.colore,n),data:Object.assign({colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"},r.danni?{attesa:"Sì",attesaDal:oggi(),danni:(r.danniDescr||"").trim()}:{},r.venduta?{venduta:"Sì",cliente:(r.cliente||"").trim()}:{},r.esposizione?{esposizione:"Sì",esposizioneDal:oggi()}:{},r.dovePrima===ALLEST?{allestimentoDal:oggi()}:{})});
+    writes.push({id:idOf(r.colore,n),data:Object.assign({colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:(r.seconda==="No")!==(!r.dovePrima)?(r.motivo||""):"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"},r.danni?{attesa:"Sì",attesaDal:oggi(),danni:(r.danniDescr||"").trim()}:{},r.venduta?{venduta:"Sì",cliente:(r.cliente||"").trim()}:{},r.esposizione?{esposizione:"Sì",esposizioneDal:oggi()}:{},r.dovePrima===ALLEST?{allestimentoDal:oggi()}:{})});
     if(r.danni)logs.push({codice:`${LETT[r.colore]}.${n}`,azione:"In attesa di ripristino",dettaglio:[DT,(r.danniDescr||"").trim()].filter(Boolean).join(" · ")});
     logs.push({codice:`${LETT[r.colore]}.${n}`,azione:r.foto?"Assegnato da foto":"Assegnato a mano",dettaglio:[r.modello,r.telaio].filter(Boolean).join(" · ")});}
   $("b_save").disabled=true;
@@ -1203,7 +1207,8 @@ function openUsato(id){
     <div class="grid2">${inp("km",nuovo?"Km *":"Km",{im:"numeric"})}${inp("chiave","N° chiave rossa (U)",{im:"numeric"})}</div>
     ${nuovo?`<div id="u_chmsg" class="small"></div>
     <div class="grid2"><label class="f">Prima chiave in<select id="u_dovePrima">${LUOGHI.map(l=>`<option>${l}</option>`).join("")}<option value="">Non c'è</option></select></label>
-      <label class="f">Seconda chiave (${RETRO})<select id="u_seconda"><option value="Sì">Sì, c'è</option><option value="No">Non c'è</option></select></label></div>`:""}
+      <label class="f">Seconda chiave (${RETRO})<select id="u_seconda"><option value="Sì">Sì, c'è</option><option value="No">Non c'è</option></select></label></div>
+    <label class="f">Motivo se manca una chiave<select id="u_motivo"><option value="">—</option>${MOTIVI.map(m=>`<option>${esc(m)}</option>`).join("")}</select></label>`:""}
     <div class="grid2">${inp("immatricolazione","Immatricolazione")}${inp("venditore","Venditore")}</div>
     <div class="grid2">${inp("scadBollo","Scadenza bollo (MM/AAAA)")}${inp("scadRevisione","Scadenza revisione (MM/AAAA)")}</div>
     <div class="grid2">${inp("exProprietario","Ex proprietario")}${inp("ritiroPermuta","Ritiro permuta su contratto")}</div>
@@ -1285,6 +1290,7 @@ function openUsato(id){
     const nid=nuovo?idU(f.targa,f.telaio):id;
     if(!nid){$("e_err").innerHTML=`<div class="banner bad">Serve almeno la targa o il telaio.</div>`;return;}
     if(nuovo&&U.docs.has(nid)){$("e_err").innerHTML=`<div class="banner bad">Questa vettura è già in lavorazione. Cercala nell'elenco.</div>`;return;}
+    if(nuovo&&f.chiave&&$("u_seconda")&&(($("u_dovePrima").value?"Sì":"No")==="Sì")!==($("u_seconda").value==="Sì")&&!$("u_motivo").value){$("e_err").innerHTML=`<div class="banner bad">C'è una sola chiave: indica il motivo.</div>`;return;}
     if(nuovo&&!(Number(f.km)>0)){$("e_err").innerHTML=`<div class="banner bad">Indica i km: sono obbligatori nella presa in carico.</div>`;return;}
     if(f.chiave&&!(+f.chiave>=1&&+f.chiave<=100)){$("e_err").innerHTML=`<div class="banner bad">Il numero chiave va da 1 a 100.</div>`;return;}
     if(f.stato!==base.stato||nuovo)f.date[f.stato]=f.date[f.stato]||oggi();
@@ -1304,7 +1310,7 @@ function openUsato(id){
     // collegamento con il registro chiavi
     let avviso="";
     if(f.chiave){const s=slot("ROSSO",+f.chiave);const stessa=s._has&&((f.telaio&&norm(s.telaio)===norm(f.telaio))||(f.targa&&norm(s.targa)===norm(f.targa)));
-      if(!occupato(s)&&nuovo){writes.push({col:"chiavi",id:s.id,data:{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio,targa:f.targa,modello:f.modello,prima:$("u_dovePrima")&&$("u_dovePrima").value?"Sì":"No",dovePrima:$("u_dovePrima")?$("u_dovePrima").value:"",seconda:$("u_seconda")?$("u_seconda").value:"",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Da presa in carico usato"}});logs.push({codice:`U.${f.chiave}`,azione:"Assegnato da presa in carico",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")});}
+      if(!occupato(s)&&nuovo){writes.push({col:"chiavi",id:s.id,data:{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio,targa:f.targa,modello:f.modello,prima:$("u_dovePrima")&&$("u_dovePrima").value?"Sì":"No",dovePrima:$("u_dovePrima")?$("u_dovePrima").value:"",seconda:$("u_seconda")?$("u_seconda").value:"",motivo:$("u_motivo")?$("u_motivo").value:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:"Da presa in carico usato"}});logs.push({codice:`U.${f.chiave}`,azione:"Assegnato da presa in carico",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")});}
       else if(occupato(s)&&!stessa&&nuovo)avviso=` Attenzione: la chiave Rossa ${f.chiave} risulta già occupata (${s.targa||s.modello||s.telaio||"altra vettura"}); il registro chiavi non è stato modificato.`;
       const ok=occupato(s)?stessa:nuovo;
       if(ok&&(f.stato!==base.stato||(f.stato==="ripristino"&&(f.ripTipo||"")!==(base.ripTipo||"")))){
@@ -1404,7 +1410,7 @@ const varPag=(k,v)=>(v&&v.var)||VAR_VECCHIA[k]||"";
 const nomeVar=(k,x)=>k==="servicecare"?`${x}`:`${x} mesi`;
 const nomePag=(k,l,v)=>{const x=VAR_PAG[k]?varPag(k,v):"";return x?`${l} ${nomeVar(k,x)}`:l;};
 // Accessori da ordinare: "attesa" blocca la data, "ordinato" la permette dall'arrivo previsto, "mancante" si consegna senza.
-function statoOrdine(c){if(!c||!c.ordineDa||c.ordineArrivati)return"";if(c.ordineMancante)return"mancante";if(c.ordineOrdinato&&c.ordinePrevisto)return"ordinato";return"attesa";}
+function statoOrdine(c){if(!c||!c.ordineDa||c.ordineArrivati)return"";if(c.ordineMancante)return"mancante";if(c.ordineNonDisp)return"nondisp";if(c.ordineOrdinato&&c.ordinePrevisto)return"ordinato";return"attesa";}
 const dIt=d=>d?new Date(d+"T12:00:00").toLocaleDateString("it-IT"):"";
 // Primo giorno lavorativo dopo l'arrivo previsto dei ricambi: da lì si può fissare la consegna.
 const giornoLavDopo=d=>{if(!d)return"";const x=new Date(d+"T12:00:00");do{x.setDate(x.getDate()+1);}while(x.getDay()===0||x.getDay()===6);return`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;};
@@ -1480,7 +1486,7 @@ function quando(c){return c.data?new Date(`${c.data}T${c.ora||"09:00"}:00`):null
 function semaforo(c){
   if(c.stato==="consegnata")return["done","Consegnata"];
   if(c.stato==="annullata")return["done","Annullata"];
-  {const so=statoOrdine(c);if(so==="attesa")return["warn","Accessori da ordinare: in attesa del magazzino"];if(so==="ordinato"&&!c.data)return["warn",`Accessori ordinati: arrivo previsto il ${dIt(c.ordinePrevisto)}`];}
+  {const so=statoOrdine(c);if(so==="attesa")return["warn","Accessori da ordinare: in attesa del magazzino"];if(so==="nondisp")return["bad","Ricambi non disponibili, senza data di arrivo"];if(so==="ordinato"&&!c.data)return["warn",`Accessori ordinati: arrivo previsto il ${dIt(c.ordinePrevisto)}`];}
   if(prontaC(c))return["ok",c.data?"Pronta":"Pronta · data da fissare"];
   if(!c.data)return["warn","Data da fissare"];
   const h=oreLavorative(Date.now(),quando(c).getTime());
@@ -1563,7 +1569,7 @@ function openConsegna(id){
   const nuovo=!id;
   const base=nuovo?{stato:"richiesta",tipo:"vendita",colore:"BLU",std:{},pag:{},prep:{},date:{richiesta:oggi()}}:JSON.parse(JSON.stringify(C.docs.get(id)));
   const f=Object.assign({std:{},pag:{},prep:{},date:{}},JSON.parse(JSON.stringify(base)));
-  const edAll=canCreaConsegna();const prepOk=canPrepConsegna();const appOk=canAppConsegna();const roP=prepOk?"":"disabled";const bloccoOrd=statoOrdine(base)==="attesa";const roA=appOk&&!bloccoOrd?"":"disabled";
+  const edAll=canCreaConsegna();const prepOk=canPrepConsegna();const appOk=canAppConsegna();const roP=prepOk?"":"disabled";const bloccoOrd=["attesa","nondisp"].includes(statoOrdine(base));const roA=appOk&&!bloccoOrd?"":"disabled";
   const ro=edAll?"":"disabled";
   const ck=(grp,k,l,dis)=>`<label class="chk"><input type="checkbox" data-g="${grp}" data-k="${k}" ${(f[grp]||{})[k]?"checked":""} ${dis?"disabled":""}> ${esc(l)}</label>`;
   const p=openSheet(`<form class="panel" id="cf" novalidate role="dialog" aria-modal="true" aria-label="Consegna">
@@ -1582,7 +1588,7 @@ function openConsegna(id){
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
     <label class="f">Venditore / Product expert<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&soloSposta()?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
-      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${statoOrdine(base)==="ordinato"?`min="${esc(giornoLavDopo(base.ordinePrevisto))}"`:""} ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}${statoOrdine(base)==="ordinato"?`<div class="banner">Ricambi ordinati: arrivo previsto il ${esc(dIt(base.ordinePrevisto))}, la consegna si può fissare dal ${esc(dIt(giornoLavDopo(base.ordinePrevisto)))}.</div>`:""}${statoOrdine(base)==="mancante"?`<div class="banner">Ricambi non disponibili o in arretrato: i ricambi verranno consegnati dopo.</div>`:""}
+      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${statoOrdine(base)==="ordinato"?`min="${esc(giornoLavDopo(base.ordinePrevisto))}"`:""} ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}${statoOrdine(base)==="ordinato"?`<div class="banner">Ricambi ordinati: arrivo previsto il ${esc(dIt(base.ordinePrevisto))}, la consegna si può fissare dal ${esc(dIt(giornoLavDopo(base.ordinePrevisto)))}.</div>`:""}${statoOrdine(base)==="nondisp"?`<div class="banner bad">Ricambi non disponibili, senza previsione di arrivo: la consegna non si può ancora fissare.</div>`:""}${statoOrdine(base)==="mancante"?`<div class="banner">Ricambi non disponibili o in arretrato: i ricambi verranno consegnati dopo.</div>`:""}
       <label class="f" style="margin-top:8px">Omaggio da preparare <span class="small">(se il product expert lo sa già: arriva a officina, ripristini, preparatori e magazzino)</span><input id="c_omPE" value="${esc(f.omaggioPE||"")}" placeholder="es. fiori, portachiavi personalizzato, borsa Mercedes" autocomplete="off" ${appOk?"":"disabled"}></label>
       ${f.omaggioPE?`<label class="chk small"><input type="checkbox" id="c_omPEfatto" ${f.omaggioPEFatto?"checked":""} ${prepOk?"":"disabled"}> omaggio preparato</label>`:""}</div>
     <div class="keybox"><h4>Accessori a pagamento <span class="small">scelti dal back office · l'officina spunta «montato», i servizi «attivato»</span></h4>
@@ -1596,6 +1602,7 @@ function openConsegna(id){
     <div class="keybox ${f.ordineDa&&!f.ordineArrivati?"ripbox":""}"><h4><span>Accessori omaggio da ordinare<br><span class="small">es. pneumatici, barre · il magazzino indica l'arrivo previsto, la consegna si fissa dal giorno lavorativo dopo</span></span><label class="chk"><input type="checkbox" id="c_ordDa" ${f.ordineDa?"checked":""} ${ro}> da ordinare</label></h4>
       <div id="c_ordBox" ${f.ordineDa?"":"hidden"}><label class="f">Cosa ordinare<textarea id="c_ordDett" rows="2" placeholder="es. 4 pneumatici invernali, barre portatutto" ${ro}>${esc(f.ordineDettagli||"")}</textarea></label>
       <div class="grid2" style="margin-top:8px"><label class="chk" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="c_ordOrd" ${f.ordineOrdinato?"checked":""} ${canMagazzino()?"":"disabled"}> Ordinati</label><label class="f">Arrivo previsto<input type="date" id="c_ordPrev" value="${esc(f.ordinePrevisto||"")}" ${canMagazzino()?"":"disabled"}></label></div>
+      <label class="chk" style="margin-top:8px"><input type="checkbox" id="c_ordND" ${f.ordineNonDisp?"checked":""} ${canMagazzino()?"":"disabled"}> Non disponibili, senza previsione di arrivo</label>
       <label class="chk" style="margin-top:8px"><input type="checkbox" id="c_ordMan" ${f.ordineMancante?"checked":""} ${canSenzaRicambi()?"":"disabled"}> Ricambi non disponibili o in arretrato: si consegna dopo <span class="small">(lo segnano back office o product expert)</span></label>
       ${f.ordineArrivati&&f.ordineArrivatiDa?`<div class="small">Segnati arrivati da ${esc(f.ordineArrivatiDa)}${f.ordineArrivatiIl?" il "+new Date(f.ordineArrivatiIl).toLocaleDateString("it-IT"):""}</div>`:""}</div></div>
     <div class="keybox"><h4>Preparazione officina <span class="small">tutte le voci sono obbligatorie: «Preconsegna fatta» le spunta tutte</span></h4>
@@ -1611,6 +1618,7 @@ function openConsegna(id){
   $("c_close").onclick=closeSheet;
   // «Preconsegna fatta» spunta da sola tutte le voci della preparazione.
   const cpr=$("c_pronta");if(cpr)cpr.addEventListener("change",()=>{if(cpr.checked)p.querySelectorAll('[data-g="std"],[data-g="prep"]').forEach(i=>{if(!i.disabled)i.checked=true;});});
+  {const oo=$("c_ordOrd"),nd=$("c_ordND");if(oo&&nd){oo.addEventListener("change",()=>{if(oo.checked)nd.checked=false;});nd.addEventListener("change",()=>{if(nd.checked){oo.checked=false;$("c_ordPrev").value="";}});}}
   const odc=$("c_ordDa");odc.onchange=()=>{$("c_ordBox").hidden=!odc.checked;};
   const oa=$("c_omadd");if(oa)oa.onclick=()=>{const d=document.createElement("div");d.innerHTML=omRow({testo:"",fatto:false},0,"");const r=d.firstElementChild;$("c_omlist").appendChild(r);r.querySelector("input").focus();};
   $("c_omlist").addEventListener("click",e=>{const b=e.target.closest("[data-omdel]");if(b)b.closest(".omrow").remove();});
@@ -1649,6 +1657,7 @@ function openConsegna(id){
     // Accessori da ordinare: i campi si scrivono solo se usati, così le altre utenze non li «toccano» salvando.
     const od2=$("c_ordDa").checked;if(od2||"ordineDa" in base){f.ordineDa=od2;f.ordineDettagli=od2?$("c_ordDett").value.trim():"";}
     const oa2=od2&&!!$("c_ordArr")&&$("c_ordArr").checked;if($("c_ordArr")&&(oa2||"ordineArrivati" in base)){if(oa2&&!base.ordineArrivati){f.ordineArrivatiDa=S.me.nome;f.ordineArrivatiIl=oggi();}if(!oa2){delete f.ordineArrivatiDa;delete f.ordineArrivatiIl;}f.ordineArrivati=oa2;}
+    const ndv=od2&&$("c_ordND").checked;if(ndv||"ordineNonDisp" in base)f.ordineNonDisp=ndv;
     const oo=od2&&$("c_ordOrd").checked;if(oo||"ordineOrdinato" in base){f.ordineOrdinato=oo;f.ordinePrevisto=oo?$("c_ordPrev").value:"";}
     const om2=od2&&$("c_ordMan").checked;if(om2||"ordineMancante" in base){if(om2&&!base.ordineMancante){f.ordineMancanteDa=S.me.nome;f.ordineMancanteIl=oggi();}if(!om2){delete f.ordineMancanteDa;delete f.ordineMancanteIl;}f.ordineMancante=om2;}
   };
@@ -1662,6 +1671,7 @@ function openConsegna(id){
   p.onsubmit=e=>{e.preventDefault();leggi();
     if(f.ordineOrdinato&&!f.ordinePrevisto){$("e_err").innerHTML=`<div class="banner bad">Indica la data di arrivo prevista degli accessori ordinati.</div>`;return;}
     {const so=statoOrdine(f),cambiata=f.data&&(f.data!==(base.data||"")||f.ora!==(base.ora||""));
+      if(cambiata&&so==="nondisp"){$("e_err").innerHTML=`<div class="banner bad">Ricambi non disponibili, senza previsione di arrivo: la consegna non si può ancora fissare.</div>`;return;}
       if(cambiata&&so==="attesa"){$("e_err").innerHTML=`<div class="banner bad">Ci sono accessori da ordinare non ancora ordinati: la data si fissa quando il magazzino indica l'arrivo previsto.</div>`;return;}
       if(cambiata&&so==="ordinato"&&f.data<giornoLavDopo(f.ordinePrevisto)){$("e_err").innerHTML=`<div class="banner bad">I ricambi arrivano il ${esc(dIt(f.ordinePrevisto))}: la consegna si può fissare dal ${esc(dIt(giornoLavDopo(f.ordinePrevisto)))}.</div>`;return;}}
     if(nuovo){if(!(f.numero>=1&&f.numero<=100)){$("e_err").innerHTML=`<div class="banner bad">Cerca la vettura per targa o telaio e toccala nei risultati (oppure indica colore e numero chiave).</div>`;return;}
@@ -1686,6 +1696,7 @@ function openConsegna(id){
     if(f.ordineDa&&!f.ordineArrivati&&(!base.ordineDa||f.ordineDettagli!==(base.ordineDettagli||""))){qw.push(coda("consegna_ordine",`Accessori da ordinare: ${sig}`,`${chi} · ${f.ordineDettagli||"vedi la consegna"}`,"#consegne"));logs.push({codice:cod,azione:"Accessori da ordinare",dettaglio:f.ordineDettagli||""});}
     if(f.omaggioPE&&f.omaggioPE!==(base.omaggioPE||""))qw.push(coda("consegna_omaggio",`Omaggio da preparare: ${sig}${f.cliente?" · "+f.cliente:""}`,`${f.omaggioPE} · ${[f.modello,quandoTxt].filter(Boolean).join(" · ")}`,"#consegne"));
     if(f.ordineOrdinato&&f.ordinePrevisto&&!f.ordineArrivati&&(!base.ordineOrdinato||f.ordinePrevisto!==base.ordinePrevisto))qw.push(coda("consegna_ordinati",`Accessori ordinati: ${sig}${f.cliente?" · "+f.cliente:""}`,`Arrivo previsto il ${dIt(f.ordinePrevisto)}: la consegna si può fissare dal ${dIt(giornoLavDopo(f.ordinePrevisto))}. ${f.ordineDettagli||""}`,"#consegne"));
+    if(f.ordineNonDisp&&!base.ordineNonDisp&&!f.ordineMancante)qw.push(coda("consegna_nondisp",`Ricambi non disponibili: ${sig}${f.cliente?" · "+f.cliente:""}`,`${f.ordineDettagli||"Ricambi"} non disponibili, senza previsione di arrivo: la consegna non si può ancora fissare.`,"#consegne"));
     if(f.ordineMancante&&!base.ordineMancante)qw.push(coda("consegna_senza",`Ricambi non disponibili: ${sig}${f.cliente?" · "+f.cliente:""}`,`${f.ordineDettagli||"Ricambi"} non disponibili o in arretrato: i ricambi verranno consegnati dopo.`,"#consegne"));
     {const nr=(f.ripAgg||[]).filter(o=>!(base.ripAgg||[]).some(b=>b.testo===o.testo));if(nr.length)qw.push(coda("consegna_ripristini",`Ripristini da fare: ${sig}${f.cliente?" · "+f.cliente:""}`,`${nr.map(o=>o.testo).join(", ")} · ${quandoTxt}`,"#consegne"));}
     if(f.ordineArrivati&&!base.ordineArrivati){qw.push(coda("consegna_arrivati",`Accessori arrivati: ${sig}`,`${chi} · si può fissare la consegna`,"#consegne"));logs.push({codice:cod,azione:"Accessori arrivati",dettaglio:f.ordineDettagli||""});}
@@ -1803,7 +1814,7 @@ $("btnExportC").onclick=async()=>{
 };
 
 /* =================== Notifiche =================== */
-const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con revisione scaduta o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_omaggio","Omaggio da preparare indicato dal product expert",["officina","ripristini","preparatore","magazzino"]],["consegna_ordinati","Ricambi ordinati con data di arrivo prevista",["productexpert","backoffice"]],["consegna_senza","Ricambi non disponibili o in arretrato: si consegna dopo",["magazzino","productexpert","backoffice"]],["consegna_ripristini","Ripristini aggiuntivi da fare prima della consegna",["officina","ripristini","preparatore"]]];
+const EVENTI=[["consegna_nuova","Nuova consegna da preparare",["officina","preparatore","backoffice"]],["consegna_fissata","Appuntamento di consegna fissato o spostato",["officina","preparatore","backoffice"]],["consegna_24h","Consegna entro 24 ore non pronta",["officina","preparatore","backoffice","admin"]],["consegna_pronta","Vettura pronta per la consegna",["productexpert","backoffice"]],["consegna_scadenze","Consegna con revisione scaduta o in scadenza",["officina","backoffice"]],["usato_presa","Nuova vettura usata entrata",["usato","admin"]],["usato_attesa","Usato in attesa di ripristino",["ripristini","officina"]],["usato_pronta","Usato pronto e lavato: foto da fare",["foto","preparatore"]],["consegna_ordine","Accessori omaggio da ordinare per una consegna",["magazzino","backoffice"]],["consegna_omaggio","Omaggio da preparare indicato dal product expert",["officina","ripristini","preparatore","magazzino"]],["consegna_nondisp","Ricambi non disponibili, senza previsione di arrivo",["productexpert","backoffice"]],["consegna_ordinati","Ricambi ordinati con data di arrivo prevista",["productexpert","backoffice"]],["consegna_senza","Ricambi non disponibili o in arretrato: si consegna dopo",["magazzino","productexpert","backoffice"]],["consegna_ripristini","Ripristini aggiuntivi da fare prima della consegna",["officina","ripristini","preparatore"]]];
 const coda=(evento,titolo,testo,link)=>({col:"notifiche_coda",id:`${evento}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`,data:{evento,titolo,testo,link:link||"",ruoli:((EVENTI.find(e=>e[0]===evento)||[])[2])||[],inviata:false,ts:Date.now()}});
 let MIE={prefs:{},tokens:[]};
 const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
