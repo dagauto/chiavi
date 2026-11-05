@@ -71,12 +71,16 @@ Ti mando la foto di un documento di una vettura usata: può essere la carta di c
   cristalli = parabrezza, lunotto, vetri laterali; illuminazione = fari e fanali;
   pneumatici = tabella Pneumatici e dischi ruota/cerchi; meccanica = Stato meccanica, motore, batterie (modulo batterie con KO o anomalie);
   manutenzione = tagliando, manutenzione; freni = freni, pastiglie, dischi freno;
-  altro = Dotazioni mancanti o da sostituire (es. 2ª chiave, kit riparazione) e quello che non rientra altrove.
+  altro = Dotazioni segnate NO che hanno un importo scritto accanto (es. "2ª chiave mancante") e quello che non rientra altrove.
   Per ogni sezione: descrizione = elenco breve e compatto dei pezzi, separati da virgola, con R o S tra parentesi
   (es. "Porta ant. dx (R), paraurti post. (S), parafango post. sx (R)"; per i pneumatici es. "Ant. sx e ant. dx da sostituire, 2 mm");
   stimato = il subtotale della sezione se è scritto, altrimenti la somma degli importi della sezione (0 se non ci sono importi).
   Se c'è anche il retro "Perizia aggiuntiva al rientro", aggiungi quei danni nelle stesse sezioni scrivendo "al rientro" accanto al pezzo.
-- Nel verbale: "km" è il campo KM in alto; "accessori" sono le Dotazioni presenti (non segnate R o S); in "note" metti
+- DOTAZIONI del verbale (colonne SI / NO): in "accessori" metti SOLO le dotazioni con la crocetta su SI.
+  Le dotazioni segnate NO riportale SOLO se hanno un prezzo/importo scritto: diventano una voce nella sezione "altro"
+  (descrizione "<dotazione> mancante", stimato = quell'importo). Le NO senza prezzo e quelle senza crocetta NON vanno riportate
+  da nessuna parte (né accessori, né voci, né note).
+- Nel verbale: "km" è il campo KM in alto; in "note" metti
   esterno/interno pulito SI/NO, numero verbale, tipo pneumatici e le note di stato meccanica se brevi.
 - sicuro: true se targa e telaio si leggono chiaramente, false se hai dovuto indovinare.
 - Scrittura a mano: molte perizie sono compilate a penna, anche in fretta. Leggi la grafia con attenzione e riporta comunque
