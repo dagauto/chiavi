@@ -1581,7 +1581,7 @@ function openConsegna(id){
       <div class="grid2" style="margin-top:8px"><label class="chk" style="align-self:end;padding-bottom:10px"><input type="checkbox" id="c_ordOrd" ${f.ordineOrdinato?"checked":""} ${canMagazzino()?"":"disabled"}> Ordinati</label><label class="f">Arrivo previsto<input type="date" id="c_ordPrev" value="${esc(f.ordinePrevisto||"")}" ${canMagazzino()?"":"disabled"}></label></div>
       <label class="chk" style="margin-top:8px"><input type="checkbox" id="c_ordMan" ${f.ordineMancante?"checked":""} ${canSenzaRicambi()?"":"disabled"}> Ricambi non disponibili o in arretrato: si consegna dopo <span class="small">(lo segnano back office o product expert)</span></label>
       ${f.ordineArrivati&&f.ordineArrivatiDa?`<div class="small">Segnati arrivati da ${esc(f.ordineArrivatiDa)}${f.ordineArrivatiIl?" il "+new Date(f.ordineArrivatiIl).toLocaleDateString("it-IT"):""}</div>`:""}</div></div>
-    <div class="keybox"><h4>Preparazione officina <span class="small">tutte le voci sono obbligatorie per segnare la vettura pronta</span></h4>
+    <div class="keybox"><h4>Preparazione officina <span class="small">tutte le voci sono obbligatorie: «Preconsegna fatta» le spunta tutte</span></h4>
       <div class="chkgrid">${ACC_STD.map(([k,l])=>ck("std",k,l,!prepOk)).join("")}${PREP.map(([k,l])=>ck("prep",k,l,!prepOk)).join("")}</div>
       <label class="chk" style="margin-top:10px;padding:10px;border:2px solid var(--ok);border-radius:8px;font-weight:600"><input type="checkbox" id="c_pronta" ${f.pronta?"checked":""} ${roP}> Preconsegna fatta: vettura pronta per la consegna</label>
       ${f.pronta&&f.prontaDa?`<div class="small">Segnata pronta da ${esc(f.prontaDa)}${f.date&&f.date.pronta?" il "+new Date(f.date.pronta).toLocaleDateString("it-IT"):""}</div>`:""}</div>
@@ -1592,6 +1592,8 @@ function openConsegna(id){
     ${!nuovo&&edAll&&f.stato!=="consegnata"?`<div style="text-align:right"><button type="button" class="link" id="c_annulla">Annulla questa consegna</button></div>`:""}
   </form>`);
   $("c_close").onclick=closeSheet;
+  // «Preconsegna fatta» spunta da sola tutte le voci della preparazione.
+  const cpr=$("c_pronta");if(cpr)cpr.addEventListener("change",()=>{if(cpr.checked)p.querySelectorAll('[data-g="std"],[data-g="prep"]').forEach(i=>{if(!i.disabled)i.checked=true;});});
   const odc=$("c_ordDa");odc.onchange=()=>{$("c_ordBox").hidden=!odc.checked;};
   const oa=$("c_omadd");if(oa)oa.onclick=()=>{const d=document.createElement("div");d.innerHTML=omRow({testo:"",fatto:false},0,"");const r=d.firstElementChild;$("c_omlist").appendChild(r);r.querySelector("input").focus();};
   $("c_omlist").addEventListener("click",e=>{const b=e.target.closest("[data-omdel]");if(b)b.closest(".omrow").remove();});
