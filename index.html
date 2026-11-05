@@ -725,6 +725,9 @@ function openEditor(id,assegna){
     </div>
   </form>`);
   const sp=soloSposta()&&!libero;
+  // «In ripristino» sulla chiave: solo officina, ripristini e gestione (back office, usato, admin), non l'operatore.
+  if(!canRip()){ed.querySelectorAll('[data-k="ripristino"] button,[data-k="ripristinoTipo"] button').forEach(x=>x.disabled=true);const rd=$("e_ripristinoDove");if(rd)rd.disabled=true;
+    const rh=ed.querySelector('[data-k="ripristino"]');if(rh)rh.closest("h4").querySelector(".small").insertAdjacentHTML("beforeend"," · lo mettono officina, ripristini o back office");}
   if(sp){ed.querySelectorAll("input,select,textarea").forEach(x=>x.disabled=true);ed.querySelectorAll("[data-k] button").forEach(x=>{if(x.parentElement.dataset.k!=="dovePrima")x.disabled=true;});
     const hp=ed.querySelector(".phead p");if(hp)hp.insertAdjacentHTML("beforeend"," · puoi solo spostare la vettura");}
   const press=(k)=>ed.querySelectorAll(`[data-k="${k}"] button`).forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===f[k]));
@@ -1443,6 +1446,7 @@ const canAppConsegna=()=>ha(...GEST,"productexpert");
 const canPrepConsegna=()=>ha(...GEST,"officina","ripristini","preparatore");
 const canConsegnata=()=>ha(...GEST,"venditore","productexpert");
 const canMagazzino=()=>ha(...GEST,"magazzino");
+const canRip=()=>ha(...GEST,"officina","ripristini");
 const canMontato=()=>ha(...GEST,"officina","ripristini","preparatore");
 const canImpegni=()=>ha(...GEST,"productexpert","venditore");
 const canImpTutti=()=>ha(...GEST);
