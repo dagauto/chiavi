@@ -1540,7 +1540,7 @@ function cardC(c){
   return`<button class="card ccard" data-c="${esc(c.id)}">
     <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
     <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio breve</span>':c.tipo==="lungo"?'<span class="pill p-Doppia">Noleggio lungo</span>':""}</span>
-      <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`PE ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
+      <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`Venditore ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
       <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${avvisoChiaveC(c)?`<span class="kp miss">${esc(avvisoChiaveC(c))}</span>`:""}${c.ordineMancante&&!c.ordineArrivati?`<span class="kp miss">Ricambi verranno consegnati dopo</span>`:""}${c.permuta?`<span class="kp scad">Permuta presente</span>`:""}${scadenzeC(c).map(x=>`<span class="kp ${x.bad?"miss":"scad"}">${esc(x.t)}</span>`).join("")}${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
 }
 function renderConsegne(){
@@ -1575,7 +1575,7 @@ function icsDi(c){
   const f=x=>x.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
   const esc2=s=>String(s||"").replace(/[,;\\]/g,m=>"\\"+m).replace(/\n/g,"\\n");
   return["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Dag Auto//Chiavi//IT","BEGIN:VEVENT",`UID:consegna-${c.id}@dagauto`,`DTSTAMP:${f(new Date())}`,`DTSTART:${f(d)}`,`DTEND:${f(e)}`,
-    `SUMMARY:${esc2(`Consegna ${etich(c)} ${c.cliente||""}`)}`,`DESCRIPTION:${esc2([c.modello,c.targa,c.telaio,c.venditore?`PE ${c.venditore}`:""].filter(Boolean).join(" - "))}`,"LOCATION:Dag Auto\\, Via I Maggio 33\\, Manocalzati (AV)","BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:Consegna domani","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
+    `SUMMARY:${esc2(`Consegna ${etich(c)} ${c.cliente||""}`)}`,`DESCRIPTION:${esc2([c.modello,c.targa,c.telaio,c.venditore?`Venditore ${c.venditore}`:""].filter(Boolean).join(" - "))}`,"LOCATION:Dag Auto\\, Via I Maggio 33\\, Manocalzati (AV)","BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:Consegna domani","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
 }
 function stampaVerbale(c){
   const sel=ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel);
