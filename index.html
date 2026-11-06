@@ -1115,7 +1115,7 @@ function listaU(){
   const q=norm(U.q),es=espoSet();
   return [...U.docs.entries()].map(([id,d])=>Object.assign({id},d)).filter(u=>{
     if(inEspo(u,es))return false;
-    if(q)return [u.targa,u.telaio,u.modello,u.chiave,u.venditore].some(v=>norm(v).includes(q));
+    if(q)return [u.targa,u.telaio,u.modello,u.chiave,u.venditore,u.wip].some(v=>norm(v).includes(q));
     if(U.stato==="vendita")return inVendita(u);
     if(U.stato)return u.stato===U.stato;
     return !CHIUSI_U.includes(u.stato);
@@ -1152,7 +1152,7 @@ function renderUsato(){
       <span style="min-width:0">
         <span class="ctitle">${u.targa?`<span class="targa">${esc(u.targa)}</span>`:""}<span class="modello">${esc(u.modello||"Modello non indicato")}</span>${u.priorita==="alta"?`<span class="pill p-Solo-seconda">${IN_VENDITA.includes(u.stato)?"Vendita prioritaria":"Priorità alta"}</span>`:u.priorita==="bassa"&&!IN_VENDITA.includes(u.stato)?'<span class="pill p-Doppia">Priorità bassa</span>':""}</span>
         <span class="uinfo">${[u.chiave?`Chiave U.${esc(u.chiave)}`:"",u.km?`${Number(u.km).toLocaleString("it-IT")} km`:"",u.venditore?`Venditore ${esc(u.venditore)}`:""].filter(Boolean).join(" · ")}</span>
-        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}${u.ivaEsposta?" · IVA esp. "+esc(u.ivaEsposta):""}</span>`:""}${u.stato==="ripristino"&&u.ripTipo?`<span class="kp">${esc(u.ripTipo)}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
+        <span class="keys"><span class="kp">Stimato <strong>${euro(t.s)}</strong></span>${t.hasE?`<span class="kp ${t.e>t.s?"miss":""}">Effettivo <strong>${euro(t.e)}</strong></span>`:""}${vedePrezzo()&&u.prezzoVendita?`<span class="kp">Prezzo <strong>${euro(u.prezzoVendita)}</strong>${u.margine?" · "+esc(u.margine):""}${u.ivaEsposta?" · IVA esp. "+esc(u.ivaEsposta):""}</span>`:""}${u.stato==="ripristino"&&u.ripTipo?`<span class="kp">${esc(u.ripTipo)}</span>`:""}${u.wip?`<span class="kp">WIP ${esc(u.wip)}</span>`:""}${g!=null?`<span class="kp">${esc(giorniTxtU(u))}</span>`:""}</span>
       </span></button>`;
   }
   $("uList").innerHTML=html||`<div class="empty"><p>Nessuna vettura in questa vista.</p></div>`;
@@ -1233,6 +1233,7 @@ function openUsato(id){
     ${!nuovo&&fotoOk(f.stato)?citBox(f.targa,f):""}
     <div class="keybox"><h4>Stato${nuovo?' <span class="small">dove va la vettura appena entra</span>':""}</h4><div class="places" data-k="stato">${STATI_U.filter(([k])=>!nuovo||STATI_ENTRATA.includes(k)).map(([k,l])=>`<button type="button" class="chip" data-v="${k}" aria-pressed="${f.stato===k}" ${statiPermessi().includes(k)||f.stato===k?"":"disabled"}>${l}</button>`).join("")}</div>
       ${!nuovo&&canVoci()?`<div class="small" style="margin-top:8px">In ripristino in <span class="small">(la prima chiave si sposta lì; a fine ripristino va in Officina)</span></div><div class="places" data-k="ripTipo">${LUOGHI_RIP.map(t=>`<button type="button" class="chip" data-v="${t}" aria-pressed="${f.ripTipo===t}">${t}</button>`).join("")}</div>`:""}
+      ${nuovo?"":`<label class="f" style="margin-top:8px">WIP <span class="small">(numero della lavorazione in officina)</span><input id="u_wip" value="${esc(f.wip||"")}" autocomplete="off" ${canWip()?"":"disabled"}></label>`}
       ${nuovo?"":`<div class="small">${[f.date.presa?`Entrata: ${new Date(f.date.presa).toLocaleDateString("it-IT")}`:""].concat(STATI_U.filter(([k])=>f.date[k]).map(([k,l])=>`${l}: ${new Date(f.date[k]).toLocaleDateString("it-IT")}`)).filter(Boolean).join(" · ")}</div>`}</div>
     <div class="keybox"><h4>${IN_VENDITA.includes(f.stato)?"Priorità di vendita":"Priorità di ripristino"} <span class="seg" data-k="priorita">${PRIO.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${f.priorita===k}">${l}</button>`).join("")}</span></h4></div>
     <div class="grid2">${inp("targa","Targa",{mono:1})}${inp("modello","Modello")}</div>
@@ -1319,6 +1320,7 @@ function openUsato(id){
     if(!nuovo){const w=cambiataDaAltri(base,U.docs.get(id));if(w){$("e_err").innerHTML=w;return;}}
     if(edDati)for(const k of["targa","modello","marca","telaio","km","chiave","immatricolazione","venditore","scadBollo","scadRevisione","exProprietario","ritiroPermuta"])f[k]=$("u_"+k).value.trim();
     if(!nuovo&&canPrezzo()&&$("u_prezzoVendita")){f.prezzoVendita=num($("u_prezzoVendita").value);f.margine=$("u_margine").value.replace(/[^A-Za-z]/g,"").slice(0,2);}
+    {const w=$("u_wip");if(w&&!w.disabled){const v=w.value.trim();if(v||"wip" in base)f.wip=v;}}
     f.note=$("u_note").value.trim();f.danni=$("u_danni").value.trim();f.accessoriDoc=$("u_accdoc").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,10);f.targa=String(f.targa||"").toUpperCase().replace(/\s/g,"");f.telaio=String(f.telaio||"").toUpperCase().replace(/\s/g,"");f.km=num(f.km);f.chiave=f.chiave?String(parseInt(f.chiave,10)||""):"";
     const nid=nuovo?idU(f.targa,f.telaio):id;
     if(!nid){$("e_err").innerHTML=`<div class="banner bad">Serve almeno la targa o il telaio.</div>`;return;}
@@ -1456,6 +1458,8 @@ const canPrepConsegna=()=>ha(...GEST,"officina","ripristini","preparatore");
 const canConsegnata=()=>ha(...GEST,"venditore","productexpert");
 const canMagazzino=()=>ha(...GEST,"magazzino");
 const canRip=()=>ha(...GEST,"officina","ripristini");
+// WIP (numero della lavorazione in officina): lo scrive l'officina (e la gestione).
+const canWip=()=>ha(...GEST,"officina");
 const canMontato=()=>ha(...GEST,"officina","ripristini","preparatore");
 const canImpegni=()=>ha(...GEST,"productexpert","venditore");
 const canImpTutti=()=>ha(...GEST);
@@ -1540,14 +1544,14 @@ function cardC(c){
   return`<button class="card ccard" data-c="${esc(c.id)}">
     <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
     <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio breve</span>':c.tipo==="lungo"?'<span class="pill p-Doppia">Noleggio lungo</span>':""}</span>
-      <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`Venditore ${c.venditore}`:""].filter(Boolean).map(esc).join(" · ")}</span>
+      <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`Venditore ${c.venditore}`:"",c.wip?`WIP ${c.wip}`:""].filter(Boolean).map(esc).join(" · ")}</span>
       <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${avvisoChiaveC(c)?`<span class="kp miss">${esc(avvisoChiaveC(c))}</span>`:""}${c.ordineMancante&&!c.ordineArrivati?`<span class="kp miss">Ricambi verranno consegnati dopo</span>`:""}${c.permuta?`<span class="kp scad">Permuta presente</span>`:""}${scadenzeC(c).map(x=>`<span class="kp ${x.bad?"miss":"scad"}">${esc(x.t)}</span>`).join("")}${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
 }
 function renderConsegne(){
   if(!canConsegne())return;
   const all=[...C.docs.entries()].map(([id,d])=>Object.assign({id},d));
   const q=norm(C.q);
-  if(q){const xs=all.filter(c=>[c.cliente,c.targa,c.telaio,c.modello,c.venditore,etich(c)].some(v=>norm(v).includes(q)));
+  if(q){const xs=all.filter(c=>[c.cliente,c.targa,c.telaio,c.modello,c.venditore,c.wip,etich(c)].some(v=>norm(v).includes(q)));
     $("cWeek").textContent=`${xs.length} ${plur(xs.length,"risultato","risultati")} per «${C.q}»`;
     $("cList").innerHTML=xs.length?xs.sort((a,b)=>String(b.data).localeCompare(String(a.data))).map(c=>`<div class="small">${c.data?new Date(c.data).toLocaleDateString("it-IT"):"senza data"}</div>`+cardC(c)).join(""):`<div class="empty"><p>Nessuna consegna trovata.</p></div>`;return;}
   const lu=lunedi(C.week),dom=new Date(lu);dom.setDate(dom.getDate()+6);
@@ -1586,7 +1590,7 @@ function stampaVerbale(c){
     <tr><td>Si consegna al/alla Sig./Sig.ra</td><td colspan="3">${esc(c.consegnatario||c.cliente||"")}</td></tr>
     <tr><td>Venditore</td><td colspan="3">${esc(c.venditore||"")}</td></tr>
     <tr><td>Marca e modello</td><td colspan="3">Mercedes-Benz ${esc(c.modello||"")}</td></tr>
-    <tr><td>Telaio</td><td>${esc(c.telaio||"")}</td><td>n° Chiave</td><td>${esc(etich(c))}</td></tr></table>
+    <tr><td>Telaio</td><td>${esc(c.telaio||"")}</td><td>n° Chiave</td><td>${esc(etich(c))}</td></tr>${c.wip?`<tr><td>WIP</td><td colspan="3">${esc(c.wip)}</td></tr>`:""}</table>
     <h2>Accessori standard di preconsegna</h2>${ACC_STD.map(([k,l])=>`<div>${box((c.std||{})[k])} ${esc(l)}</div>`).join("")}
     <h2>Ulteriori accessori a pagamento</h2>${sel.length?sel.map(([k,l])=>`<div>${SOLO_INFO.includes(k)?"• ":box(c.pag[k].fatto)+" "}${esc(nomePag(k,l,c.pag[k]))}</div>`).join(""):"<div>Nessuno</div>"}
     <h2>Ulteriori accessori in omaggio</h2>${(()=>{const l=omaggi(c).concat(c.omaggioPE?[{testo:c.omaggioPE,fatto:!!c.omaggioPEFatto}]:[]);return l.length?l.map(o=>`<div>${box(o.fatto)} ${esc(o.testo)}</div>`).join(""):"<div>Nessuno</div>";})()}
@@ -1641,6 +1645,7 @@ function openConsegna(id){
       <label class="chk" style="margin-top:8px"><input type="checkbox" id="c_ordMan" ${f.ordineMancante?"checked":""} ${canSenzaRicambi()?"":"disabled"}> Ricambi non disponibili o in arretrato: si consegna dopo <span class="small">(lo segnano back office o product expert)</span></label>
       ${f.ordineArrivati&&f.ordineArrivatiDa?`<div class="small">Segnati arrivati da ${esc(f.ordineArrivatiDa)}${f.ordineArrivatiIl?" il "+new Date(f.ordineArrivatiIl).toLocaleDateString("it-IT"):""}</div>`:""}</div></div>
     <div class="keybox"><h4>Preparazione officina <span class="small">tutte le voci sono obbligatorie: «Preconsegna fatta» le spunta tutte</span></h4>
+      <label class="f">WIP <span class="small">(numero della lavorazione in officina)</span><input id="c_wip" value="${esc(f.wip||"")}" autocomplete="off" ${canWip()?"":"disabled"}></label>
       <div class="chkgrid">${ACC_STD.map(([k,l])=>ck("std",k,l,!prepOk)).join("")}${PREP.map(([k,l])=>ck("prep",k,l,!prepOk)).join("")}</div>
       <label class="chk" style="margin-top:10px;padding:10px;border:2px solid var(--ok);border-radius:8px;font-weight:600"><input type="checkbox" id="c_pronta" ${f.pronta?"checked":""} ${roP}> Preconsegna fatta: vettura pronta per la consegna</label>
       ${f.pronta&&f.prontaDa?`<div class="small">Segnata pronta da ${esc(f.prontaDa)}${f.date&&f.date.pronta?" il "+new Date(f.date.pronta).toLocaleDateString("it-IT"):""}</div>`:""}</div>
@@ -1681,6 +1686,7 @@ function openConsegna(id){
   const leggi=()=>{
     for(const k of["targa","telaio","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");
     f.targa=f.targa.toUpperCase().replace(/\s/g,"");f.tipo=$("c_tipo").value;
+    {const w=$("c_wip");if(w&&!w.disabled){const v=w.value.trim();if(v||"wip" in base)f.wip=v;}}
     f.omaggi=[...p.querySelectorAll(".omrow")].map(r=>({testo:r.querySelector('[data-om="testo"]').value.trim(),fatto:r.querySelector('[data-om="fatto"]').checked})).filter(o=>o.testo);delete f.omaggio;delete f.omaggioFatto;
     {const rp=[...p.querySelectorAll(".rprow")].map(x=>({testo:x.querySelector('[data-rp="testo"]').value.trim(),fatto:x.querySelector('[data-rp="fatto"]').checked})).filter(o=>o.testo);if(rp.length||"ripAgg" in base)f.ripAgg=rp;}
     p.querySelectorAll("[data-g]").forEach(i=>{f[i.dataset.g][i.dataset.k]=i.checked;});
