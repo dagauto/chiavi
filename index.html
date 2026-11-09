@@ -1341,6 +1341,18 @@ function openUsato(id){
     if(nuovo)logs.push({codice:cod,azione:f.stato==="commerciante"?"Entrata · destinazione commerciante":"Entrata · in attesa di ripristino",dettaglio:[f.modello,f.chiave?`chiave U.${f.chiave}`:""].filter(Boolean).join(" · ")});
     else if(f.stato!==base.stato)logs.push({codice:cod,azione:NOME_STATO[f.stato],dettaglio:`da «${NOME_STATO[base.stato]}»`});
     else logs.push({codice:cod,azione:"Scheda usato aggiornata",dettaglio:f.priorita!==base.priorita?`priorità ${f.priorita}`:""});
+    // Numero di chiave cambiato su una scheda già esistente: la chiave si sposta anche nel registro, solo se il nuovo numero è libero.
+    if(!nuovo&&f.chiave&&f.chiave!==(base.chiave||"")){
+      const sua=x=>x&&x._has&&((f.telaio&&norm(x.telaio)===norm(f.telaio))||(f.targa&&norm(x.targa)===norm(f.targa)));
+      const da=base.chiave?slot("ROSSO",+base.chiave):null,a=slot("ROSSO",+f.chiave);
+      if(occupato(a)&&!sua(a)){$("e_err").innerHTML=`<div class="banner bad">La chiave Rossa ${esc(f.chiave)} è già occupata (${esc(a.targa||a.modello||a.telaio||"altra vettura")}): scegli un numero libero oppure libera prima quel numero nelle chiavi. Non ho salvato niente.</div>`;return;}
+      if(!occupato(a)){const src=sua(da)?da:{};const d={};for(const[k]of FIELDS)if(src[k]!==undefined)d[k]=src[k];
+        Object.assign(d,{colore:"ROSSO",numero:+f.chiave,telaio:f.telaio||d.telaio||"",targa:f.targa||d.targa||"",modello:f.modello||d.modello||"",prima:d.prima||"Sì",controllatoDa:S.me.nome,dataControllo:oggi()});
+        writes.push({col:"chiavi",id:a.id,data:d});
+        logs.push({codice:`U.${f.chiave}`,azione:"Assegnato da scheda usato",dettaglio:[f.modello,f.targa].filter(Boolean).join(" · ")+(sua(da)?` (spostata da U.${base.chiave})`:"")});
+        if(sua(da)){writes.push({col:"chiavi",id:da.id,data:{colore:"ROSSO",numero:da.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}});
+          logs.push({codice:`U.${base.chiave}`,azione:"Numero liberato",dettaglio:`chiave spostata su U.${f.chiave} (${f.targa||f.telaio||""})`});}}
+    }
     // collegamento con il registro chiavi
     let avviso="";
     if(f.chiave){const s=slot("ROSSO",+f.chiave);const stessa=s._has&&((f.telaio&&norm(s.telaio)===norm(f.telaio))||(f.targa&&norm(s.targa)===norm(f.targa)));
