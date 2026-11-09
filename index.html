@@ -1545,14 +1545,14 @@ function cardC(c){
   return`<button class="card ccard" data-c="${esc(c.id)}">
     <span class="ctime"><b>${esc(c.ora||"--:--")}</b><span class="ctag c${esc(c.colore)}">${esc(etich(c))}</span></span>
     <span style="min-width:0"><span class="ctitle"><span class="modello">${esc(c.cliente||"Cliente da indicare")}</span>${c.tipo==="noleggio"?'<span class="pill p-Doppia">Noleggio breve</span>':c.tipo==="lungo"?'<span class="pill p-Doppia">Noleggio lungo</span>':""}</span>
-      <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`Venditore ${c.venditore}`:"",c.wip?`WIP ${c.wip}`:""].filter(Boolean).map(esc).join(" · ")}</span>
+      <span class="uinfo">${[c.modello,c.targa||"da targare",c.venditore?`Venditore ${c.venditore}`:"",c.data?`Consegna ${consegnaDi(c)}`:"",c.wip?`WIP ${c.wip}`:""].filter(Boolean).map(esc).join(" · ")}</span>
       <span class="keys"><span class="sem sem-${k}">${esc(l)}</span>${avvisoChiaveC(c)?`<span class="kp miss">${esc(avvisoChiaveC(c))}</span>`:""}${c.ordineMancante&&!c.ordineArrivati?`<span class="kp miss">Ricambi verranno consegnati dopo</span>`:""}${c.permuta?`<span class="kp scad">Permuta presente</span>`:""}${scadenzeC(c).map(x=>`<span class="kp ${x.bad?"miss":"scad"}">${esc(x.t)}</span>`).join("")}${c.stato!=="consegnata"&&c.stato!=="annullata"&&!c.pronta?`<span class="kp">Voci spuntate ${m.t-m.n}/${m.t}</span>`:""}</span></span></button>`;
 }
 function renderConsegne(){
   if(!canConsegne())return;
   const all=[...C.docs.entries()].map(([id,d])=>Object.assign({id},d));
   const q=norm(C.q);
-  if(q){const xs=all.filter(c=>[c.cliente,c.targa,c.telaio,c.modello,c.venditore,c.wip,etich(c)].some(v=>norm(v).includes(q)));
+  if(q){const xs=all.filter(c=>[c.cliente,c.targa,c.telaio,c.modello,c.venditore,consegnaDi(c),c.wip,etich(c)].some(v=>norm(v).includes(q)));
     $("cWeek").textContent=`${xs.length} ${plur(xs.length,"risultato","risultati")} per «${C.q}»`;
     $("cList").innerHTML=xs.length?xs.sort((a,b)=>String(b.data).localeCompare(String(a.data))).map(c=>`<div class="small">${c.data?new Date(c.data).toLocaleDateString("it-IT"):"senza data"}</div>`+cardC(c)).join(""):`<div class="empty"><p>Nessuna consegna trovata.</p></div>`;return;}
   const lu=lunedi(C.week),dom=new Date(lu);dom.setDate(dom.getDate()+6);
@@ -1580,7 +1580,7 @@ function icsDi(c){
   const f=x=>x.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
   const esc2=s=>String(s||"").replace(/[,;\\]/g,m=>"\\"+m).replace(/\n/g,"\\n");
   return["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Dag Auto//Chiavi//IT","BEGIN:VEVENT",`UID:consegna-${c.id}@dagauto`,`DTSTAMP:${f(new Date())}`,`DTSTART:${f(d)}`,`DTEND:${f(e)}`,
-    `SUMMARY:${esc2(`Consegna ${etich(c)} ${c.cliente||""}`)}`,`DESCRIPTION:${esc2([c.modello,c.targa,c.telaio,c.venditore?`Venditore ${c.venditore}`:""].filter(Boolean).join(" - "))}`,"LOCATION:Dag Auto\\, Via I Maggio 33\\, Manocalzati (AV)","BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:Consegna domani","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
+    `SUMMARY:${esc2(`Consegna ${etich(c)} ${c.cliente||""}`)}`,`DESCRIPTION:${esc2([c.modello,c.targa,c.telaio,c.venditore?`Venditore ${c.venditore}`:"",`Consegna ${consegnaDi(c)}`].filter(Boolean).join(" - "))}`,"LOCATION:Dag Auto\\, Via I Maggio 33\\, Manocalzati (AV)","BEGIN:VALARM","TRIGGER:-P1D","ACTION:DISPLAY","DESCRIPTION:Consegna domani","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
 }
 function stampaVerbale(c){
   const sel=ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel);
@@ -1590,6 +1590,7 @@ function stampaVerbale(c){
     <table class="pvt"><tr><td>Targa</td><td>${esc(c.targa||"")}</td><td>Cliente</td><td>${esc(c.cliente||"")}</td></tr>
     <tr><td>Si consegna al/alla Sig./Sig.ra</td><td colspan="3">${esc(c.consegnatario||c.cliente||"")}</td></tr>
     <tr><td>Venditore</td><td colspan="3">${esc(c.venditore||"")}</td></tr>
+    <tr><td>Consegna</td><td colspan="3">${esc(consegnaDi(c))}</td></tr>
     <tr><td>Marca e modello</td><td colspan="3">Mercedes-Benz ${esc(c.modello||"")}</td></tr>
     <tr><td>Telaio</td><td>${esc(c.telaio||"")}</td><td>n° Chiave</td><td>${esc(etich(c))}</td></tr>${c.wip?`<tr><td>WIP</td><td colspan="3">${esc(c.wip)}</td></tr>`:""}</table>
     <h2>Accessori standard di preconsegna</h2>${ACC_STD.map(([k,l])=>`<div>${box((c.std||{})[k])} ${esc(l)}</div>`).join("")}
@@ -1627,7 +1628,8 @@ function openConsegna(id){
       <label class="f">Si consegna a (se diverso)<input id="c_consegnatario" value="${esc(f.consegnatario||"")}" ${ro}></label></div>
     <label class="f">Venditore<input id="c_venditore" list="c_pelist" autocomplete="off" value="${esc(f.venditore||(nuovo&&soloSposta()?S.me.nome:""))}" ${ro}><datalist id="c_pelist">${[...new Set(AGENDA_PERSONE.concat(pes().map(p=>p.nome)))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label>
     <div class="keybox"><h4>Appuntamento di consegna <span class="small">fissato dal product expert, almeno 24–48 ore prima</span></h4>
-      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${statoOrdine(base)==="ordinato"?`min="${esc(giornoLavDopo(base.ordinePrevisto))}"`:""} ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}${statoOrdine(base)==="ordinato"?`<div class="banner">Ricambi ordinati: arrivo previsto il ${esc(dIt(base.ordinePrevisto))}, la consegna si può fissare dal ${esc(dIt(giornoLavDopo(base.ordinePrevisto)))}.</div>`:""}${statoOrdine(base)==="nondisp"?`<div class="banner bad">Ricambi non disponibili, senza previsione di arrivo: la consegna non si può ancora fissare.</div>`:""}${statoOrdine(base)==="mancante"?`<div class="banner">Ricambi non disponibili o in arretrato: i ricambi verranno consegnati dopo.</div>`:""}
+      <div class="grid2"><label class="f">Data<input type="date" id="c_data" value="${esc(f.data||"")}" ${statoOrdine(base)==="ordinato"?`min="${esc(giornoLavDopo(base.ordinePrevisto))}"`:""} ${roA}></label><label class="f">Ora<input type="time" id="c_ora" value="${esc(f.ora||"")}" ${roA}></label></div>
+      <label class="f">Consegna <span class="small">(chi consegna la vettura al cliente: risulta impegnato in agenda)</span><input id="c_consegnaDa" list="c_cdlist" autocomplete="off" value="${esc(consegnaDi(f))}" ${appOk?"":"disabled"}><datalist id="c_cdlist">${[...new Set(CONSEGNANO.concat(AGENDA_PERSONE))].map(n=>`<option value="${esc(n)}">`).join("")}</datalist></label><div id="c_dwarn"></div>${bloccoOrd?`<div class="banner">Accessori da ordinare non ancora arrivati: la data si fissa dopo il via libera del magazzino.</div>`:""}${statoOrdine(base)==="ordinato"?`<div class="banner">Ricambi ordinati: arrivo previsto il ${esc(dIt(base.ordinePrevisto))}, la consegna si può fissare dal ${esc(dIt(giornoLavDopo(base.ordinePrevisto)))}.</div>`:""}${statoOrdine(base)==="nondisp"?`<div class="banner bad">Ricambi non disponibili, senza previsione di arrivo: la consegna non si può ancora fissare.</div>`:""}${statoOrdine(base)==="mancante"?`<div class="banner">Ricambi non disponibili o in arretrato: i ricambi verranno consegnati dopo.</div>`:""}
       <label class="f" style="margin-top:8px">Omaggio da preparare <span class="small">(se il product expert lo sa già: arriva a officina, ripristini, preparatori e magazzino)</span><input id="c_omPE" value="${esc(f.omaggioPE||"")}" placeholder="es. fiori, portachiavi personalizzato, borsa Mercedes" autocomplete="off" ${appOk?"":"disabled"}></label>
       ${f.omaggioPE?`<label class="chk small"><input type="checkbox" id="c_omPEfatto" ${f.omaggioPEFatto?"checked":""} ${prepOk?"":"disabled"}> omaggio preparato</label>`:""}
       <label class="chk" style="margin-top:8px"><input type="checkbox" id="c_permuta" ${f.permuta?"checked":""} ${appOk?"":"disabled"}> Permuta presente <span class="small">(avvisa il back office: quel giorno ritira la permuta e fa firmare l'atto di proprietà)</span></label></div>
@@ -1678,16 +1680,17 @@ function openConsegna(id){
   $("c_numero").addEventListener("input",mostraVett);$("c_colore").addEventListener("change",mostraVett);mostraVett();
   const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=oreLavorative(Date.now(),new Date(`${d}T${o}:00`).getTime());
     w.innerHTML=h<24?`<div class="banner">Mancano meno di 24 ore lavorative (sabato e domenica esclusi): avvisa subito i preparatori.</div>`:"";const dup=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.ora&&c.ora===$("c_ora").value&&c.stato!=="annullata");if(dup.length)w.innerHTML+=`<div class="banner">Alla stessa ora c'è già: ${dup.map(([,c])=>esc(etich(c)+" "+(c.cliente||""))).join(", ")}.</div>`;
-    const pe=$("c_venditore").value.trim();if(pe){const im=impegniDel(d,pe);const ora=$("c_ora").value;const hit=im.filter(i=>sovrapposto(i,ora));
+    const pe=($("c_consegnaDa").value||"").trim();if(pe){const im=impegniDel(d,pe);const ora=$("c_ora").value;const hit=im.filter(i=>sovrapposto(i,ora));
       if(im.length)w.innerHTML+=`<div class="banner ${hit.length?"bad":""}">${esc(pe)} ${hit.length?"non è disponibile":"quel giorno ha impegni"}: ${im.map(i=>esc(fasciaImp(i)+(titoloImp(i)?" ("+titoloImp(i)+")":""))).join(", ")}.</div>`;
-      const altre=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.stato!=="annullata"&&norm(c.venditore)===norm(pe));
+      const altre=[...C.docs.entries()].filter(([i,c])=>i!==id&&c.data===d&&c.stato!=="annullata"&&stessaPersona(consegnaDi(c),pe));
       if(altre.length)w.innerHTML+=`<div class="banner">${esc(pe)} quel giorno ha già ${altre.length} ${plur(altre.length,"consegna","consegne")}: ${altre.map(([,c])=>esc((c.ora||"--:--")+" "+etich(c))).join(", ")}.</div>`;}};
-  $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);$("c_venditore").addEventListener("input",avvData);avvData();
+  $("c_data").addEventListener("input",avvData);$("c_ora").addEventListener("input",avvData);$("c_consegnaDa").addEventListener("input",avvData);avvData();
   p.addEventListener("change",e=>{const t=e.target;if(t.dataset.pag&&t.dataset.pf==="sel"){const r=t.closest(".accrow").querySelector('[data-pf="fatto"]');if(!r)return;r.disabled=!t.checked||!puoFatto(t.dataset.pag);if(!t.checked)r.checked=false;r.parentElement.classList.toggle("dim",!t.checked);}});
   const leggi=()=>{
     for(const k of["targa","telaio","cliente","consegnatario","venditore","data","ora","note"])f[k]=$("c_"+k).value.trim();f.telaio=f.telaio.toUpperCase().replace(/\s/g,"");
     f.targa=f.targa.toUpperCase().replace(/\s/g,"");f.tipo=$("c_tipo").value;
     {const w=$("c_wip");if(w&&!w.disabled){const v=w.value.trim();if(v||"wip" in base)f.wip=v;}}
+    {const w=$("c_consegnaDa");if(w&&!w.disabled){const v=w.value.trim();if(v||"consegnaDa" in base)f.consegnaDa=v;}}
     f.omaggi=[...p.querySelectorAll(".omrow")].map(r=>({testo:r.querySelector('[data-om="testo"]').value.trim(),fatto:r.querySelector('[data-om="fatto"]').checked})).filter(o=>o.testo);delete f.omaggio;delete f.omaggioFatto;
     {const rp=[...p.querySelectorAll(".rprow")].map(x=>({testo:x.querySelector('[data-rp="testo"]').value.trim(),fatto:x.querySelector('[data-rp="fatto"]').checked})).filter(o=>o.testo);if(rp.length||"ripAgg" in base)f.ripAgg=rp;}
     p.querySelectorAll("[data-g]").forEach(i=>{f[i.dataset.g][i.dataset.k]=i.checked;});
@@ -1773,9 +1776,13 @@ $("btnImpegno").onclick=()=>openImpegno(null);
 /* =================== Agenda =================== */
 const A={mese:0,chi:""};
 const AGENDA_PERSONE=["Domenico Sperandeo","Nicola Bussolotto","Dino Di Bello","Girolamo De Blasiis","Marco Belisario"];
+// Chi fa la consegna (non il venditore, che è solo informativo): di regola Domenico Sperandeo per il nuovo, Nicola Bussolotto per l'usato.
+const CONSEGNANO=["Domenico Sperandeo","Nicola Bussolotto"];
+const consegnaDi=c=>c.consegnaDa||(c.colore==="ROSSO"?"Nicola Bussolotto":"Domenico Sperandeo");
+const stessaPersona=(a,b)=>{const x=norm(a),y=norm(b);return!!x&&!!y&&(x.includes(y)||y.includes(x));};
 function voceAgenda(iso){
-  const cs=[...C.docs.entries()].map(([id,c])=>Object.assign({id},c)).filter(c=>c.data===iso&&c.stato!=="annullata"&&(!A.chi||(c.venditore&&(norm(A.chi).includes(norm(c.venditore))||norm(c.venditore).includes(norm(A.chi))))))
-    .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${c.ora?`<b>${esc(c.ora)}</b> `:""}${esc(etich(c))} ${esc(c.cliente||"")}${c.venditore?` · ${esc(c.venditore)}`:""}${c.permuta?" · <b>Permuta</b>":""}</span>`}));
+  const cs=[...C.docs.entries()].map(([id,c])=>Object.assign({id},c)).filter(c=>c.data===iso&&c.stato!=="annullata"&&(!A.chi||stessaPersona(c.venditore,A.chi)||stessaPersona(consegnaDi(c),A.chi)))
+    .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${c.ora?`<b>${esc(c.ora)}</b> `:""}${esc(etich(c))} ${esc(c.cliente||"")}${` · consegna ${esc(consegnaDi(c).split(" ")[0])}`}${c.venditore&&!stessaPersona(c.venditore,consegnaDi(c))?` · vend. ${esc(c.venditore)}`:""}${c.permuta?" · <b>Permuta</b>":""}</span>`}));
   const is=(vedeImpegni()?impegniDel(iso,A.chi):[]).map(i=>({ord:i.tutto?"00":i.dalle||"98",html:`<span class="ach t-${esc(i.tipo||"altro")}" data-imp="${esc(i.id)}">${esc((i.nome||"").split(" ")[0])} ${esc(titoloImp(i)||"impegno")}</span>`}));
   return cs.concat(is).sort((a,b)=>a.ord.localeCompare(b.ord));
 }
@@ -1851,7 +1858,7 @@ $("aList").addEventListener("click",async e=>{const b=e.target.closest("button")
   const c=e.target.closest("[data-c]");if(c)openConsegna(c.dataset.c);const k=e.target.closest("[data-id]");if(k)openEditor(k.dataset.id);});
 $("btnExportC").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
-  const rows=[...C.docs.values()].sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(c=>{const m=mancanti(c);return{"Chiave":etich(c),"Tipo":c.tipo,"Cliente":c.cliente||"","Si consegna a":c.consegnatario||"","Product expert":c.venditore||"","Modello":c.modello||"","Targa":c.targa||"","Telaio":c.telaio||"","Data":c.data||"","Ora":c.ora||"","Stato":c.stato,"Semaforo":semaforo(c)[1],"Preparazione":`${m.t-m.n}/${m.t}`,
+  const rows=[...C.docs.values()].sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(c=>{const m=mancanti(c);return{"Chiave":etich(c),"Tipo":c.tipo,"Cliente":c.cliente||"","Si consegna a":c.consegnatario||"","Consegna":consegnaDi(c),"Product expert":c.venditore||"","Modello":c.modello||"","Targa":c.targa||"","Telaio":c.telaio||"","Data":c.data||"","Ora":c.ora||"","Stato":c.stato,"Semaforo":semaforo(c)[1],"Preparazione":`${m.t-m.n}/${m.t}`,
     "Accessori a pagamento":ACC_PAG.filter(([k])=>(c.pag||{})[k]&&c.pag[k].sel).map(([k,l])=>nomePag(k,l,c.pag[k])+(c.pag[k].fatto&&!SOLO_INFO.includes(k)?(SERVIZI.includes(k)?" (attivato)":" (montato)"):"")).join(", "),"Omaggi":omaggi(c).map(o=>o.testo+(o.fatto?" (montato)":"")).join(", "),"Consegnata il":(c.date||{}).consegnata||"","Note":c.note||""};});
   const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"Chiave":""}]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Consegne");
   const blob=new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
