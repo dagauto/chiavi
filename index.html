@@ -1782,7 +1782,7 @@ const consegnaDi=c=>c.consegnaDa||(c.colore==="ROSSO"?"Nicola Bussolotto":"Domen
 const stessaPersona=(a,b)=>{const x=norm(a),y=norm(b);return!!x&&!!y&&(x.includes(y)||y.includes(x));};
 function voceAgenda(iso){
   const cs=[...C.docs.entries()].map(([id,c])=>Object.assign({id},c)).filter(c=>c.data===iso&&c.stato!=="annullata"&&(!A.chi||stessaPersona(c.venditore,A.chi)||stessaPersona(consegnaDi(c),A.chi)))
-    .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${c.ora?`<b>${esc(c.ora)}</b> `:""}${esc(etich(c))} ${esc(c.cliente||"")}${` · consegna ${esc(consegnaDi(c).split(" ")[0])}`}${c.venditore&&!stessaPersona(c.venditore,consegnaDi(c))?` · vend. ${esc(c.venditore)}`:""}${c.permuta?" · <b>Permuta</b>":""}</span>`}));
+    .map(c=>({ord:c.ora||"99",html:`<span class="ach c${esc(c.colore)} ${c.stato==="consegnata"?"done":""}" data-c="${esc(c.id)}">${c.ora?`<b>${esc(c.ora)}</b> `:""}${esc(etich(c))} ${esc(c.cliente||"")}${c.permuta?" · <b>Permuta</b>":""}${c.venditore?` · ${esc(c.venditore)}`:""}</span>`}));
   const is=(vedeImpegni()?impegniDel(iso,A.chi):[]).map(i=>({ord:i.tutto?"00":i.dalle||"98",html:`<span class="ach t-${esc(i.tipo||"altro")}" data-imp="${esc(i.id)}">${esc((i.nome||"").split(" ")[0])} ${esc(titoloImp(i)||"impegno")}</span>`}));
   return cs.concat(is).sort((a,b)=>a.ord.localeCompare(b.ord));
 }
