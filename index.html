@@ -1132,7 +1132,7 @@ function renderUsato(){
   const es=espoSet(),all=[...U.docs.values()].filter(u=>!u.deleted&&!inEspo(u,es));
   // Venditori e product expert vedono per primi i filtri che servono a loro (e partono da «Disponibili alla vendita»).
   const vend=ha("venditore","productexpert");if(vend&&!U.partito){U.partito=true;U.stato="vendita";}
-  const chU=[[null,"Da lavorare"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`]),["vendita",`Disponibili alla vendita · ${all.filter(inVendita).length}`]];
+  const chU=[[null,"Tutte"],...STATI_U.map(([k,l])=>[k,`${l} · ${all.filter(u=>u.stato===k).length}`]),["vendita",`Disponibili alla vendita · ${all.filter(inVendita).length}`]];
   const primi=vend?["vendita","commerciante"]:[];
   chipRow($("uStato"),chU.filter(c=>primi.includes(c[0])).sort((a,b)=>primi.indexOf(a[0])-primi.indexOf(b[0])).concat(chU.filter(c=>!primi.includes(c[0]))),U.stato,v=>{U.stato=v;renderUsato();});
   const pub=all.filter(u=>giorniTot(u)!=null),media=pub.length?Math.round(pub.reduce((a,u)=>a+giorniTot(u),0)/pub.length):null;
