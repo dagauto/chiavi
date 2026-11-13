@@ -1,8 +1,8 @@
 rules_version = '2';
 // Regole di sicurezza del registro chiavi e della lavorazione usato Dag Auto.
 // Entra solo chi ha verificato la propria email ED è presente nell'elenco "utenti".
-// Ruoli: admin, backoffice, usato (responsabile usato), productexpert, venditore, movimentatore, officina,
-// ripristini, preparatore, foto, operatore (solo chiavi).
+// Ruoli: admin, backoffice, usato (responsabile usato), productexpert, venditore, preparatore, officina,
+// ripristini, magazzino, foto, operatore (solo chiavi).
 // Il carico fiscale (usato_riservato) lo vedono solo admin, backoffice e usato.
 // Lo storico movimenti si può solo aggiungere: nessuno può modificarlo o cancellarlo.
 service cloud.firestore {
@@ -43,34 +43,55 @@ service cloud.firestore {
     function cambia() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
+    // Accessori da ordinare: la data della consegna si può fissare solo se arrivati, se il magazzino li ha ordinati
+    // (dal giorno dopo l'arrivo previsto) o se back office / product expert hanno segnato ricambi non disponibili.
+    function ordineInAttesaConData() {
+      return request.resource.data.get("ordineDa", false) == true && request.resource.data.get("ordineArrivati", false) != true
+        && request.resource.data.get("ordineMancante", false) != true
+        && request.resource.data.get("data", "") != ""
+        && !(request.resource.data.get("ordineOrdinato", false) == true && request.resource.data.get("ordinePrevisto", "") != ""
+             && request.resource.data.get("data", "") > request.resource.data.get("ordinePrevisto", ""));
+    }
+    // Lo stimato dei ripristini lo cambia solo la gestione: officina e ripristini scrivono solo l'effettivo.
+    function stimatoUguale(k) {
+      return request.resource.data.get("voci", {}).get(k, {}).get("stimato", "") == resource.data.get("voci", {}).get(k, {}).get("stimato", "");
+    }
+    function stimatiInvariati() {
+      return stimatoUguale("carrozzeria") && stimatoUguale("manutenzione") && stimatoUguale("freni") && stimatoUguale("pneumatici")
+        && stimatoUguale("meccanica") && stimatoUguale("cristalli") && stimatoUguale("illuminazione") && stimatoUguale("interni") && stimatoUguale("altro");
+    }
     function statoIn(l) {
       return request.resource.data.get("stato", "") == resource.data.get("stato", "") || request.resource.data.get("stato", "") in l;
     }
 
-    // Tutti inseriscono vetture e lavorano sulle chiavi. Liberare il numero (vettura uscita): solo gestione e venditori.
+    // Tutti inseriscono vetture, lavorano sulle chiavi e liberano il numero quando la vettura esce.
     // Venditori e product expert su una vettura presente possono solo spostarla.
     match /chiavi/{id} {
       allow read: if autorizzato();
       allow create: if autorizzato() && chiaveValida();
       allow update: if autorizzato() && chiaveValida()
-        && (vuota(resource.data) || !vuota(request.resource.data) || ruolo() in ["admin", "backoffice", "usato", "venditore", "productexpert"])
         && (!(ruolo() in ["venditore", "productexpert", "bdc"]) || vuota(resource.data) || vuota(request.resource.data)
-            || cambia().hasOnly(["dovePrima", "prima", "noleggioDal", "noleggioCliente", "ripristino", "ripristinoTipo", "ripristinoDove", "ripristinoDal", "updatedAt", "updatedBy"]));
+            || cambia().hasOnly(["dovePrima", "prima", "noleggioDal", "noleggioCliente", "allestimentoDal", "ripristino", "ripristinoTipo", "ripristinoDove", "ripristinoDal", "updatedAt", "updatedBy"]));
       allow delete: if admin();
     }
 
     match /usato/{id} {
       allow read: if lavoraUsato();
-      allow create: if vedeFiscale() && request.resource.data.updatedBy == emailUtente();
+      // Creazione: la gestione; chiunque altro solo se mette «In ripristino» dalle chiavi una rossa senza scheda: solo stato «attesa», senza prezzi né dati fiscali.
+      allow create: if request.resource.data.updatedBy == emailUtente()
+        && (vedeFiscale()
+          || (autorizzato() && request.resource.data.get("stato", "") == "attesa" && request.resource.data.get("note", "") == "Entrata da chiavi"
+              && !request.resource.data.keys().hasAny(["prezzoVendita", "margine", "ivaEsposta", "valoreContratto"])));
       // Gestione: tutto. Officina e ripristini: voci e stati «in ripristino» / «pronta».
       // Movimentatore, foto, venditori: solo lo stato, ognuno i suoi.
       allow update: if lavoraUsato() && request.resource.data.updatedBy == emailUtente()
         && (gestione()
-          || (ruolo() in ["officina", "ripristini"] && statoIn(["ripristino", "pronta"]))
+          || (ruolo() in ["officina", "ripristini"] && statoIn(["ripristino", "pronta"]) && !cambia().hasAny(["prezzoVendita", "margine", "ivaEsposta"]) && stimatiInvariati() && (ruolo() == "officina" || !cambia().hasAny(["wip"])))
+          || (ruolo() == "officina" && resource.data.get("stato", "") == "attesa" && statoIn(["attesa"]) && !cambia().hasAny(["prezzoVendita", "margine", "ivaEsposta"]) && stimatiInvariati())
           || (cambia().hasOnly(["stato", "date", "updatedAt", "updatedBy"])
-              && ((ruolo() == "movimentatore" && statoIn(["ripristino", "pronta", "foto"]))
+              && ((ruolo() == "preparatore" && statoIn(["ripristino", "pronta", "foto"]))
                 || (ruolo() == "foto" && statoIn(["foto"]))
-                || (ruolo() in ["venditore", "productexpert"] && statoIn(["pubblicata"])))));
+                || (ruolo() in ["venditore", "productexpert"] && statoIn(["foto", "pubblicata"])))));
       allow delete: if admin();
     }
 
@@ -81,25 +102,39 @@ service cloud.firestore {
 
     match /consegne/{id} {
       allow read: if lavoraUsato();
-      allow create: if gestione() && request.resource.data.updatedBy == emailUtente();
-      allow update: if lavoraUsato() && request.resource.data.updatedBy == emailUtente();
+      allow create: if gestione() && request.resource.data.updatedBy == emailUtente() && !ordineInAttesaConData();
+      // Cliente, vettura e accessori scelti li cambia solo la gestione; data e ora anche il product expert.
+      // Accessori da ordinare: li segna la gestione, «arrivati» il magazzino; finché non arrivano non si fissa la data.
+      allow update: if lavoraUsato() && request.resource.data.updatedBy == emailUtente()
+        && (gestione() || !cambia().hasAny(["cliente", "consegnatario", "venditore", "tipo", "colore", "numero", "telaio", "targa", "ordineDa", "ordineDettagli"]))
+        && (gestione() || ruolo() == "magazzino" || !cambia().hasAny(["ordineArrivati", "ordineArrivatiDa", "ordineArrivatiIl", "ordineOrdinato", "ordinePrevisto", "ordineNonDisp"]))
+        && (gestione() || ruolo() == "productexpert" || !cambia().hasAny(["ordineMancante", "ordineMancanteDa", "ordineMancanteIl"]))
+        && (gestione() || ruolo() == "productexpert" || !cambia().hasAny(["data", "ora", "consegnaDa"]))
+        && (gestione() || ruolo() == "officina" || !cambia().hasAny(["wip"]))
+        && !(ordineInAttesaConData() && cambia().hasAny(["data", "ora"]));
       allow delete: if admin();
     }
 
-    // Impegni / appuntamenti: li vedono gestione e venditori; li scrivono il product expert (i suoi) e la gestione.
+    // Impegni / appuntamenti: li vedono gestione e venditori; ogni venditore scrive i suoi, la gestione tutti.
     match /impegni/{id} {
       allow read: if autorizzato() && ruolo() in ["admin", "backoffice", "usato", "venditore", "productexpert", "bdc"];
       allow create: if autorizzato() && request.resource.data.updatedBy == emailUtente()
-        && ((ruolo() == "productexpert" && request.resource.data.email == emailUtente()) || gestione());
+        && ((ruolo() in ["productexpert", "venditore"] && request.resource.data.email == emailUtente()) || gestione());
       allow update: if autorizzato() && request.resource.data.updatedBy == emailUtente()
-        && ((ruolo() == "productexpert" && resource.data.email == emailUtente() && request.resource.data.email == emailUtente()) || gestione());
-      allow delete: if autorizzato() && ((ruolo() == "productexpert" && resource.data.email == emailUtente()) || gestione());
+        && ((ruolo() in ["productexpert", "venditore"] && resource.data.email == emailUtente() && request.resource.data.email == emailUtente()) || gestione());
+      allow delete: if autorizzato() && ((ruolo() in ["productexpert", "venditore"] && resource.data.email == emailUtente()) || gestione());
     }
 
+    // Storico: si scrive quando una vettura esce. Se la consegna era stata segnata «consegnata» per errore,
+    // chi la riapre (gestione, venditori, product expert) toglie anche la sua uscita dallo storico, nella stessa operazione.
     match /storico/{id} {
       allow read: if gestione();
       allow create: if autorizzato();
-      allow update, delete: if admin();
+      allow update: if admin();
+      allow delete: if admin()
+        || (autorizzato() && ruolo() in ["admin", "backoffice", "usato", "venditore", "productexpert"]
+            && resource.data.get("consegnaId", "") != ""
+            && getAfter(/databases/$(database)/documents/consegne/$(resource.data.consegnaId)).data.get("stato", "") != "consegnata");
     }
 
     match /notifiche_coda/{id} {

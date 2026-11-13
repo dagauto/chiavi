@@ -1667,7 +1667,7 @@ function openConsegna(id){
     <label class="f">Note<textarea id="c_note" rows="2" ${edAll||prepOk||appOk?"":"disabled"}>${esc(f.note||"")}</textarea></label>
     <div id="e_err"></div>
     <div class="pfoot"><div class="r" style="margin-left:0;flex-wrap:wrap">${nuovo?"":`<button type="button" id="c_print">Stampa verbale</button><button type="button" id="c_ics">Aggiungi al calendario</button>`}</div>
-      <div class="r">${!nuovo&&f.stato!=="consegnata"&&canConsegnata()?`<button type="button" class="danger" id="c_done">Consegnata</button>`:""}<button type="button" id="c_close">Chiudi</button>${edAll||prepOk||appOk||canMagazzino()?`<button type="submit" class="primary" id="e_save">${nuovo?"Crea consegna":"Salva"}</button>`:""}</div></div>
+      <div class="r">${!nuovo&&f.stato!=="consegnata"&&canConsegnata()?`<button type="button" class="danger" id="c_done">Consegnata</button>`:""}${!nuovo&&f.stato==="consegnata"&&canConsegnata()?`<button type="button" id="c_riapri">Riapri: non è ancora consegnata</button>`:""}<button type="button" id="c_close">Chiudi</button>${edAll||prepOk||appOk||canMagazzino()?`<button type="submit" class="primary" id="e_save">${nuovo?"Crea consegna":"Salva"}</button>`:""}</div></div>
     ${!nuovo&&edAll&&f.stato!=="consegnata"?`<div style="text-align:right"><button type="button" class="link" id="c_annulla">Annulla questa consegna</button></div>`:""}
   </form>`);
   $("c_close").onclick=closeSheet;
@@ -1770,17 +1770,50 @@ function openConsegna(id){
   const dn=$("c_done");if(dn)dn.onclick=()=>{
     if(!dn.dataset.armed){dn.dataset.armed="1";dn.classList.add("solid");dn.textContent="Conferma consegna";
       const tp=$("c_tipo")?$("c_tipo").value:f.tipo;
-      $("e_err").innerHTML=tp==="noleggio"?`<div class="banner">Noleggio breve: alla conferma la prima chiave risulta «${FUORI}» e il numero ${esc(etich(f))} resta occupato.</div>`:`<div class="banner">Alla conferma il numero ${esc(etich(f))} si libera nel registro chiavi.</div>`;return;}
+      $("e_err").innerHTML=tp==="noleggio"?`<div class="banner">Noleggio breve: alla conferma la prima chiave risulta «${FUORI}» e il numero ${esc(etich(f))} resta occupato.</div>`:`<div class="banner">Alla conferma il numero ${esc(etich(f))} si libera nel registro chiavi.</div>`;
+      // Errore tipico: premere «Consegnata» invece di «Salva» dopo aver scritto l'appuntamento.
+      {const dv=$("c_data").value,ov=$("c_ora").value;const nonSalvato=dv!==(base.data||"")||ov!==(base.ora||"");
+        const avv=nonSalvato?`Hai cambiato data o ora senza salvare: se volevi solo fissare l'appuntamento premi «Salva», non «Conferma consegna».`
+          :!base.data?`L'appuntamento di consegna non è ancora fissato.`:base.data>oggi()?`L'appuntamento è fissato per il ${dIt(base.data)}: la vettura non dovrebbe essere ancora consegnata.`:"";
+        if(avv)$("e_err").innerHTML+=`<div class="banner bad">Attenzione: ${esc(avv)}</div>`;}
+      return;}
     leggi();f.stato="consegnata";f.date.consegnata=oggi();
     const w=[{col:"consegne",id,data:f}],logs=[{codice:etich(f),azione:"Consegnata",dettaglio:[f.cliente,f.targa].filter(Boolean).join(" · ")}];
     const s=slot(f.colore,f.numero);
     if((f.tipo==="vendita"||f.tipo==="lungo")&&occupato(s)&&(!f.telaio||norm(s.telaio)===norm(f.telaio))){
-      const snap=Object.assign({},s);delete snap._has;delete snap.id;snap.uscita=oggi();snap.motivoUscita=`Consegnata a ${f.cliente||"cliente"}`;snap.refs=[norm(s.targa||f.targa),norm(s.telaio||f.telaio)].filter(Boolean);
-      w.push({col:"chiavi",id:s.id,data:{colore:f.colore,numero:f.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:`${s.id}-${Date.now().toString(36)}`,data:snap});
+      const snap=Object.assign({},s);delete snap._has;delete snap.id;snap.uscita=oggi();snap.motivoUscita=`Consegnata a ${f.cliente||"cliente"}`;snap.refs=[norm(s.targa||f.targa),norm(s.telaio||f.telaio)].filter(Boolean);snap.consegnaId=id;
+      const sid=`${s.id}-${Date.now().toString(36)}`;
+      // Copia della chiave com'era: serve a «Riapri» per rimetterla al suo posto se la consegna è stata segnata per errore.
+      {const k=Object.assign({},s);delete k._has;delete k.id;delete k.updatedAt;delete k.updatedBy;f.uscitaChiave={storicoId:sid,chiave:k};}
+      w.push({col:"chiavi",id:s.id,data:{colore:f.colore,numero:f.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:sid,data:snap});
       logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Numero liberato",dettaglio:`consegnata a ${f.cliente||"cliente"}`});}
-    else if(f.tipo==="noleggio"&&occupato(s)){w.push({col:"chiavi",id:s.id,merge:true,data:{colore:f.colore,numero:f.numero,prima:"Sì",dovePrima:FUORI,noleggioDal:oggi(),noleggioCliente:f.cliente||""}});
+    else if(f.tipo==="noleggio"&&occupato(s)){f.uscitaChiave={noleggio:true,prima:s.prima||"",dovePrima:s.dovePrima||"",noleggioDal:s.noleggioDal||"",noleggioCliente:s.noleggioCliente||""};
+      w.push({col:"chiavi",id:s.id,merge:true,data:{colore:f.colore,numero:f.numero,prima:"Sì",dovePrima:FUORI,noleggioDal:oggi(),noleggioCliente:f.cliente||""}});
       logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Uscita a noleggio breve",dettaglio:`prima chiave con ${f.cliente||"il cliente"}, seconda in cassaforte`});}
     salvaC(w,logs,"Consegna registrata.");
+  };
+  // «Riapri»: consegna segnata per errore. Torna aperta e la chiave torna nel registro com'era.
+  const ri=$("c_riapri");if(ri)ri.onclick=()=>{
+    if(!ri.dataset.armed){ri.dataset.armed="1";ri.classList.add("solid");ri.textContent="Conferma: riapri la consegna";
+      $("e_err").innerHTML=`<div class="banner">La consegna torna aperta${f.tipo==="noleggio"?" e la prima chiave torna dov'era prima del noleggio":` e la vettura torna nel registro chiavi al numero ${esc(etich(f))}`}.</div>`;return;}
+    leggi();const u=f.uscitaChiave;delete f.uscitaChiave;
+    f.stato=f.data?"fissata":"richiesta";delete f.date.consegnata;f.date.riaperta=oggi();
+    const w=[{col:"consegne",id,data:f}],logs=[{codice:etich(f),azione:"Consegna riaperta",dettaglio:`${f.cliente||"cliente"}: era segnata consegnata per errore`}];
+    const s=slot(f.colore,f.numero);let msg="Consegna riaperta.";
+    if(f.tipo==="noleggio"){
+      if(u&&u.noleggio&&occupato(s)){w.push({col:"chiavi",id:s.id,merge:true,data:{colore:f.colore,numero:f.numero,prima:u.prima,dovePrima:u.dovePrima,noleggioDal:u.noleggioDal,noleggioCliente:u.noleggioCliente}});
+        logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Rientro da noleggio",dettaglio:"consegna riaperta: noleggio non iniziato"});}
+      else msg="Consegna riaperta. Controlla nel registro dove sta la prima chiave.";}
+    else if(occupato(s)){
+      if(f.telaio&&norm(s.telaio)!==norm(f.telaio)){$("e_err").innerHTML=`<div class="banner bad">Il numero ${esc(etich(f))} nel registro chiavi è già occupato da un'altra vettura (${esc([s.modello,s.targa||s.telaio].filter(Boolean).join(" · "))}): non posso rimettere qui la chiave. Chiedi al back office.</div>`;return;}}
+    else{
+      const k=u&&u.chiave?Object.assign({},u.chiave):{telaio:f.telaio||"",targa:f.targa||"",modello:f.modello||"",prima:"Sì",dovePrima:"",seconda:"Sì",motivo:"",note:""};
+      k.colore=f.colore;k.numero=f.numero;k.controllatoDa=S.me.nome;k.dataControllo=oggi();
+      w.push({col:"chiavi",id:s.id,data:k});
+      if(u&&u.storicoId)w.push({col:"storico",id:u.storicoId,del:true});
+      logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Chiave rimessa nel registro",dettaglio:`consegna a ${f.cliente||"cliente"} riaperta`});
+      if(!(u&&u.chiave))msg="Consegna riaperta e chiave rimessa nel registro: indica dove sta la prima chiave.";}
+    salvaC(w,logs,msg);
   };
 }
 $("cList").addEventListener("click",e=>{const im=e.target.closest("[data-imp]");if(im){openImpegno(im.dataset.imp);return;}const b=e.target.closest("[data-c]");if(b)openConsegna(b.dataset.c);});
