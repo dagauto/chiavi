@@ -124,10 +124,10 @@ service cloud.firestore {
     match /impegni/{id} {
       allow read: if autorizzato() && ruolo() in ["admin", "backoffice", "usato", "venditore", "productexpert", "bdc"];
       allow create: if autorizzato() && request.resource.data.updatedBy == emailUtente()
-        && ((ruolo() in ["productexpert", "venditore"] && request.resource.data.email == emailUtente()) || gestione());
+        && ((ruolo() in ["productexpert", "venditore"] && request.resource.data.email == emailUtente()) || gestione() || (autorizzato() && ruolo() == "bdc"));
       allow update: if autorizzato() && request.resource.data.updatedBy == emailUtente()
-        && ((ruolo() in ["productexpert", "venditore"] && resource.data.email == emailUtente() && request.resource.data.email == emailUtente()) || gestione());
-      allow delete: if autorizzato() && ((ruolo() in ["productexpert", "venditore"] && resource.data.email == emailUtente()) || gestione());
+        && ((ruolo() in ["productexpert", "venditore"] && resource.data.email == emailUtente() && request.resource.data.email == emailUtente()) || gestione() || (autorizzato() && ruolo() == "bdc"));
+      allow delete: if autorizzato() && ((ruolo() in ["productexpert", "venditore"] && resource.data.email == emailUtente()) || gestione() || (autorizzato() && ruolo() == "bdc"));
     }
 
     // Storico: si scrive quando una vettura esce. Se la consegna era stata segnata «consegnata» per errore,
@@ -141,6 +141,70 @@ service cloud.firestore {
             && resource.data.get("consegnaId", "") != ""
             && getAfter(/databases/$(database)/documents/consegne/$(resource.data.consegnaId)).data.get("stato", "") != "consegnata");
     }
+
+    // ===== Dag Auto Lead (dagauto-lead.web.app) =====
+    // Solo collezioni nuove di Lead: le regole di Dag Auto Vetture qui sopra restano come sono.
+    // Lead legge chiavi/consegne/impegni/utenti con le regole di Vetture e non scrive nelle collezioni di Vetture.
+    function bdc() {
+      return autorizzato() && ruolo() in ["admin", "backoffice", "usato", "bdc"];
+    }
+    function venditoreLead() {
+      return autorizzato() && ruolo() in ["venditore", "productexpert"];
+    }
+    function serviceLead() {
+      return autorizzato() && ruolo() in ["admin", "backoffice", "usato", "bdc", "officina"];
+    }
+    // Magazzino, ripristini e preparatori (movimentatori) vedono l'agenda officina; il magazzino aggiorna i ricambi.
+    function magazzino() {
+      return autorizzato() && ruolo() == "magazzino";
+    }
+    function agendaOfficina() {
+      return autorizzato() && ruolo() in ["magazzino", "ripristini", "preparatore", "movimentatore"];
+    }
+    // Lead vendita: BDC e gestione tutto; il venditore vede e aggiorna solo i lead assegnati a lui e può crearne di suoi.
+    match /lead/{id} {
+      allow read: if bdc() || (venditoreLead() && resource.data.get("consulenteEmail", "") == emailUtente());
+      allow create: if request.resource.data.updatedBy == emailUtente()
+        && (bdc() || (venditoreLead() && request.resource.data.consulenteEmail == emailUtente()));
+      allow update: if request.resource.data.updatedBy == emailUtente()
+        && (bdc() || (venditoreLead() && resource.data.get("consulenteEmail", "") == emailUtente()));
+      allow delete: if admin();
+    }
+    match /lead_service/{id} {
+      allow read: if serviceLead();
+      allow create, update: if serviceLead() && request.resource.data.updatedBy == emailUtente();
+      allow delete: if admin();
+    }
+    match /officina_app/{id} {
+      allow read: if serviceLead() || agendaOfficina();
+      allow create: if serviceLead() && request.resource.data.updatedBy == emailUtente();
+      allow update: if (serviceLead() || magazzino()) && request.resource.data.updatedBy == emailUtente();
+      allow delete: if gestione();
+    }
+    // Turni settimanali dei meccanici (un documento per settimana, id = lunedì): li gestisce l'officina.
+    match /officina_turni/{id} {
+      allow read: if serviceLead() || agendaOfficina();
+      allow create, update: if serviceLead() && request.resource.data.updatedBy == emailUtente();
+      allow delete: if gestione();
+    }
+    // Clienti in salone: li registra la BDC (o il venditore), il venditore li prende in carico e registra l'uscita.
+    match /salone/{id} {
+      allow read: if bdc() || venditoreLead();
+      allow create, update: if (bdc() || venditoreLead()) && request.resource.data.updatedBy == emailUtente();
+      allow delete: if gestione();
+    }
+    // Registro di Dag Auto Lead (es. esportazioni in Excel): si può solo aggiungere, a proprio nome; lo legge la gestione.
+    match /lead_registro/{id} {
+      allow create: if bdc() && request.resource.data.email == emailUtente() && request.resource.data.updatedBy == emailUtente();
+      allow read: if gestione();
+      allow update, delete: if false;
+    }
+    // Impostazioni di Lead (impostazioni/lead, impostazioni/notifiche_lead): le legge chi entra, le cambia la gestione.
+    match /impostazioni/{id} {
+      allow read: if autorizzato();
+      allow write: if gestione();
+    }
+    // ===== fine Dag Auto Lead =====
 
     match /notifiche_coda/{id} {
       allow create: if autorizzato() && request.resource.data.inviata == false;
