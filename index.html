@@ -1677,7 +1677,8 @@ function openConsegna(id){
     <div id="e_err"></div>
     <div class="pfoot"><div class="r" style="margin-left:0;flex-wrap:wrap">${nuovo?"":`<button type="button" id="c_print">Stampa verbale</button><button type="button" id="c_ics">Aggiungi al calendario</button>`}</div>
       <div class="r">${!nuovo&&f.stato!=="consegnata"&&canConsegnata()?`<button type="button" class="danger" id="c_done">Consegnata</button>`:""}${!nuovo&&f.stato==="consegnata"&&canConsegnata()?`<button type="button" id="c_riapri">Riapri: non è ancora consegnata</button>`:""}<button type="button" id="c_close">Chiudi</button>${edAll||prepOk||appOk||canMagazzino()?`<button type="submit" class="primary" id="e_save">${nuovo?"Crea consegna":"Salva"}</button>`:""}</div></div>
-    ${!nuovo&&edAll&&f.stato!=="consegnata"?`<div style="text-align:right"><button type="button" class="link" id="c_annulla">Annulla questa consegna</button></div>`:""}
+    ${!nuovo&&edAll&&!["consegnata","annullata"].includes(f.stato)?`<div style="text-align:right"><button type="button" class="link" id="c_annulla">Annulla questa consegna</button></div>`:""}
+    ${!nuovo&&edAll&&f.stato==="annullata"?`<div style="text-align:right"><button type="button" class="link" id="c_riattiva">Riattiva questa consegna</button></div>`:""}
   </form>`);
   $("c_close").onclick=closeSheet;
   // «Preconsegna fatta» spunta da sola tutte le voci della preparazione.
@@ -1688,15 +1689,24 @@ function openConsegna(id){
   $("c_omlist").addEventListener("click",e=>{const b=e.target.closest("[data-omdel]");if(b)b.closest(".omrow").remove();});
   const ra=$("c_rpadd");if(ra)ra.onclick=()=>{const d=document.createElement("div");d.innerHTML=rpRow({testo:"",fatto:false},"");const x=d.firstElementChild;$("c_rplist").appendChild(x);x.querySelector("input").focus();};
   $("c_rplist").addEventListener("click",e=>{const b=e.target.closest("[data-rpdel]");if(b)b.closest(".rprow").remove();});
+  // Targa e telaio riempiti dal registro: se cambia il numero si aggiornano (prima restava il telaio del numero
+  // a metà digitazione, es. «1» → telaio della BLU 1 anche scrivendo 18). Quelli scritti a mano non si toccano.
+  const auto={targa:"",telaio:""};
+  const riempi=(k,v)=>{const i=$("c_"+k);if(!nuovo)return;if(!i.value||i.value===auto[k]){i.value=v||"";auto[k]=v||"";}};
   const mostraVett=()=>{const n=parseInt($("c_numero").value,10),col=$("c_colore").value;const el=$("c_vett");
-    if(!(n>=1&&n<=100)){el.textContent="";return null;}const s=slot(col,n);
-    if(occupato(s)){el.innerHTML=`Dal registro chiavi: <b>${esc(s.modello||"modello non indicato")}</b> · ${esc(s.telaio||"telaio non indicato")}${s.targa?" · "+esc(s.targa):""}`;if(nuovo&&!$("c_targa").value&&s.targa)$("c_targa").value=s.targa;if(nuovo&&!$("c_telaio").value&&s.telaio)$("c_telaio").value=s.telaio;return s;}
+    if(!(n>=1&&n<=100)){el.textContent="";riempi("targa","");riempi("telaio","");return null;}const s=slot(col,n);
+    if(occupato(s)){el.innerHTML=`Dal registro chiavi: <b>${esc(s.modello||"modello non indicato")}</b> · ${esc(s.telaio||"telaio non indicato")}${s.targa?" · "+esc(s.targa):""}`;riempi("targa",s.targa);riempi("telaio",s.telaio);return s;}
+    riempi("targa","");riempi("telaio","");
     el.innerHTML=`<span style="color:var(--bad)">Il ${SING[col]} ${n} non risulta occupato nel registro chiavi: controlla il numero.</span>`;return null;};
+  // Il telaio della consegna deve essere quello della chiave nel registro (se entrambi indicati).
+  const telaioDiverso=()=>{if(["consegnata","annullata"].includes(f.stato)&&f.stato===base.stato)return"";const s=slot(f.colore,f.numero);
+    if(!occupato(s)||!s.telaio||!f.telaio||norm(s.telaio)===norm(f.telaio))return"";
+    return`<div class="banner bad">Il telaio scritto (${esc(f.telaio)}) non è quello della chiave ${esc(etich(f))} nel registro (${esc(s.telaio)}${s.modello?" · "+esc(s.modello):""}). Correggi il telaio; se è sbagliato il registro, correggi prima la chiave.</div>`;};
   if(nuovo){const cerca=$("c_cerca"),ris=$("c_ris");
     cerca.addEventListener("input",()=>{const q=cerca.value.toUpperCase().replace(/\s/g,"");if(q.length<3){ris.innerHTML=q?'<span class="small">Scrivi almeno 3 caratteri.</span>':"";return;}
       const hit=slots().filter(x=>occupato(x)&&((x.targa||"").includes(q)||(x.telaio||"").includes(q))).slice(0,8);
       ris.innerHTML=hit.length?hit.map(x=>`<button type="button" data-pick="${x.colore}|${x.numero}">${esc(SING[x.colore]+" "+x.numero)} · ${esc(x.targa||"senza targa")} · ${esc((x.telaio||"").slice(-8))} ${esc(x.modello||"")}</button>`).join(""):'<span class="small" style="color:var(--bad)">Nessuna vettura nel registro chiavi con questa targa o telaio.</span>';});
-    ris.addEventListener("click",e=>{const b=e.target.closest("[data-pick]");if(!b)return;const[col,n]=b.dataset.pick.split("|");$("c_colore").value=col;$("c_numero").value=n;$("c_targa").value="";$("c_telaio").value="";mostraVett();ris.innerHTML="";cerca.value="";});
+    ris.addEventListener("click",e=>{const b=e.target.closest("[data-pick]");if(!b)return;const[col,n]=b.dataset.pick.split("|");$("c_colore").value=col;$("c_numero").value=n;$("c_targa").value="";$("c_telaio").value="";auto.targa="";auto.telaio="";mostraVett();ris.innerHTML="";cerca.value="";});
     setTimeout(()=>cerca.focus(),50);}
   $("c_numero").addEventListener("input",mostraVett);$("c_colore").addEventListener("change",mostraVett);mostraVett();
   const avvData=()=>{const d=$("c_data").value,o=$("c_ora").value||"09:00";const w=$("c_dwarn");if(!d){w.innerHTML="";return;}const h=oreLavorative(Date.now(),new Date(`${d}T${o}:00`).getTime());
@@ -1736,6 +1746,7 @@ function openConsegna(id){
   };
   const cid=()=>id||`${f.colore}-${String(f.numero).padStart(3,"0")}-${Date.now().toString(36)}`;
   p.onsubmit=e=>{e.preventDefault();leggi();
+    {const td=telaioDiverso();if(td){$("e_err").innerHTML=td;return;}}
     if(f.ordineOrdinato&&!f.ordinePrevisto){$("e_err").innerHTML=`<div class="banner bad">Indica la data di arrivo prevista degli accessori ordinati.</div>`;return;}
     {const so=statoOrdine(f),cambiata=f.data&&(f.data!==(base.data||"")||f.ora!==(base.ora||""));
       if(cambiata&&so==="nondisp"){$("e_err").innerHTML=`<div class="banner bad">Ricambi non disponibili, senza previsione di arrivo: la consegna non si può ancora fissare.</div>`;return;}
@@ -1776,6 +1787,13 @@ function openConsegna(id){
   const ic=$("c_ics");if(ic)ic.onclick=()=>{leggi();const t=icsDi(f);if(!t){$("e_err").innerHTML=`<div class="banner">Prima fissa data e ora.</div>`;return;}
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/calendar"}));a.download=`Consegna_${etich(f)}.ics`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);};
   const an=$("c_annulla");if(an)an.onclick=()=>{if(!an.dataset.armed){an.dataset.armed="1";an.textContent="Conferma: annulla la consegna";return;}leggi();f.stato="annullata";f.date.annullata=oggi();salvaC([{col:"consegne",id,data:f}],[{codice:etich(f),azione:"Consegna annullata",dettaglio:f.cliente||""}],"Consegna annullata.");};
+  // Consegna annullata per errore: torna aperta (richiesta o fissata), con i dati corretti nella scheda.
+  const ra2=$("c_riattiva");if(ra2)ra2.onclick=()=>{if(!ra2.dataset.armed){ra2.dataset.armed="1";ra2.textContent="Conferma: riattiva la consegna";return;}
+    leggi();f.stato=f.data?"fissata":"richiesta";delete f.date.annullata;f.date.riattivata=oggi();
+    {const td=telaioDiverso();if(td){$("e_err").innerHTML=td;f.stato="annullata";return;}}
+    const altra=[...C.docs.entries()].find(([i,c])=>i!==id&&c.colore===f.colore&&c.numero===f.numero&&!["consegnata","annullata"].includes(c.stato));
+    if(altra){$("e_err").innerHTML=`<div class="banner bad">Per la chiave ${esc(etich(f))} c'è già un'altra consegna aperta (${esc(altra[1].cliente||"")}).</div>`;f.stato="annullata";return;}
+    salvaC([{col:"consegne",id,data:f}],[{codice:etich(f),azione:"Consegna riattivata",dettaglio:f.cliente||""}],"Consegna riattivata.");};
   const dn=$("c_done");if(dn)dn.onclick=()=>{
     if(!dn.dataset.armed){dn.dataset.armed="1";dn.classList.add("solid");dn.textContent="Conferma consegna";
       const tp=$("c_tipo")?$("c_tipo").value:f.tipo;
