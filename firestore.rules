@@ -91,7 +91,12 @@ service cloud.firestore {
           || (cambia().hasOnly(["stato", "date", "updatedAt", "updatedBy"])
               && ((ruolo() == "preparatore" && statoIn(["ripristino", "pronta", "foto"]))
                 || (ruolo() == "foto" && statoIn(["foto"]))
-                || (ruolo() in ["venditore", "productexpert"] && statoIn(["foto", "pubblicata"])))));
+                || (ruolo() in ["venditore", "productexpert"] && statoIn(["foto", "pubblicata"]))))
+          // Vettura uscita dal registro chiavi (o consegnata): chiunque la libera toglie la scheda dalla tab Usato;
+          // se la consegna viene riaperta la scheda torna. Solo questi campi, nient'altro.
+          || (cambia().hasOnly(["deleted", "deletedAt", "deletedBy", "uscita", "motivoUscita", "updatedAt", "updatedBy"])
+              && ((request.resource.data.deleted == true && request.resource.data.get("uscita", "") != "")
+                || (resource.data.get("uscita", "") != "" && request.resource.data.deleted == false && request.resource.data.get("uscita", "") == ""))));
       allow delete: if admin();
     }
 

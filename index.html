@@ -777,8 +777,11 @@ function openEditor(id,assegna){
     {const w=cambiataDaAltri(base,S.docs.get(base.id));if(w){$("e_err").innerHTML=w;return;}}
     if(!out.dataset.armed){out.dataset.armed="1";out.classList.add("solid");out.textContent="Conferma: la vettura è uscita";return;}
     const snap=Object.assign({},base);delete snap._has;delete snap.id;snap.uscita=oggi();snap.motivoUscita=`Auto uscita, liberata da ${S.me.nome}`;snap.refs=[norm(base.targa),norm(base.telaio)].filter(Boolean);
-    salva([{id:base.id,data:{colore:base.colore,numero:base.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:`${base.id}-${Date.now().toString(36)}`,data:snap}],
-      [{codice:codice(base),azione:"Numero liberato",dettaglio:`uscita ${base.targa||base.telaio||""}`.trim()}],`${SING[base.colore]} ${base.numero} liberato.`);
+    const logs=[{codice:codice(base),azione:"Numero liberato",dettaglio:`uscita ${base.targa||base.telaio||""}`.trim()}];
+    // La vettura è uscita: sparisce anche dalla tab Usato (la scheda resta recuperabile dall'Archivio).
+    const us=uscitaUsato(base,snap.motivoUscita);if(us)logs.push(us.log);
+    salva([{id:base.id,data:{colore:base.colore,numero:base.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:`${base.id}-${Date.now().toString(36)}`,data:snap},...(us?[us.write]:[])],
+      logs,`${SING[base.colore]} ${base.numero} liberato${us?", tolta anche dalla tab Usato":""}.`);
   };
   ed.onsubmit=e=>{e.preventDefault();
     {const w=cambiataDaAltri(base,S.docs.get(base.id));if(w){$("e_err").innerHTML=w;return;}}
@@ -1520,6 +1523,12 @@ function scadData(s){s=String(s||"").trim();let m;
   if((m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/))){let y=+m[3];if(y<100)y+=2000;return`${y}-${String(m[2]).padStart(2,"0")}-${String(m[1]).padStart(2,"0")}`;}
   if((m=s.match(/^(\d{1,2})[\/.\-](\d{4})$/))){const y=+m[2],mo=+m[1];return`${y}-${String(mo).padStart(2,"0")}-${String(new Date(y,mo,0).getDate()).padStart(2,"0")}`;}
   return"";}
+// Scheda usato attiva della vettura (stessa targa o telaio): [id, scheda] oppure null.
+function schedaUsatoDi(c){const t=norm(c.targa),v=norm(c.telaio);if(!t&&!v)return null;for(const[id,u]of U.docs.entries()){if(u.deleted)continue;if((t&&norm(u.targa)===t)||(v&&norm(u.telaio)===v))return[id,u];}return null;}
+// Vettura uscita (chiavi liberate o consegnata): toglie la scheda dalla tab Usato. Chi non vede l'usato non la tocca.
+function uscitaUsato(c,motivo){if(!canUsato())return null;const su=schedaUsatoDi(c);if(!su)return null;const[id,u]=su;
+  return{id,write:{col:"usato",id,merge:true,data:{deleted:true,deletedAt:oggi(),deletedBy:S.me.nome,uscita:oggi(),motivoUscita:motivo}},
+    log:{codice:u.targa||id,azione:"Uscita anche dalla tab Usato",dettaglio:`${NOME_STATO[u.stato]||u.stato||""} · recuperabile da Archivio`}};}
 function usatoDi(c){const t=norm(c.targa),v=norm(c.telaio);if(!t&&!v)return null;for(const u of U.docs.values()){if(u.deleted)continue;if((t&&norm(u.targa)===t)||(v&&norm(u.telaio)===v))return u;}return null;}
 // Scaduto alla data di consegna = rosso; in scadenza entro 30 giorni dalla consegna = giallo.
 function scadenzeC(c){if(c.stato==="consegnata"||c.stato==="annullata")return[];const u=usatoDi(c);if(!u)return[];const rif=c.data||oggi();
@@ -1785,6 +1794,7 @@ function openConsegna(id){
       const sid=`${s.id}-${Date.now().toString(36)}`;
       // Copia della chiave com'era: serve a «Riapri» per rimetterla al suo posto se la consegna è stata segnata per errore.
       {const k=Object.assign({},s);delete k._has;delete k.id;delete k.updatedAt;delete k.updatedBy;f.uscitaChiave={storicoId:sid,chiave:k};}
+      {const us=uscitaUsato(Object.assign({},f,{targa:s.targa||f.targa,telaio:s.telaio||f.telaio}),snap.motivoUscita);if(us){w.push(us.write);logs.push(us.log);f.uscitaChiave.usatoId=us.id;}}
       w.push({col:"chiavi",id:s.id,data:{colore:f.colore,numero:f.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:sid,data:snap});
       logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Numero liberato",dettaglio:`consegnata a ${f.cliente||"cliente"}`});}
     else if(f.tipo==="noleggio"&&occupato(s)){f.uscitaChiave={noleggio:true,prima:s.prima||"",dovePrima:s.dovePrima||"",noleggioDal:s.noleggioDal||"",noleggioCliente:s.noleggioCliente||""};
@@ -1811,6 +1821,7 @@ function openConsegna(id){
       k.colore=f.colore;k.numero=f.numero;k.controllatoDa=S.me.nome;k.dataControllo=oggi();
       w.push({col:"chiavi",id:s.id,data:k});
       if(u&&u.storicoId)w.push({col:"storico",id:u.storicoId,del:true});
+      if(u&&u.usatoId&&canUsato()){w.push({col:"usato",id:u.usatoId,merge:true,data:{deleted:false,deletedAt:"",deletedBy:"",uscita:"",motivoUscita:""}});logs.push({codice:f.targa||u.usatoId,azione:"Tornata nella tab Usato",dettaglio:"consegna riaperta"});}
       logs.push({codice:`${LETT[f.colore]}.${f.numero}`,azione:"Chiave rimessa nel registro",dettaglio:`consegna a ${f.cliente||"cliente"} riaperta`});
       if(!(u&&u.chiave))msg="Consegna riaperta e chiave rimessa nel registro: indica dove sta la prima chiave.";}
     salvaC(w,logs,msg);
@@ -1887,7 +1898,7 @@ async function cercaArchivio(){
   st=uniq(st,x=>x._id||JSON.stringify(x));mv=uniq(mv,x=>x._id||(x.ts+x.azione)).sort((a,b)=>b.ts-a.ts);
   let h="";
   if(ora.length)h+=`<h3 class="ugrp">Ora nel registro chiavi</h3>`+ora.map(card).join("");
-  if(us.length)h+=`<h3 class="ugrp">Lavorazione usato</h3>`+us.map(([id,u])=>{const t=totali(u);return`<div class="card" style="grid-template-columns:1fr"><span><b>${esc(u.targa||"")}</b> · ${esc(u.modello||"")} · ${esc(NOME_STATO[u.stato]||"")}${u.deleted?` · <span style="color:var(--bad)">eliminata il ${esc(u.deletedAt||"")}</span>`:""}</span>
+  if(us.length)h+=`<h3 class="ugrp">Lavorazione usato</h3>`+us.map(([id,u])=>{const t=totali(u);return`<div class="card" style="grid-template-columns:1fr"><span><b>${esc(u.targa||"")}</b> · ${esc(u.modello||"")} · ${esc(NOME_STATO[u.stato]||"")}${u.deleted?(u.uscita?` · <span style="color:var(--bad)">uscita il ${esc(dIt(u.uscita))}</span>`:` · <span style="color:var(--bad)">eliminata il ${esc(u.deletedAt||"")}</span>`):""}</span>
     <span class="uinfo">${STATI_U.filter(([k])=>(u.date||{})[k]).map(([k,l])=>`${l}: ${new Date(u.date[k]).toLocaleDateString("it-IT")}`).join(" · ")}</span>
     <span class="uinfo">Ripristini stimati ${euro(t.s)}${t.hasE?` · effettivi ${euro(t.e)}`:""}</span>
     <span class="keys">${u.deleted?(ha(...GEST)?`<button type="button" data-ripristina="${esc(id)}">Ripristina scheda</button>`:""):`<button type="button" data-apriu="${esc(id)}">Apri scheda</button>`}</span></div>`;}).join("");
@@ -1899,7 +1910,7 @@ async function cercaArchivio(){
 $("aForm").onsubmit=e=>{e.preventDefault();cercaArchivio();};
 $("aList").addEventListener("click",async e=>{const b=e.target.closest("button");if(!b)return;
   if(b.dataset.apriu){openUsato(b.dataset.apriu);return;}
-  if(b.dataset.ripristina){try{await S.store.commitU([{col:"usato",id:b.dataset.ripristina,merge:true,data:{deleted:false,deletedAt:"",deletedBy:""}}],addRefs([{codice:b.dataset.ripristina,azione:"Scheda usato ripristinata",dettaglio:""}]));flash("Scheda ripristinata.","ok");cercaArchivio();}catch(x){flash(erroreScrittura(x),"bad");}return;}
+  if(b.dataset.ripristina){try{await S.store.commitU([{col:"usato",id:b.dataset.ripristina,merge:true,data:{deleted:false,deletedAt:"",deletedBy:"",uscita:"",motivoUscita:""}}],addRefs([{codice:b.dataset.ripristina,azione:"Scheda usato ripristinata",dettaglio:""}]));flash("Scheda ripristinata.","ok");cercaArchivio();}catch(x){flash(erroreScrittura(x),"bad");}return;}
   const c=e.target.closest("[data-c]");if(c)openConsegna(c.dataset.c);const k=e.target.closest("[data-id]");if(k)openEditor(k.dataset.id);});
 $("btnExportC").onclick=async()=>{
   try{if(!window.XLSX)await loadScript(XLSX_URL);}catch(_){flash("Non riesco a caricare il lettore Excel. Riprova tra poco.","bad");return;}
