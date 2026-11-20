@@ -398,6 +398,19 @@ const S={docs:new Map(),log:[],utenti:[],q:"",col:null,stato:"incasa",luogo:null
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const norm=s=>String(s??"").toUpperCase().replace(/[\s\-\.]/g,"");
+// Telaio: 17 caratteri, niente I/O/Q; per i Mercedes del formato nuovo (W1…/WD… con lettere tra 4ª e 8ª posizione)
+// la 9ª cifra è di controllo (ISO 3779): se non torna, quasi sempre c'è un carattere letto o scritto male.
+const VAL_VIN=Object.fromEntries([..."0123456789"].map((c,i)=>[c,i]).concat([..."ABCDEFGH"].map((c,i)=>[c,i+1]),[..."JKLMN"].map((c,i)=>[c,i+1]),[["P",7],["R",9]],[..."STUVWXYZ"].map((c,i)=>[c,i+2])));
+const PESI_VIN=[8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+function problemaTelaio(t){t=norm(t);if(!t)return"";
+  if(t.length!==17)return`Il telaio ha ${t.length} caratteri invece di 17`;
+  if(/[IOQ]/.test(t))return"Nei telai non esistono le lettere I, O e Q (sono 1 o 0)";
+  if(!/^[A-Z0-9]{17}$/.test(t))return"Il telaio contiene caratteri non validi";
+  if(/^(W1|WD)/.test(t)&&/[A-Z]/.test(t.slice(3,8))){let s=0;for(let i=0;i<17;i++)s+=VAL_VIN[t[i]]*PESI_VIN[i];const r=s%11;if((r===10?"X":String(r))!==t[8])return"Il telaio non torna con la cifra di controllo (9° carattere): probabilmente c'è un carattere letto o scritto male";}
+  return"";}
+// Blocca il salvataggio di un telaio nuovo che non torna; se la persona l'ha controllato, al secondo «Salva» passa.
+function bloccoTelaio(t,prima,st){const p=problemaTelaio(t);if(!p||norm(t)===norm(prima)||st.ok===norm(t))return"";st.ok=norm(t);
+  return`<div class="banner bad">${esc(p)}. Controllalo sulla vettura o sul libretto; se è proprio così, premi di nuovo «Salva».</div>`;}
 const idOf=(c,n)=>c+"-"+String(n).padStart(3,"0");
 const oggi=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
 const isAdmin=()=>S.me&&S.me.ruolo==="admin";
@@ -783,12 +796,14 @@ function openEditor(id,assegna){
     salva([{id:base.id,data:{colore:base.colore,numero:base.numero,telaio:"",targa:"",modello:"",prima:"No",dovePrima:"",seconda:"No",motivo:"",controllatoDa:S.me.nome,dataControllo:oggi(),note:""}},{col:"storico",id:`${base.id}-${Date.now().toString(36)}`,data:snap},...(us?[us.write]:[])],
       logs,`${SING[base.colore]} ${base.numero} liberato${us?", tolta anche dalla tab Usato":""}.`);
   };
+  const stTel={};
   ed.onsubmit=e=>{e.preventDefault();
     {const w=cambiataDaAltri(base,S.docs.get(base.id));if(w){$("e_err").innerHTML=w;return;}}
     if(sp){const data={dovePrima:f.dovePrima||"",prima:f.prima||"",noleggioDal:f.noleggioDal||"",allestimentoDal:f.allestimentoDal||""};
       if(data.dovePrima===(base.dovePrima||"")&&data.prima===(base.prima||"")){closeSheet();return;}
       salva([{id:base.id,merge:true,data}],[{codice:codice(base),azione:"Spostata",dettaglio:`prima chiave: ${data.dovePrima||"—"}`}],`${SING[base.colore]} ${base.numero}: spostata.`);return;}
     for(const k of["telaio","targa","modello","motivo","controllatoDa","dataControllo","note"])f[k]=$("e_"+k).value.trim();
+    {const bt=bloccoTelaio(f.telaio,base.telaio,stTel);if(bt){$("e_err").innerHTML=bt;return;}}
     f.cliente=f.venduta==="Sì"&&$("e_cliente")?$("e_cliente").value.trim():"";if(f.venduta!=="Sì")f.venduta="";if(f.esposizione!=="Sì"){f.esposizione="";f.esposizioneDal="";}
     if($("e_ripristinoDove"))f.ripristinoDove=f.ripristino==="Sì"?$("e_ripristinoDove").value.trim():"";
     if($("e_danni"))f.danni=$("e_danni").value.trim();if(f.attesa!=="Sì"){f.attesa="";f.attesaDal="";}
@@ -914,7 +929,7 @@ async function leggiFoto(files){
       }
       $("b_prog").hidden=true;
       if(!tutte.length){$("b_err").innerHTML=`<div class="banner">Nella foto non ho trovato nessun telaio. Riprova inquadrando bene il documento, oppure inserisci il telaio a mano.</div>`;if(!B.righe.length)aggiungiRiga({});return;}
-      let n=0;for(const v of tutte)if(!B.righe.some(r=>r.telaio===v.telaio)){aggiungiRiga({telaio:v.telaio,modello:v.modello,targa:v.targa,dubbio:!v.sicuro||v.telaio.length!==17},true);n++;}
+      let n=0;for(const v of tutte)if(!B.righe.some(r=>r.telaio===v.telaio)){aggiungiRiga({telaio:v.telaio,modello:v.modello,targa:v.targa,dubbio:!v.sicuro||!!problemaTelaio(v.telaio)},true);n++;}
       renderRighe();
       flash(`Trovat${n===1?"a 1 vettura":"e "+n+" vetture"}: controlla i dati e metti il numero della chiave.`,"ok");
       return;
@@ -947,7 +962,7 @@ function aggiungiRiga(v,silenzioso){
 }
 function controllaRiga(r,i){
   if(!r.telaio)return["bad","Manca il telaio."];
-  if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(r.telaio))return["warn",`Il telaio ha ${r.telaio.length} caratteri invece di 17: controllalo.`];
+  {const pt=problemaTelaio(r.telaio);if(pt)return["warn",`${pt}: controllalo carattere per carattere sul documento.`];}
   const dup=telaioUsato(r.telaio);if(dup)return["bad",`Telaio già registrato al ${SING[dup.colore]} ${dup.numero}.`];
   if(B.righe.some((x,j)=>j!==i&&x.telaio===r.telaio))return["bad","Telaio ripetuto in questa bolla."];
   const n=parseInt(r.numero,10);
@@ -996,6 +1011,9 @@ function renderRighe(){
 async function registraBolla(){
   const errs=B.righe.map((r,i)=>controllaRiga(r,i)).map(([k,m],i)=>[k,m,i]).filter(([k,m])=>k==="bad"||m.startsWith("Metti"));
   if(errs.length){$("b_err").innerHTML=`<div class="banner bad">Sistema prima ${errs.length===1?"la vettura evidenziata":"le "+errs.length+" vetture evidenziate"}: ${esc(errs[0][1])}</div>`;return;}
+  // Telai che non tornano: al primo «Registra» si fermano; se sono stati controllati, al secondo passano.
+  {const dubbi=B.righe.filter(r=>problemaTelaio(r.telaio)).map(r=>r.telaio);const chiave=dubbi.join("|");
+    if(dubbi.length&&B.telConf!==chiave){B.telConf=chiave;$("b_err").innerHTML=`<div class="banner bad">${dubbi.length===1?"Un telaio non torna":dubbi.length+" telai non tornano"} (${esc(dubbi.join(", "))}): probabilmente c'è un carattere letto male. Controlla sul documento; se sono proprio così, premi di nuovo «Registra».</div>`;return;}}
   const writes=[],logs=[];
   for(const r of B.righe){const n=parseInt(r.numero,10);
     writes.push({id:idOf(r.colore,n),data:Object.assign({colore:r.colore,numero:n,telaio:r.telaio,targa:r.targa,modello:r.modello,prima:r.dovePrima?"Sì":"No",dovePrima:r.dovePrima,seconda:r.seconda,motivo:(r.seconda==="No")!==(!r.dovePrima)?(r.motivo||""):"",controllatoDa:S.me.nome,dataControllo:oggi(),note:r.foto?"Inserita da foto":"Inserita a mano"},r.danni?{attesa:"Sì",attesaDal:oggi(),danni:(r.danniDescr||"").trim()}:{},r.venduta?{venduta:"Sì",cliente:(r.cliente||"").trim()}:{},r.esposizione?{esposizione:"Sì",esposizioneDal:oggi()}:{},r.dovePrima===ALLEST?{allestimentoDal:oggi()}:{})});
@@ -1291,14 +1309,21 @@ function openUsato(id){
     const msgF=t=>{$("u_fmsg").innerHTML=t;};
     const metti=(k,v)=>{const i=$("u_"+k);if(i&&v&&!i.disabled&&!i.value.trim()){i.value=v;return 1;}return 0;};
     const aggiungi=(id,v,sep)=>{const i=$(id);if(!i||!v)return 0;const cur=i.value.trim();if(cur.includes(v))return 0;i.value=cur?cur+sep+v:v;return 1;};
+    const fonteTT={};// targa/telaio: true = dal libretto, false = da un altro documento (es. perizia)
     const leggiU=async files=>{if(!files.length)return;
       if(!window.LEGGIFOTO_URL||!S.store.idToken){msgF("Lettura delle foto non disponibile qui: compila a mano.");return;}
-      let n=0,dubbio=false,dataDub=false;const ko=[];
+      let n=0,dubbio=false,dataDub=false,daLibretto=false;const ko=[];
       for(let i=0;i<files.length;i++){msgF(`Leggo la foto ${i+1} di ${files.length}…`);
         try{const r=await fetch(window.LEGGIFOTO_URL,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+await S.store.idToken(),"X-Firebase-AppCheck":S.store.appCheckToken?await S.store.appCheckToken():""},body:JSON.stringify({modo:"usato",immagine:await fotoAI(files[i]),mime:"image/jpeg"})});
           if(!r.ok)throw new Error(r.status);const d=await r.json();
           if(d.marca){const im=$("u_marca");if(im&&!im.disabled&&(!im.value.trim()||(nuovo&&/^MERCEDES$/i.test(im.value.trim())&&!/MERCEDES/i.test(d.marca)))){im.value=d.marca;n++;}}
-          n+=metti("targa",d.targa)+metti("telaio",d.telaio)+metti("modello",d.modello)+metti("immatricolazione",d.immatricolazione)+metti("exProprietario",d.exProprietario)+metti("km",d.km);
+          // Targa e telaio: vince il libretto. Se prima li aveva riempiti una perizia (scritta a mano), il libretto li sostituisce;
+          // quelli scritti a mano dalla persona non si toccano.
+          {const libr=/libretto/i.test(d.tipo||"");for(const k of["targa","telaio"]){const i=$("u_"+k),v=d[k];if(!i||!v||i.disabled)continue;
+            if(!i.value.trim()){i.value=v;fonteTT[k]=libr;n++;}
+            else if(libr&&fonteTT[k]===false&&norm(i.value)!==norm(v)&&!(k==="telaio"&&problemaTelaio(v))){i.value=v;fonteTT[k]=true;n++;daLibretto=true;}}}
+          if(d.telaio&&problemaTelaio($("u_telaio")?$("u_telaio").value:d.telaio))dubbio=true;
+          n+=metti("modello",d.modello)+metti("immatricolazione",d.immatricolazione)+metti("exProprietario",d.exProprietario)+metti("km",d.km);
           n+=aggiungi("u_danni",d.danni,", ");for(const a of d.accessori||[])n+=aggiungi("u_accdoc",a,"\n");n+=aggiungi("u_note",d.note,"\n");
           for(const v of d.voci||[]){const el=p.querySelector(`[data-voce="${v.sezione}"]`);if(!el)continue;const ds=el.querySelector('[data-vf="descrizione"]'),st=el.querySelector('[data-vf="stimato"]');
             if(v.descrizione&&!ds.value.toLowerCase().includes(v.descrizione.toLowerCase())){ds.value=ds.value.trim()?ds.value.trim()+"; "+v.descrizione:v.descrizione;n++;}
@@ -1308,7 +1333,7 @@ function openUsato(id){
         }catch(e){ko.push(i+1);}}
       const koT=ko.length?`<span style="color:var(--bad)">Non sono riuscito a leggere ${ko.length===1?"la foto "+ko[0]:"le foto "+ko.join(", ")}: riprova con più luce e il foglio dritto, oppure compila a mano.</span> `:"";
       if(ko.length&&!n){msgF(koT);return;}
-      msgF(koT+(dataDub?'<b style="color:var(--warn)">Controlla la data di immatricolazione: non torna con l\'anno del telaio (va presa dal campo B del libretto).</b> ':"")+(n?`<span style="color:var(--ok)">Ho compilato ${n} ${n===1?"campo":"campi"}.</span> ${dubbio?'<b style="color:var(--warn)">Controlla targa e telaio: la foto non era nitida.</b>':(nuovo?"Controlla i dati prima di registrare.":"Controlla i dati e tocca Salva.")}`:"Nella foto non ho trovato dati nuovi da inserire."));};
+      msgF(koT+(daLibretto?'<b style="color:var(--warn)">Targa/telaio sostituiti con quelli del libretto (prima erano presi dalla perizia).</b> ':"")+(dataDub?'<b style="color:var(--warn)">Controlla la data di immatricolazione: non torna con l\'anno del telaio (va presa dal campo B del libretto).</b> ':"")+(n?`<span style="color:var(--ok)">Ho compilato ${n} ${n===1?"campo":"campi"}.</span> ${dubbio?'<b style="color:var(--warn)">Controlla targa e telaio: la foto non era nitida.</b>':(nuovo?"Controlla i dati prima di registrare.":"Controlla i dati e tocca Salva.")}`:"Nella foto non ho trovato dati nuovi da inserire."));};
     if($("u_bLib"))$("u_bLib").onclick=()=>$("u_fLib").click();$("u_bStato").onclick=()=>$("u_fStato").click();
     $("u_fLib").onchange=e=>{leggiU([...e.target.files]);e.target.value="";};$("u_fStato").onchange=e=>{leggiU([...e.target.files]);e.target.value="";};
   }
@@ -1319,12 +1344,14 @@ function openUsato(id){
     $("e_err").innerHTML=n?`<div class="banner ok">Ho compilato ${n} campi dalla mail. Controllali prima di registrare.</div>`:`<div class="banner">Non ho riconosciuto i campi. Controlla di aver incollato il testo della mail.</div>`;};
   const del=$("u_del");if(del)del.onclick=async()=>{if(!del.dataset.armed){del.dataset.armed="1";del.classList.add("solid");del.textContent="Conferma eliminazione";return;}
     try{await S.store.commitU([{col:"usato",id,merge:true,data:{deleted:true,deletedAt:oggi(),deletedBy:S.me.nome}}],addRefs([{codice:base.targa||id,azione:"Scheda usato eliminata",dettaglio:"recuperabile da Archivio"}],[{data:base}]));closeSheet();flash("Scheda eliminata. Si recupera da Archivio cercando la targa.","ok");}catch(x){$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}};
+  const stTelU={};
   p.onsubmit=async e=>{e.preventDefault();leggiVoci();
     if(!nuovo){const w=cambiataDaAltri(base,U.docs.get(id));if(w){$("e_err").innerHTML=w;return;}}
     if(edDati)for(const k of["targa","modello","marca","telaio","km","chiave","immatricolazione","venditore","scadBollo","scadRevisione","exProprietario","ritiroPermuta"])f[k]=$("u_"+k).value.trim();
     if(!nuovo&&canPrezzo()&&$("u_prezzoVendita")){f.prezzoVendita=num($("u_prezzoVendita").value);f.margine=$("u_margine").value.replace(/[^A-Za-z]/g,"").slice(0,2);}
     {const w=$("u_wip");if(w&&!w.disabled){const v=w.value.trim();if(v||"wip" in base)f.wip=v;}}
     f.note=$("u_note").value.trim();f.danni=$("u_danni").value.trim();f.accessoriDoc=$("u_accdoc").value.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,10);f.targa=String(f.targa||"").toUpperCase().replace(/\s/g,"");f.telaio=String(f.telaio||"").toUpperCase().replace(/\s/g,"");f.km=num(f.km);f.chiave=f.chiave?String(parseInt(f.chiave,10)||""):"";
+    if(edDati){const bt=bloccoTelaio(f.telaio,base.telaio,stTelU);if(bt){$("e_err").innerHTML=bt;return;}}
     const nid=nuovo?idU(f.targa,f.telaio):id;
     if(!nid){$("e_err").innerHTML=`<div class="banner bad">Serve almeno la targa o il telaio.</div>`;return;}
     if(nuovo&&U.docs.has(nid)){$("e_err").innerHTML=`<div class="banner bad">Questa vettura è già in lavorazione. Cercala nell'elenco.</div>`;return;}
@@ -1745,8 +1772,10 @@ function openConsegna(id){
     catch(x){if(sv)sv.disabled=false;$("e_err").innerHTML=`<div class="banner bad">${esc(erroreScrittura(x))}</div>`;}
   };
   const cid=()=>id||`${f.colore}-${String(f.numero).padStart(3,"0")}-${Date.now().toString(36)}`;
+  const stTelC={};
   p.onsubmit=e=>{e.preventDefault();leggi();
     {const td=telaioDiverso();if(td){$("e_err").innerHTML=td;return;}}
+    {const bt=bloccoTelaio(f.telaio,base.telaio,stTelC);if(bt){$("e_err").innerHTML=bt;return;}}
     if(f.ordineOrdinato&&!f.ordinePrevisto){$("e_err").innerHTML=`<div class="banner bad">Indica la data di arrivo prevista degli accessori ordinati.</div>`;return;}
     {const so=statoOrdine(f),cambiata=f.data&&(f.data!==(base.data||"")||f.ora!==(base.ora||""));
       if(cambiata&&so==="nondisp"){$("e_err").innerHTML=`<div class="banner bad">Ricambi non disponibili, senza previsione di arrivo: la consegna non si può ancora fissare.</div>`;return;}

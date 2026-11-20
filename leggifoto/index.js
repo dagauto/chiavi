@@ -129,6 +129,18 @@ function dataDubbia(imm, telaio, marca) {
   return Math.abs(Number(m[1]) - anno) > 1;
 }
 const pulisciTarga = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+// Controllo del telaio: 17 caratteri; per i Mercedes del formato nuovo (W1…/WD…)
+// (lettere tra la 4ª e l'8ª posizione) anche la cifra di controllo in 9ª posizione (ISO 3779).
+const VAL_VIN = Object.fromEntries([..."0123456789"].map((c, i) => [c, i]).concat(
+  [..."ABCDEFGH"].map((c, i) => [c, i + 1]), [..."JKLMN"].map((c, i) => [c, i + 1]), [["P", 7], ["R", 9]], [..."STUVWXYZ"].map((c, i) => [c, i + 2])));
+const PESI_VIN = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2];
+function telaioOk(t) {
+  if (!t) return true; // vuoto: niente da controllare
+  if (t.length !== 17) return false;
+  if (!/^(W1|WD)/.test(t) || !/[A-Z]/.test(t.slice(3, 8))) return true; // formato vecchio (solo cifre): niente cifra di controllo
+  let s = 0; for (let i = 0; i < 17; i++) { const v = VAL_VIN[t[i]]; if (v === undefined) return false; s += v * PESI_VIN[i]; }
+  const r = s % 11; return (r === 10 ? "X" : String(r)) === t[8];
+}
 
 functions.http("leggifoto", async (req, res) => {
   const o = req.get("origin") || "";
@@ -157,29 +169,43 @@ functions.http("leggifoto", async (req, res) => {
     const usato = (req.body || {}).modo === "usato";
     if (!immagine || typeof immagine !== "string" || immagine.length > 8e6) return res.status(400).json({ errore: "Foto mancante o troppo grande" });
 
-    const url = `https://aiplatform.googleapis.com/v1/projects/${PROGETTO}/locations/${LUOGO}/publishers/google/models/${MODELLO}:generateContent`;
+    const HOST = LUOGO === "global" ? "aiplatform.googleapis.com" : `${LUOGO}-aiplatform.googleapis.com`;
+    const url = `https://${HOST}/v1/projects/${PROGETTO}/locations/${LUOGO}/publishers/google/models/${MODELLO}:generateContent`;
     const corpo = {
       contents: [{ role: "user", parts: [{ text: usato ? ISTRUZIONI_USATO : ISTRUZIONI }, { inlineData: { mimeType: mime || "image/jpeg", data: immagine } }] }],
       generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: usato ? SCHEMA_USATO : SCHEMA },
     };
     // Ragionamento breve: le perizie scritte a mano con il ragionamento lungo superavano il tempo massimo.
     // Se il modello non accetta l'opzione, si riprova senza.
-    const chiama = async (c) => {
-      const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 170000);
+    const t0 = Date.now();
+    const chiama = async (c, max = 170000) => {
+      const ac = new AbortController(); const t = setTimeout(() => ac.abort(), max);
       try { return await fetch(url, { method: "POST", signal: ac.signal, headers: { Authorization: `Bearer ${await tokenGoogle()}`, "Content-Type": "application/json" }, body: JSON.stringify(c) }); }
       finally { clearTimeout(t); }
     };
     const veloce = JSON.parse(JSON.stringify(corpo)); veloce.generationConfig.thinkingConfig = { thinkingLevel: "LOW" };
-    let r = await chiama(veloce);
-    if (r.status === 400) { console.warn("thinkingLevel non accettato, riprovo senza"); r = await chiama(corpo); }
-    const j = await r.json();
-    if (!r.ok) {
-      console.error("Gemini", r.status, JSON.stringify(j).slice(0, 500));
-      return res.status(502).json({ errore: "Lettura non riuscita" });
+    const leggi = async (c, max) => {
+      let r = await chiama(c, max);
+      if (r.status === 400 && c.generationConfig.thinkingConfig) { console.warn("thinkingLevel non accettato, riprovo senza"); r = await chiama(corpo); }
+      const j = await r.json();
+      if (!r.ok) { console.error("Gemini", r.status, JSON.stringify(j).slice(0, 500)); return null; }
+      const testo = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("") || "{}";
+      try { return JSON.parse(testo); } catch (e) { return { tipo_documento: "", vetture: [] }; }
+    };
+    let dati = await leggi(veloce);
+    if (!dati) return res.status(502).json({ errore: "Lettura non riuscita" });
+    // Telaio che non torna (lunghezza o cifra di controllo): rilegge la foto con il ragionamento completo.
+    const telaiDati = (d) => usato ? [pulisciTelaio(d.telaio)] : (d.vetture || []).map((v) => pulisciTelaio(v.telaio)).filter((t) => t.length >= 11);
+    const sbagliati = (d) => telaiDati(d).filter((t) => !telaioOk(t)).length;
+    let riletta = false;
+    if (sbagliati(dati) && Date.now() - t0 < 100000) {
+      const attento = JSON.parse(JSON.stringify(corpo)); attento.generationConfig.thinkingConfig = { thinkingLevel: "HIGH" };
+      attento.contents[0].parts[0].text += `\nATTENZIONE: in una prima lettura il telaio non tornava (17 caratteri esatti, 9° carattere = cifra di controllo).
+Rileggi il telaio carattere per carattere: non scambiare caratteri vicini, non saltarne e non raddoppiarne.`;
+      const d2 = await leggi(attento, 170000 - (Date.now() - t0)).catch((e) => { console.warn("rilettura non riuscita", String(e.message || e)); return null; });
+      if (d2 && telaiDati(d2).length >= telaiDati(dati).length && sbagliati(d2) < sbagliati(dati)) { dati = d2; riletta = true; }
+      console.log("telaio da rileggere", email, riletta ? "corretto con la rilettura" : "ancora dubbio");
     }
-    const testo = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("") || "{}";
-    let dati;
-    try { dati = JSON.parse(testo); } catch (e) { dati = { tipo_documento: "", vetture: [] }; }
     if (usato) {
       const out = {
         tipo: dati.tipo_documento || "", targa: pulisciTarga(dati.targa), telaio: pulisciTelaio(dati.telaio),
@@ -192,12 +218,14 @@ functions.http("leggifoto", async (req, res) => {
       // Il modello non deve ripetere la marca; la data si confronta con l'anno del telaio (10° carattere, non vale per Mercedes).
       if (out.marca && out.modello.toUpperCase().startsWith(out.marca.toUpperCase() + " ")) out.modello = out.modello.slice(out.marca.length + 1).trim();
       out.dataDubbia = dataDubbia(out.immatricolazione, out.telaio, out.marca);
+      out.telaioOk = telaioOk(out.telaio); if (!out.telaioOk) out.sicuro = false; out.riletta = riletta;
       console.log("letta foto usato", email, out.tipo, out.dataDubbia ? "data dubbia" : "");
       return res.json(out);
     }
     const vetture = (dati.vetture || [])
       .map((v) => ({ telaio: pulisciTelaio(v.telaio), modello: String(v.modello || "").trim(), targa: pulisciTarga(v.targa), colore: String(v.colore || "").trim(), sicuro: v.sicuro !== false }))
-      .filter((v) => v.telaio.length >= 11);
+      .filter((v) => v.telaio.length >= 11)
+      .map((v) => Object.assign(v, { telaioOk: telaioOk(v.telaio) }, telaioOk(v.telaio) ? {} : { sicuro: false }));
     console.log("letta foto", email, dati.tipo_documento, vetture.length);
     return res.json({ tipo: dati.tipo_documento || "", vetture });
   } catch (e) {
