@@ -69,6 +69,7 @@ function mailer() {
 }
 
 // Per un evento nuovo che la funzione non conosce ancora valgono i ruoli scritti dalla pagina.
+const GESTIONE = ["admin", "backoffice", "usato"];
 async function destinatari(evento, ruoliPagina) {
   const ruoli = EVENTI[evento] || (Array.isArray(ruoliPagina) ? ruoliPagina : []);
   const [us, pr] = await Promise.all([db.collection("utenti").get(), db.collection("notifiche_utenti").get()]);
@@ -80,7 +81,7 @@ async function destinatari(evento, ruoliPagina) {
     const base = ruoli.includes(u.get("ruolo"));
     const push = scelta.push !== undefined ? scelta.push : base;
     const mail = scelta.email !== undefined ? scelta.email : base;
-    if (push || mail) out.push({ email: u.id, push, mail, tokens: p.tokens || [] });
+    if (push || mail) out.push({ email: u.id, ruolo: u.get("ruolo"), push, mail, tokens: p.tokens || [] });
   }
   return out;
 }
@@ -114,7 +115,8 @@ async function invia(n) {
         from: `"Dag Auto Vetture" <${process.env.SMTP_USER}>`,
         to: d.email,
         subject: n.titolo || "Dag Auto Vetture",
-        text: `${n.testo || ""}\n\nApri il registro: ${link}\n\nPer cambiare quali avvisi ricevere: Altro → Notifiche nel registro.`,
+        // I dati riservati (es. carico fiscale) vanno solo nella mail e solo a chi e' della gestione.
+        text: `${n.testo || ""}${n.riservato && GESTIONE.includes(d.ruolo) ? "\n" + n.riservato : ""}\n\nApri il registro: ${link}\n\nPer cambiare quali avvisi ricevere: Altro → Notifiche nel registro.`,
       });
       mail++;
     }

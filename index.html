@@ -1362,7 +1362,10 @@ function openUsato(id){
     const writes=[soloStato?{col:"usato",id:nid,merge:true,data:{stato:f.stato,date:f.date}}:{col:"usato",id:nid,data:f}],logs=[];
     if(soloStato&&f.stato===base.stato){closeSheet();return;}
     const desc=[f.targa,f.modello].filter(Boolean).join(" · ");
-    if(nuovo)writes.push(coda("usato_presa",`Entrata usato ${f.targa||""}${f.stato==="commerciante"?" · destinazione commerciante":""}`,`${desc}${f.chiave?" · chiave R "+f.chiave:""}`,"#usato"));
+    if(nuovo){const q=coda("usato_presa",`Entrata usato ${f.targa||""}${f.stato==="commerciante"?" · destinazione commerciante":""}`,`${desc}${f.chiave?" · chiave R "+f.chiave:""}\nCliente: ${f.exProprietario||"non indicato"}\nVenditore: ${f.venditore||"non indicato"}`,"#usato");
+      // Carico fiscale e IVA: la funzione li mette solo nella mail e solo a chi è della gestione (mai nelle notifiche sul telefono).
+      if(canFiscale()&&$("u_valoreContratto")){const vc=num($("u_valoreContratto").value),iv=$("u_ivaEsposta").value;q.data.riservato=`Carico fiscale: ${vc?euro(vc):"non indicato"}\nIVA esposta: ${iv||"non indicata"}`;}
+      writes.push(q);}
     if(f.stato==="attesa"&&(nuovo||f.stato!==base.stato))writes.push(coda("usato_attesa",`Usato da ripristinare: ${f.targa||""}`,`${desc} · priorità ${f.priorita||"normale"}`,"#usato"));
     else if(f.stato!==base.stato&&f.stato==="pronta")writes.push(coda("usato_pronta",`Foto da fare: ${f.targa||""}`,`${desc} è pronta e lavata`,"#usato"));
     if(canFiscale()&&$("u_ivaEsposta"))f.ivaEsposta=$("u_ivaEsposta").value;
